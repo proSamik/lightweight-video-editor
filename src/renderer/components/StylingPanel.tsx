@@ -98,27 +98,34 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
     
     const updatedWords = [...selectedSegment.words];
     const originalWord = updatedWords[wordIndex].word;
-    updatedWords[wordIndex] = { ...updatedWords[wordIndex], word: newWord };
     
-    // Regenerate text from words
-    const newText = updatedWords.map(w => w.word).join(' ');
-    
-    // Mark this word as edited by updating its timing to force highlighter to focus on it
-    if (originalWord !== newWord) {
-      // Extend the word's timing slightly to make it more visible during highlighting
-      const wordDuration = updatedWords[wordIndex].end - updatedWords[wordIndex].start;
-      const minDuration = 500; // Minimum 500ms for edited words
+    // Only update if the word is not completely empty
+    if (newWord.trim() !== '') {
+      updatedWords[wordIndex] = { ...updatedWords[wordIndex], word: newWord.trim() };
       
-      if (wordDuration < minDuration) {
-        const timeDiff = minDuration - wordDuration;
-        updatedWords[wordIndex].end = updatedWords[wordIndex].end + timeDiff;
+      // Mark this word as edited by updating its timing to force highlighter to focus on it
+      if (originalWord !== newWord.trim()) {
+        // Extend the word's timing slightly to make it more visible during highlighting
+        const wordDuration = updatedWords[wordIndex].end - updatedWords[wordIndex].start;
+        const minDuration = 500; // Minimum 500ms for edited words
+        
+        if (wordDuration < minDuration) {
+          const timeDiff = minDuration - wordDuration;
+          updatedWords[wordIndex].end = updatedWords[wordIndex].end + timeDiff;
+        }
       }
+      
+      // Regenerate text from words (only non-empty words)
+      const newText = updatedWords.filter(w => w.word.trim() !== '').map(w => w.word).join(' ');
+      
+      onSegmentUpdate(selectedSegment.id, {
+        text: newText,
+        words: updatedWords
+      });
+    } else {
+      // If word is empty, call the delete function instead
+      handleWordDelete(wordIndex);
     }
-    
-    onSegmentUpdate(selectedSegment.id, {
-      text: newText,
-      words: updatedWords
-    });
   };
 
   const handleWordDelete = (wordIndex: number) => {
