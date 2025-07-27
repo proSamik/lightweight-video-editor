@@ -1,0 +1,27 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="240" fill="#1a1a1a" stroke="#4a90e2" stroke-width="8"/>
+  
+  <!-- Video frame -->
+  <rect x="120" y="140" width="272" height="160" rx="12" fill="#2d2d2d" stroke="#4a90e2" stroke-width="4"/>
+  
+  <!-- Play button triangle -->
+  <polygon points="200,200 200,240 240,220" fill="#4a90e2"/>
+  
+  <!-- Caption/subtitle lines -->
+  <rect x="140" y="320" width="232" height="8" rx="4" fill="#4a90e2" opacity="0.8"/>
+  <rect x="160" y="340" width="192" height="8" rx="4" fill="#4a90e2" opacity="0.6"/>
+  
+  <!-- Word highlighting effect -->
+  <rect x="180" y="320" width="40" height="8" rx="4" fill="#ff6b6b"/>
+  
+  <!-- Video editing tools -->
+  <circle cx="380" cy="180" r="12" fill="#4a90e2" opacity="0.7"/>
+  <circle cx="400" cy="200" r="8" fill="#4a90e2" opacity="0.5"/>
+  
+  <!-- Text editing cursor -->
+  <rect x="220" y="318" width="2" height="12" fill="#ff6b6b"/>
+  
+  <!-- Subtle glow effect -->
+  <circle cx="256" cy="256" r="200" fill="none" stroke="#4a90e2" stroke-width="2" opacity="0.3"/>
+</svg> 
