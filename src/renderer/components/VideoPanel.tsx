@@ -247,6 +247,14 @@ function renderCaptionOnCanvas(
   const x = (canvasWidth * caption.style.position.x) / 100;
   const y = (canvasHeight * caption.style.position.y) / 100;
   
+  // Apply rotation if z rotation is specified
+  if (caption.style.position.z && caption.style.position.z !== 0) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate((caption.style.position.z * Math.PI) / 180);
+    ctx.translate(-x, -y);
+  }
+  
   // Get text to render
   let text = caption.text;
   let words: any[] = [];
@@ -261,6 +269,11 @@ function renderCaptionOnCanvas(
   } else {
     // Simple text without word-level timing
     renderSimpleTextOnCanvas(ctx, text, caption, x, y, scaleFactor);
+  }
+  
+  // Restore context if rotation was applied
+  if (caption.style.position.z && caption.style.position.z !== 0) {
+    ctx.restore();
   }
 }
 
@@ -293,9 +306,11 @@ function renderSimpleTextOnCanvas(
   const boxWidth = textWidth + 24; // 12px padding on each side
   const boxHeight = textHeight + 24; // 12px padding top/bottom
   
-  // Draw background box (matching VideoPanel's caption background exactly)
-  ctx.fillStyle = `rgba(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b}, ${backgroundColor.a})`;
-  ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+  // Draw background box (matching VideoPanel's caption background exactly) - only if not transparent
+  if (backgroundColor.a > 0) {
+    ctx.fillStyle = `rgba(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b}, ${backgroundColor.a})`;
+    ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+  }
   
   // Add text shadow for better visibility (matching VideoPanel exactly)
   ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
@@ -312,6 +327,42 @@ function renderSimpleTextOnCanvas(
   ctx.shadowBlur = 0;
   ctx.shadowOffsetX = 0;
   ctx.shadowOffsetY = 0;
+}
+
+function wrapTextToWidth(
+  ctx: CanvasRenderingContext2D,
+  words: any[],
+  maxWidth: number,
+  wordPadding: number,
+  wordSpacing: number
+): any[][] {
+  const lines: any[][] = [];
+  let currentLine: any[] = [];
+  let currentLineWidth = 0;
+  
+  for (const word of words) {
+    const wordWidth = ctx.measureText(word.word).width;
+    const wordFullWidth = wordWidth + (wordPadding * 2) + wordSpacing;
+    
+    // Check if adding this word would exceed the max width
+    if (currentLine.length > 0 && currentLineWidth + wordFullWidth > maxWidth) {
+      // Start new line
+      lines.push(currentLine);
+      currentLine = [word];
+      currentLineWidth = wordFullWidth;
+    } else {
+      // Add to current line
+      currentLine.push(word);
+      currentLineWidth += wordFullWidth;
+    }
+  }
+  
+  // Add the last line if it has words
+  if (currentLine.length > 0) {
+    lines.push(currentLine);
+  }
+  
+  return lines;
 }
 
 function renderKaraokeTextOnCanvas(
@@ -334,77 +385,114 @@ function renderKaraokeTextOnCanvas(
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
   
-  // Calculate total width including word spacing and padding (matching VideoPanel exactly)
-  let totalWidth = 0;
+  // Calculate text wrapping based on style width
   const wordSpacing = 4; // marginRight from VideoPanel
   const wordPadding = 4; // padding from VideoPanel
+  const maxWidth = caption.style.width * scaleFactor; // Apply scale factor to width
   
-  for (const word of words) {
-    ctx.font = `bold ${fontSize * scaleFactor}px ${fontFamily}, Arial, sans-serif`;
-    const wordWidth = ctx.measureText(word.word).width;
-    totalWidth += wordWidth + (wordPadding * 2) + wordSpacing; // word + padding + margin
+  // Wrap text to multiple lines if needed
+  const textLines = wrapTextToWidth(ctx, words, maxWidth, wordPadding, wordSpacing);
+  const lineHeight = fontSize * scaleFactor + 10; // Add some line spacing
+  
+  // Calculate total height and max width for background
+  const totalHeight = textLines.length * lineHeight;
+  let maxLineWidth = 0;
+  
+  // Calculate width for each line to find the maximum
+  for (const line of textLines) {
+    let lineWidth = 0;
+    for (const word of line) {
+      const wordWidth = ctx.measureText(word.word).width;
+      lineWidth += wordWidth + (wordPadding * 2) + wordSpacing;
+    }
+    lineWidth -= wordSpacing; // Remove last margin
+    maxLineWidth = Math.max(maxLineWidth, lineWidth);
   }
-  totalWidth -= wordSpacing; // Remove last margin
   
-  // Calculate background box for entire caption (matching VideoPanel exactly)
-  const boxX = centerX - (totalWidth / 2);
-  const boxY = centerY - fontSize * scaleFactor - 12;
-  const boxWidth = totalWidth;
-  const boxHeight = fontSize * scaleFactor + 24; // 12px padding top/bottom
+  // Calculate background box for entire multi-line caption
+  const boxX = centerX - (maxLineWidth / 2) - 12;
+  const boxY = centerY - (totalHeight / 2) - 12;
+  const boxWidth = maxLineWidth + 24;
+  const boxHeight = totalHeight + 24;
   
-  // Draw main background box (matching VideoPanel's caption background exactly)
-  ctx.fillStyle = `rgba(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b}, ${backgroundColor.a})`;
-  ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+  // Draw main background box - only if not transparent
+  if (backgroundColor.a > 0) {
+    ctx.fillStyle = `rgba(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b}, ${backgroundColor.a})`;
+    ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+  }
   
-  // Add text shadow for better visibility (matching VideoPanel exactly)
+  // Add text shadow for better visibility
   ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
   ctx.shadowBlur = 4;
   ctx.shadowOffsetX = 2;
   ctx.shadowOffsetY = 2;
   
-  // Draw words with individual highlighting (matching VideoPanel exactly)
-  let currentX = centerX - (totalWidth / 2) + wordPadding; // Start with padding
-  
-  for (let i = 0; i < words.length; i++) {
-    const word = words[i];
-    const wordStart = word.start;
-    const wordEnd = word.end;
+  // Draw each line of words
+  for (let lineIndex = 0; lineIndex < textLines.length; lineIndex++) {
+    const line = textLines[lineIndex];
+    const currentY = centerY - (totalHeight / 2) + (lineIndex + 1) * lineHeight;
     
-    // Determine if this word should be highlighted (matching VideoPanel logic exactly)
-    const isHighlighted = frameTime >= wordStart && frameTime <= wordEnd;
-    const hasPassedWord = frameTime > wordEnd;
-    
-    // Measure word width
-    const wordWidth = ctx.measureText(word.word).width;
-    const wordBoxWidth = wordWidth + (wordPadding * 2);
-    const wordBoxHeight = fontSize * scaleFactor + (wordPadding * 2);
-    const wordBoxX = currentX - wordPadding;
-    const wordBoxY = centerY - fontSize * scaleFactor - wordPadding;
-    
-    // Draw individual word background (matching VideoPanel's word-level styling exactly)
-    if (isHighlighted) {
-      // Highlighted word background
-      ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.a})`;
-      ctx.fillRect(wordBoxX, wordBoxY, wordBoxWidth, wordBoxHeight);
+    // Calculate line width for centering
+    let lineWidth = 0;
+    for (const word of line) {
+      const wordWidth = ctx.measureText(word.word).width;
+      lineWidth += wordWidth + (wordPadding * 2) + wordSpacing;
     }
+    lineWidth -= wordSpacing; // Remove last margin
     
-    // Set text color based on highlighting (matching VideoPanel logic exactly)
-    if (hasPassedWord) {
-      // Passed word - slightly transparent
-      ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, 0.8)`;
-    } else if (isHighlighted) {
-      // Highlighted word - black text on highlight background
-      ctx.fillStyle = 'rgba(0, 0, 0, 1)';
-    } else {
-      // Normal word - white text
-      ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
+    let currentX = centerX - (lineWidth / 2) + wordPadding; // Start with padding
+    
+    for (let i = 0; i < line.length; i++) {
+      const word = line[i];
+      const wordStart = word.start;
+      const wordEnd = word.end;
+      
+      // Determine if this word should be highlighted (matching VideoPanel logic exactly)
+      const isHighlighted = frameTime >= wordStart && frameTime <= wordEnd;
+      const hasPassedWord = frameTime > wordEnd;
+      
+      // Measure word width
+      const wordWidth = ctx.measureText(word.word).width;
+      const wordBoxWidth = wordWidth + (wordPadding * 2);
+      const wordBoxHeight = fontSize * scaleFactor + (wordPadding * 2);
+      const wordBoxX = currentX - wordPadding;
+      const wordBoxY = currentY - fontSize * scaleFactor - wordPadding;
+      
+      // Handle emphasis mode vs background highlighting
+      if (isHighlighted) {
+        if (caption.style.emphasizeMode) {
+          // Emphasis mode: increase font size by 2% and use highlighter color as text color
+          const emphasizedFontSize = fontSize * scaleFactor * 1.02;
+          ctx.font = `bold ${emphasizedFontSize}px ${fontFamily}, Arial, sans-serif`;
+          ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.a})`;
+        } else {
+          // Background highlighting mode
+          ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.a})`;
+          ctx.fillRect(wordBoxX, wordBoxY, wordBoxWidth, wordBoxHeight);
+          ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
+        }
+      } else {
+        // Set normal text color
+        if (hasPassedWord) {
+          // Passed word - slightly transparent
+          ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, 0.8)`;
+        } else {
+          // Normal word - original text color
+          ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
+        }
+      }
+      
+      // Draw the word
+      ctx.fillText(word.word, currentX + wordWidth/2, currentY);
+      
+      // Reset font size if it was changed for emphasis
+      if (isHighlighted && caption.style.emphasizeMode) {
+        ctx.font = `bold ${fontSize * scaleFactor}px ${fontFamily}, Arial, sans-serif`;
+      }
+      
+      // Move to next word position
+      currentX += wordWidth + (wordPadding * 2) + wordSpacing;
     }
-    
-    // Draw the word
-    ctx.fillText(word.word, currentX + wordWidth/2, centerY);
-    
-    // Move to next word position
-    currentX += wordWidth + (wordPadding * 2) + wordSpacing;
   }
   
   // Reset shadow
@@ -446,16 +534,16 @@ function parseColor(colorStr: string): { r: number, g: number, b: number, a: num
     
     if (hex.length === 8) {
       // 8-character hex with alpha
-      const alpha = parseInt(hex.substr(0, 2), 16) / 255;
-      const r = parseInt(hex.substr(2, 2), 16);
-      const g = parseInt(hex.substr(4, 2), 16);
-      const b = parseInt(hex.substr(6, 2), 16);
+      const alpha = parseInt(hex.substring(0, 2), 16) / 255;
+      const r = parseInt(hex.substring(2, 4), 16);
+      const g = parseInt(hex.substring(4, 6), 16);
+      const b = parseInt(hex.substring(6, 8), 16);
       return { r, g, b, a: alpha };
     } else if (hex.length === 6) {
       // 6-character hex without alpha
-      const r = parseInt(hex.substr(0, 2), 16);
-      const g = parseInt(hex.substr(2, 2), 16);
-      const b = parseInt(hex.substr(4, 2), 16);
+      const r = parseInt(hex.substring(0, 2), 16);
+      const g = parseInt(hex.substring(2, 4), 16);
+      const b = parseInt(hex.substring(4, 6), 16);
       return { r, g, b, a: 1 };
     }
   }
