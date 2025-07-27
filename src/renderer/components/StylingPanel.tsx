@@ -65,64 +65,16 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
   const handleWordDelete = (wordIndex: number) => {
     if (!selectedSegment.words) return;
     
-    const wordToDelete = selectedSegment.words[wordIndex];
     const updatedWords = selectedSegment.words.filter((_, index) => index !== wordIndex);
     
-    // Calculate new timing: remove the gap left by deleted word
-    const deletedDuration = wordToDelete.end - wordToDelete.start;
-    
-    // Adjust timings of remaining words
-    const adjustedWords = updatedWords.map((word) => {
-      if (word.start > wordToDelete.start) {
-        return {
-          ...word,
-          start: word.start - deletedDuration,
-          end: word.end - deletedDuration
-        };
-      }
-      return word;
-    });
-    
     // Regenerate text from remaining words
-    const newText = adjustedWords.map(w => w.word).join(' ');
-    
-    // Calculate new segment timing
-    const newStartTime = adjustedWords.length > 0 ? adjustedWords[0].start : selectedSegment.startTime;
-    const newEndTime = adjustedWords.length > 0 ? adjustedWords[adjustedWords.length - 1].end : selectedSegment.endTime;
+    const newText = updatedWords.map(w => w.word).join(' ');
     
     onSegmentUpdate(selectedSegment.id, {
       text: newText,
-      words: adjustedWords,
-      startTime: newStartTime,
-      endTime: newEndTime
+      words: updatedWords
     });
   };
-
-  const textColors = [
-    ColorOption.WHITE,
-    ColorOption.BLACK,
-    ColorOption.YELLOW,
-    ColorOption.RED,
-    ColorOption.BLUE,
-  ];
-
-  const highlighterColors = [
-    ColorOption.BRIGHT_YELLOW,
-    ColorOption.ORANGE,
-    ColorOption.GREEN,
-    ColorOption.PINK,
-    ColorOption.CYAN,
-  ];
-
-  const backgroundColors = [
-    ColorOption.TRANSPARENT,
-    ColorOption.BLACK_SEMI,
-    ColorOption.WHITE_SEMI,
-    ColorOption.DARK_GRAY,
-    ColorOption.NAVY_BLUE,
-  ];
-
-  const fonts = Object.values(FontOption);
 
   return (
     <div style={{
@@ -224,14 +176,44 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
         </div>
       )}
       
-      {/* Font Selection */}
+      {/* Font Size Control */}
       <div style={{ marginBottom: '25px' }}>
         <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
-          Font
+          Font Size
+        </label>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          {[16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 68, 72, 76, 80].map(size => (
+            <button
+              key={size}
+              onClick={() => handleStyleUpdate({ fontSize: size })}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: selectedSegment.style.fontSize === size ? '#007acc' : '#444',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                minWidth: '40px'
+              }}
+            >
+              {size}
+            </button>
+          ))}
+        </div>
+        <div style={{ marginTop: '8px', fontSize: '12px', color: '#888' }}>
+          Current: {selectedSegment.style.fontSize}px
+        </div>
+      </div>
+
+      {/* Font Family Control */}
+      <div style={{ marginBottom: '25px' }}>
+        <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+          Font Family
         </label>
         <select
           value={selectedSegment.style.font}
-          onChange={(e) => handleStyleUpdate({ font: e.target.value as FontOption })}
+          onChange={(e) => handleStyleUpdate({ font: e.target.value })}
           style={{
             width: '100%',
             padding: '8px',
@@ -241,121 +223,118 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
             borderRadius: '4px'
           }}
         >
-          {fonts.map(font => (
-            <option key={font} value={font}>{font}</option>
-          ))}
+          <option value="SF Pro Display Semibold">SF Pro Display Semibold</option>
+          <option value="Arial">Arial</option>
+          <option value="Helvetica">Helvetica</option>
+          <option value="Times New Roman">Times New Roman</option>
+          <option value="Georgia">Georgia</option>
         </select>
       </div>
 
-      {/* Font Size */}
-      <div style={{ marginBottom: '25px' }}>
-        <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
-          Font Size: {selectedSegment.style.fontSize}px
-        </label>
-        <input
-          type="range"
-          min="16"
-          max="72"
-          value={selectedSegment.style.fontSize}
-          onChange={(e) => handleStyleUpdate({ fontSize: parseInt(e.target.value) })}
-          style={{ width: '100%' }}
-        />
-      </div>
-
-      {/* Text Width */}
-      <div style={{ marginBottom: '25px' }}>
-        <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
-          Text Width: {selectedSegment.style.width}px
-        </label>
-        <input
-          type="range"
-          min="200"
-          max="800"
-          value={selectedSegment.style.width}
-          onChange={(e) => handleStyleUpdate({ width: parseInt(e.target.value) })}
-          style={{ width: '100%' }}
-        />
-      </div>
-
-      {/* Text Color */}
+      {/* Text Color Control */}
       <div style={{ marginBottom: '25px' }}>
         <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
           Text Color
         </label>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {textColors.map(color => (
-            <div
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          {Object.values(ColorOption).map(color => (
+            <button
               key={color}
+              onClick={() => handleStyleUpdate({ textColor: color })}
               style={{
                 width: '30px',
                 height: '30px',
                 backgroundColor: color,
-                border: selectedSegment.style.textColor === color ? '3px solid #fff' : '1px solid #555',
+                border: selectedSegment.style.textColor === color ? '3px solid #007acc' : '1px solid #555',
                 borderRadius: '4px',
                 cursor: 'pointer'
               }}
-              onClick={() => handleStyleUpdate({ textColor: color })}
+              title={color}
             />
           ))}
         </div>
       </div>
 
-      {/* Highlighter Color */}
+      {/* Highlighter Color Control */}
       <div style={{ marginBottom: '25px' }}>
         <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
           Highlighter Color
         </label>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {highlighterColors.map(color => (
-            <div
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          {Object.values(ColorOption).map(color => (
+            <button
               key={color}
+              onClick={() => handleStyleUpdate({ highlighterColor: color })}
               style={{
                 width: '30px',
                 height: '30px',
                 backgroundColor: color,
-                border: selectedSegment.style.highlighterColor === color ? '3px solid #fff' : '1px solid #555',
+                border: selectedSegment.style.highlighterColor === color ? '3px solid #007acc' : '1px solid #555',
                 borderRadius: '4px',
                 cursor: 'pointer'
               }}
-              onClick={() => handleStyleUpdate({ highlighterColor: color })}
+              title={color}
             />
           ))}
         </div>
       </div>
 
-      {/* Background Color */}
+      {/* Emphasis Mode Control */}
+      <div style={{ marginBottom: '25px' }}>
+        <label style={{ display: 'flex', alignItems: 'center', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={selectedSegment.style.emphasizeMode || false}
+            onChange={(e) => handleStyleUpdate({ emphasizeMode: e.target.checked })}
+            style={{ marginRight: '8px' }}
+          />
+          Emphasis Mode
+        </label>
+        <div style={{ marginTop: '4px', fontSize: '12px', color: '#888' }}>
+          {selectedSegment.style.emphasizeMode 
+            ? 'Highlighted words will be emphasized (larger + color change)'
+            : 'Highlighted words will have background highlighting'
+          }
+        </div>
+      </div>
+
+      {/* Background Color Control */}
       <div style={{ marginBottom: '25px' }}>
         <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
           Background Color
         </label>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {backgroundColors.map(color => (
-            <div
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          {/* Transparent option with special styling */}
+          <button
+            onClick={() => handleStyleUpdate({ backgroundColor: 'transparent' })}
+            style={{
+              width: '30px',
+              height: '30px',
+              backgroundColor: 'transparent',
+              border: selectedSegment.style.backgroundColor === 'transparent' ? '3px solid #007acc' : '1px solid #555',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              position: 'relative',
+              backgroundImage: 'linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)',
+              backgroundSize: '8px 8px',
+              backgroundPosition: '0 0, 0 4px, 4px -4px, -4px 0px'
+            }}
+            title="Transparent"
+          />
+          {Object.values(ColorOption).filter(color => color !== 'transparent').map(color => (
+            <button
               key={color}
+              onClick={() => handleStyleUpdate({ backgroundColor: color })}
               style={{
                 width: '30px',
                 height: '30px',
-                backgroundColor: color === 'transparent' ? '#666' : color,
-                border: selectedSegment.style.backgroundColor === color ? '3px solid #fff' : '1px solid #555',
+                backgroundColor: color,
+                border: selectedSegment.style.backgroundColor === color ? '3px solid #007acc' : '1px solid #555',
                 borderRadius: '4px',
-                cursor: 'pointer',
-                position: 'relative'
+                cursor: 'pointer'
               }}
-              onClick={() => handleStyleUpdate({ backgroundColor: color })}
-            >
-              {color === 'transparent' && (
-                <div style={{
-                  position: 'absolute',
-                  top: '50%',
-                  left: '50%',
-                  transform: 'translate(-50%, -50%)',
-                  fontSize: '12px',
-                  color: '#fff'
-                }}>
-                  ∅
-                </div>
-              )}
-            </div>
+              title={color}
+            />
           ))}
         </div>
       </div>
@@ -398,6 +377,54 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
               style={{ width: '100%' }}
             />
           </div>
+        </div>
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '8px' }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: '12px', color: '#ccc' }}>Z Rotation: {selectedSegment.style.position.z || 0}°</label>
+            <input
+              type="range"
+              min="-180"
+              max="180"
+              value={selectedSegment.style.position.z || 0}
+              onChange={(e) => handleStyleUpdate({ 
+                position: { 
+                  ...selectedSegment.style.position, 
+                  z: parseInt(e.target.value) 
+                }
+              })}
+              style={{ width: '100%' }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Text Width Control */}
+      <div style={{ marginBottom: '25px' }}>
+        <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+          Text Width: {selectedSegment.style.width || 600}px
+        </label>
+        <input
+          type="range"
+          min="100"
+          max="2000"
+          step="10"
+          value={selectedSegment.style.width || 600}
+          onChange={(e) => handleStyleUpdate({ width: parseInt(e.target.value) })}
+          style={{
+            width: '100%',
+            height: '6px',
+            borderRadius: '3px',
+            background: '#444',
+            outline: 'none',
+            appearance: 'none'
+          }}
+        />
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '10px', color: '#888' }}>
+          <span>100px</span>
+          <span>2000px</span>
+        </div>
+        <div style={{ marginTop: '4px', fontSize: '12px', color: '#888' }}>
+          Maximum width for text wrapping
         </div>
       </div>
 
