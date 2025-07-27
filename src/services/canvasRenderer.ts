@@ -448,16 +448,17 @@ export class CanvasVideoRenderer {
       const wordPadding = 4; // padding from editor
       const maxWidth = caption.style.width; // Text width from style
       
-      // Wrap text to multiple lines if needed
+      // Since we enforce one line per frame, we use only the first line
       const textLines = this.wrapTextToWidth(ctx, words, maxWidth, wordPadding, wordSpacing);
+      const singleLine = textLines.length > 0 ? [textLines[0]] : [words]; // Take only first line
       const lineHeight = fontSize + 10; // Add some line spacing
       
-      // Calculate total height and max width for background
-      const totalHeight = textLines.length * lineHeight;
+      // Calculate total height and max width for background (single line only)
+      const totalHeight = singleLine.length * lineHeight;
       let maxLineWidth = 0;
       
-      // Calculate width for each line to find the maximum
-      for (const line of textLines) {
+      // Calculate width for the single line
+      for (const line of singleLine) {
         let lineWidth = 0;
         for (const word of line) {
           const wordWidth = ctx.measureText(word.word).width;
@@ -485,9 +486,9 @@ export class CanvasVideoRenderer {
       ctx.shadowOffsetX = 2;
       ctx.shadowOffsetY = 2;
       
-      // Draw each line of words
-      for (let lineIndex = 0; lineIndex < textLines.length; lineIndex++) {
-        const line = textLines[lineIndex];
+      // Draw each line of words (single line only)
+      for (let lineIndex = 0; lineIndex < singleLine.length; lineIndex++) {
+        const line = singleLine[lineIndex];
         const currentY = centerY - (totalHeight / 2) + (lineIndex + 1) * lineHeight;
         
         // Calculate line width for centering
