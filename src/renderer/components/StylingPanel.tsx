@@ -400,6 +400,51 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
         </div>
       </div>
 
+      {/* Render Mode Control */}
+      <div style={{ marginBottom: '25px' }}>
+        <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+          Text Reveal Style
+        </label>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            onClick={() => handleStyleUpdate({ renderMode: 'horizontal' })}
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              backgroundColor: (selectedSegment.style.renderMode || 'horizontal') === 'horizontal' ? '#007acc' : '#444',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '12px'
+            }}
+          >
+            Horizontal
+          </button>
+          <button
+            onClick={() => handleStyleUpdate({ renderMode: 'progressive' })}
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              backgroundColor: selectedSegment.style.renderMode === 'progressive' ? '#007acc' : '#444',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '12px'
+            }}
+          >
+            Progressive
+          </button>
+        </div>
+        <div style={{ marginTop: '4px', fontSize: '12px', color: '#888' }}>
+          {selectedSegment.style.renderMode === 'progressive' 
+            ? 'Words appear line-by-line vertically as they are spoken'
+            : 'Traditional horizontal layout with word highlighting'
+          }
+        </div>
+      </div>
+
       {/* Background Color Control */}
       <div style={{ marginBottom: '25px' }}>
         <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
