@@ -19,6 +19,7 @@ const App: React.FC = () => {
   const [currentTime, setCurrentTime] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
+  const [loadingProgress, setLoadingProgress] = useState<number | undefined>(undefined);
   const [history, setHistory] = useState<AppState[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [showTranscriptionSettings, setShowTranscriptionSettings] = useState(false);
@@ -252,6 +253,37 @@ const App: React.FC = () => {
     }
   };
 
+  // Function to detect actual word deletions (not just edits)
+  const hasActualWordDeletions = (original: CaptionSegment[], current: CaptionSegment[]): boolean => {
+    // Create maps of word count by segment
+    const originalWordCounts = new Map();
+    const currentWordCounts = new Map();
+    
+    original.forEach(segment => {
+      if (segment.words) {
+        originalWordCounts.set(segment.id, segment.words.length);
+      }
+    });
+    
+    current.forEach(segment => {
+      if (segment.words) {
+        // Count only non-empty words
+        const nonEmptyWords = segment.words.filter(w => w.word.trim() !== '');
+        currentWordCounts.set(segment.id, nonEmptyWords.length);
+      }
+    });
+    
+    // Check if any segment has fewer words (indicating deletions)
+    for (const [segmentId, originalCount] of originalWordCounts) {
+      const currentCount = currentWordCounts.get(segmentId) || 0;
+      if (currentCount < originalCount) {
+        return true; // Found actual word deletions
+      }
+    }
+    
+    return false; // No actual deletions, just edits
+  };
+
   const handleExport = async () => {
     if (!videoFile || captions.length === 0) return;
 
@@ -268,8 +300,8 @@ const App: React.FC = () => {
         return;
       }
 
-      // Check if any words were deleted (affecting audio/video timing)
-      const hasWordDeletions = JSON.stringify(originalCaptions) !== JSON.stringify(captions);
+      // Check if any words were actually deleted (not just edited)
+      const hasWordDeletions = hasActualWordDeletions(originalCaptions, captions);
       
       if (hasWordDeletions) {
         setLoadingMessage('Applying word deletions to video (this may take several minutes)...');
@@ -346,7 +378,7 @@ const App: React.FC = () => {
   };
 
   if (isLoading) {
-    return <LoadingScreen message={loadingMessage} />;
+    return <LoadingScreen message={loadingMessage} progress={loadingProgress} />;
   }
 
   return (
