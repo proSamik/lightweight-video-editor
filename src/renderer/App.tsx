@@ -170,13 +170,14 @@ const App: React.FC = () => {
         words: segment.words || [],
         style: {
           font: FontOption.SF_PRO_DISPLAY_SEMIBOLD,
-          fontSize: 32,
+          fontSize: 85,
           textColor: ColorOption.WHITE,
           highlighterColor: ColorOption.YELLOW,
-          backgroundColor: ColorOption.BLACK_SEMI,
+          backgroundColor: ColorOption.TRANSPARENT,
           position: { x: 50, y: 80, z: 0 },
           renderMode: 'horizontal',
-          scale: 1
+          scale: 1,
+          emphasizeMode: true
         }
       }));
 
