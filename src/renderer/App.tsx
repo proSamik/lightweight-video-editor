@@ -152,7 +152,8 @@ const App: React.FC = () => {
           highlighterColor: ColorOption.YELLOW,
           backgroundColor: ColorOption.BLACK_SEMI,
           position: { x: 50, y: 80, z: 0 },
-          renderMode: 'horizontal'
+          renderMode: 'horizontal',
+          scale: 1
         }
       }));
 
