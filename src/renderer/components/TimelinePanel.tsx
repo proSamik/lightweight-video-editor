@@ -120,6 +120,11 @@ const TimelinePanel: React.FC<TimelinePanelProps> = ({
                 transition: 'all 0.2s ease'
               }}
               onClick={() => onSegmentSelect(caption.id)}
+              onDoubleClick={() => {
+                // Select the segment and seek to its start time
+                onSegmentSelect(caption.id);
+                onTimeSeek(caption.endTime);
+              }}
             >
               <div style={{
                 display: 'flex',
