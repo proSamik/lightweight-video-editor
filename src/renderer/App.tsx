@@ -136,8 +136,7 @@ const App: React.FC = () => {
           textColor: ColorOption.WHITE,
           highlighterColor: ColorOption.YELLOW,
           backgroundColor: ColorOption.BLACK_SEMI,
-          position: { x: 50, y: 80, z: 0 },
-          width: 600
+          position: { x: 50, y: 80, z: 0 }
         }
       }));
 
@@ -159,29 +158,65 @@ const App: React.FC = () => {
   const applyLineWrapping = (segments: CaptionSegment[], settings: { maxCharsPerLine: number; maxWordsPerLine: number }): CaptionSegment[] => {
     const wrappedSegments: CaptionSegment[] = [];
     
-    segments.forEach((segment, index) => {
-      const words = segment.text.split(' ');
-      let currentLine = '';
-      let currentWordCount = 0;
+    segments.forEach((segment) => {
+      const words = segment.words || segment.text.split(' ').map((word, i) => ({
+        word,
+        start: segment.startTime + (i * (segment.endTime - segment.startTime) / segment.text.split(' ').length),
+        end: segment.startTime + ((i + 1) * (segment.endTime - segment.startTime) / segment.text.split(' ').length)
+      }));
       
-      // Since we enforce one line per frame, we need to fit everything in one line
-      // by truncating if necessary
-      words.forEach(word => {
-        const testLine = currentLine + (currentLine ? ' ' : '') + word;
+      let currentSegmentWords: any[] = [];
+      let currentText = '';
+      let currentWordCount = 0;
+      let segmentCounter = 0;
+      
+      words.forEach((word) => {
+        const testText = currentText + (currentText ? ' ' : '') + word.word;
         
         // Check if adding this word would exceed limits
-        if (testLine.length <= settings.maxCharsPerLine && currentWordCount < settings.maxWordsPerLine) {
-          currentLine = testLine;
+        if (testText.length <= settings.maxCharsPerLine && currentWordCount < settings.maxWordsPerLine) {
+          currentText = testText;
+          currentSegmentWords.push(word);
           currentWordCount++;
+        } else {
+          // Create new segment with current words if we have any
+          if (currentSegmentWords.length > 0) {
+            const segmentStart = currentSegmentWords[0].start;
+            const segmentEnd = currentSegmentWords[currentSegmentWords.length - 1].end;
+            
+            wrappedSegments.push({
+              ...segment,
+              id: `${segment.id}-${segmentCounter}`,
+              startTime: segmentStart,
+              endTime: segmentEnd,
+              text: currentText.trim(),
+              words: currentSegmentWords
+            });
+            
+            segmentCounter++;
+          }
+          
+          // Start new segment with current word
+          currentText = word.word;
+          currentSegmentWords = [word];
+          currentWordCount = 1;
         }
-        // If we've reached the limit, stop adding words (one line per frame constraint)
       });
       
-      // Create single segment with truncated text if necessary
-      wrappedSegments.push({
-        ...segment,
-        text: currentLine.trim() || segment.text.split(' ').slice(0, settings.maxWordsPerLine).join(' ')
-      });
+      // Add remaining words as final segment
+      if (currentSegmentWords.length > 0) {
+        const segmentStart = currentSegmentWords[0].start;
+        const segmentEnd = currentSegmentWords[currentSegmentWords.length - 1].end;
+        
+        wrappedSegments.push({
+          ...segment,
+          id: `${segment.id}-${segmentCounter}`,
+          startTime: segmentStart,
+          endTime: segmentEnd,
+          text: currentText.trim(),
+          words: currentSegmentWords
+        });
+      }
     });
     
     return wrappedSegments;
@@ -283,6 +318,18 @@ const App: React.FC = () => {
     }
   };
 
+  const handleApplyToAll = (styleUpdates: Partial<CaptionSegment['style']>) => {
+    // Save current state to history before making changes
+    saveToHistory();
+    
+    setCaptions(prev => 
+      prev.map(segment => ({
+        ...segment,
+        style: { ...segment.style, ...styleUpdates }
+      }))
+    );
+  };
+
   if (isLoading) {
     return <LoadingScreen message={loadingMessage} />;
   }
@@ -336,6 +383,7 @@ const App: React.FC = () => {
           videoFile={videoFile}
           captions={captions}
           onExport={handleExport}
+          onApplyToAll={handleApplyToAll}
         />
       </div>
 
