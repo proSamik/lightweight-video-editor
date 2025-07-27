@@ -109,6 +109,15 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     return undefined;
   }, [onTimeUpdate]);
 
+  // Sync video time when currentTime prop changes (for seeking)
+  useEffect(() => {
+    const video = videoRef.current;
+    if (video && Math.abs(video.currentTime * 1000 - currentTime) > 500) {
+      // Only seek if the difference is significant (> 500ms) to avoid loops
+      video.currentTime = currentTime / 1000;
+    }
+  }, [currentTime]);
+
   // Update canvas size when video loads
   useEffect(() => {
     const video = videoRef.current;
