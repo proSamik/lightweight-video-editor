@@ -62,6 +62,20 @@ const App: React.FC = () => {
     }
   };
 
+  // Auto-select segment based on current time
+  useEffect(() => {
+    if (captions.length > 0) {
+      const currentSegment = captions.find(
+        caption => currentTime >= caption.startTime && currentTime <= caption.endTime
+      );
+      
+      // Only auto-select if no segment is currently selected or if we're in a different segment
+      if (currentSegment && currentSegment.id !== selectedSegmentId) {
+        setSelectedSegmentId(currentSegment.id);
+      }
+    }
+  }, [currentTime, captions, selectedSegmentId]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
