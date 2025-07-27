@@ -8,6 +8,7 @@ interface StylingPanelProps {
   captions?: CaptionSegment[];
   onExport?: () => void;
   onApplyToAll?: (styleUpdates: Partial<CaptionSegment['style']>) => void;
+  onTimeSeek?: (time: number) => void;
 }
 
 const StylingPanel: React.FC<StylingPanelProps> = ({
@@ -17,6 +18,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
   captions,
   onExport,
   onApplyToAll,
+  onTimeSeek,
 }) => {
   if (!selectedSegment) {
     return (
@@ -44,19 +46,74 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
   };
 
   const handleTextUpdate = (newText: string) => {
-    onSegmentUpdate(selectedSegment.id, {
-      text: newText
-    });
+    // If we have word-level timing, try to preserve and update it
+    if (selectedSegment.words && selectedSegment.words.length > 0) {
+      const newWords = newText.split(' ').filter(word => word.trim() !== '');
+      const originalWords = selectedSegment.words;
+      
+      // Create updated word timing by mapping new words to original timing
+      const updatedWords = newWords.map((word, index) => {
+        // Try to find matching word in original timing
+        const originalWord = originalWords[index];
+        const isEdited = originalWord ? originalWord.word !== word : true;
+        
+        if (originalWord) {
+          // Use original timing but update the word
+          return {
+            ...originalWord,
+            word: word,
+            // If word was edited, ensure minimum duration for better highlighting
+            end: isEdited ? 
+              Math.max(originalWord.end, originalWord.start + 500) : 
+              originalWord.end
+          };
+        } else {
+          // New word - estimate timing based on segment duration
+          const segmentDuration = selectedSegment.endTime - selectedSegment.startTime;
+          const wordDuration = segmentDuration / newWords.length;
+          const wordStart = selectedSegment.startTime + (index * wordDuration);
+          
+          return {
+            word: word,
+            start: wordStart,
+            end: Math.min(wordStart + Math.max(wordDuration, 500), selectedSegment.endTime)
+          };
+        }
+      });
+      
+      onSegmentUpdate(selectedSegment.id, {
+        text: newText,
+        words: updatedWords
+      });
+    } else {
+      // No word-level timing, just update text
+      onSegmentUpdate(selectedSegment.id, {
+        text: newText
+      });
+    }
   };
 
   const handleWordUpdate = (wordIndex: number, newWord: string) => {
     if (!selectedSegment.words) return;
     
     const updatedWords = [...selectedSegment.words];
+    const originalWord = updatedWords[wordIndex].word;
     updatedWords[wordIndex] = { ...updatedWords[wordIndex], word: newWord };
     
     // Regenerate text from words
     const newText = updatedWords.map(w => w.word).join(' ');
+    
+    // Mark this word as edited by updating its timing to force highlighter to focus on it
+    if (originalWord !== newWord) {
+      // Extend the word's timing slightly to make it more visible during highlighting
+      const wordDuration = updatedWords[wordIndex].end - updatedWords[wordIndex].start;
+      const minDuration = 500; // Minimum 500ms for edited words
+      
+      if (wordDuration < minDuration) {
+        const timeDiff = minDuration - wordDuration;
+        updatedWords[wordIndex].end = updatedWords[wordIndex].end + timeDiff;
+      }
+    }
     
     onSegmentUpdate(selectedSegment.id, {
       text: newText,
@@ -76,6 +133,12 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
       text: newText,
       words: updatedWords
     });
+  };
+
+  const handleJumpToWord = (wordStart: number) => {
+    if (onTimeSeek) {
+      onTimeSeek(wordStart);
+    }
   };
 
   return (
@@ -110,7 +173,10 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
           placeholder="Enter caption text..."
         />
         <div style={{ marginTop: '8px', fontSize: '12px', color: '#888' }}>
-          {selectedSegment.words ? `${selectedSegment.words.length} words with timing` : 'No word-level timing available'}
+          {selectedSegment.words ? 
+            `${selectedSegment.words.length} words with timing • Edited words get enhanced highlighting` : 
+            'No word-level timing available • Edit text to add basic timing'
+          }
         </div>
       </div>
 
@@ -128,51 +194,88 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
             borderRadius: '4px',
             padding: '8px'
           }}>
-            {selectedSegment.words.map((word, index) => (
-              <div
-                key={index}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  marginBottom: '4px',
-                  padding: '4px',
-                  backgroundColor: '#444',
-                  borderRadius: '3px'
-                }}
-              >
-                <input
-                  type="text"
-                  value={word.word}
-                  onChange={(e) => handleWordUpdate(index, e.target.value)}
+            {selectedSegment.words.map((word, index) => {
+              // Check if this word has been edited (has extended timing)
+              const wordDuration = word.end - word.start;
+              const isEdited = wordDuration >= 500; // Words with extended timing are considered edited
+              
+              return (
+                <div
+                  key={index}
                   style={{
-                    flex: 1,
-                    padding: '2px 4px',
-                    backgroundColor: '#555',
-                    color: '#fff',
-                    border: '1px solid #666',
-                    borderRadius: '2px',
-                    fontSize: '12px'
-                  }}
-                />
-                <button
-                  onClick={() => handleWordDelete(index)}
-                  style={{
-                    marginLeft: '8px',
-                    padding: '2px 6px',
-                    backgroundColor: '#d32f2f',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '2px',
-                    fontSize: '10px',
-                    cursor: 'pointer'
+                    display: 'flex',
+                    alignItems: 'center',
+                    marginBottom: '4px',
+                    padding: '4px',
+                    backgroundColor: isEdited ? '#4a5d23' : '#444', // Green tint for edited words
+                    borderRadius: '3px',
+                    border: isEdited ? '1px solid #6b8e23' : 'none'
                   }}
                 >
-                  ✕
-                </button>
-              </div>
-            ))}
+                  <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+                    {isEdited && (
+                      <span style={{ 
+                        marginRight: '6px', 
+                        fontSize: '10px',
+                        color: '#90ee90',
+                        fontWeight: 'bold'
+                      }}>
+                        ✎
+                      </span>
+                    )}
+                    <input
+                      type="text"
+                      value={word.word}
+                      onChange={(e) => handleWordUpdate(index, e.target.value)}
+                      style={{
+                        flex: 1,
+                        padding: '2px 4px',
+                        backgroundColor: isEdited ? '#5a6d33' : '#555',
+                        color: '#fff',
+                        border: isEdited ? '1px solid #6b8e23' : '1px solid #666',
+                        borderRadius: '2px',
+                        fontSize: '12px'
+                      }}
+                    />
+                  </div>
+                  <div 
+                    onClick={() => handleJumpToWord(word.start)}
+                    style={{ 
+                      fontSize: '9px', 
+                      color: isEdited ? '#90ee90' : '#999', 
+                      marginLeft: '4px',
+                      minWidth: '40px',
+                      textAlign: 'center',
+                      cursor: onTimeSeek ? 'pointer' : 'default',
+                      padding: '2px',
+                      borderRadius: '2px',
+                      backgroundColor: onTimeSeek ? 'rgba(255,255,255,0.05)' : 'transparent'
+                    }}
+                    title={onTimeSeek ? `Click to jump to word at ${(word.start / 1000).toFixed(1)}s` : ''}
+                  >
+                    {Math.round(wordDuration)}ms
+                  </div>
+                  <button
+                    onClick={() => handleWordDelete(index)}
+                    style={{
+                      marginLeft: '8px',
+                      padding: '2px 6px',
+                      backgroundColor: '#d32f2f',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '2px',
+                      fontSize: '10px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              );
+            })}
           </div>
           <div style={{ marginTop: '8px', fontSize: '11px', color: '#888' }}>
+            ✎ Green highlighted words have extended timing for better highlighting visibility<br/>
             ⚠️ Deleting words will remove corresponding audio/video segments
           </div>
         </div>
@@ -345,11 +448,12 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
         </label>
         <div style={{ display: 'flex', gap: '10px', marginBottom: '8px' }}>
           <div style={{ flex: 1 }}>
-            <label style={{ fontSize: '12px', color: '#ccc' }}>X: {selectedSegment.style.position.x}</label>
+            <label style={{ fontSize: '12px', color: '#ccc' }}>X: {selectedSegment.style.position.x}%</label>
             <input
               type="range"
               min="0"
               max="100"
+              step="1"
               value={selectedSegment.style.position.x}
               onChange={(e) => handleStyleUpdate({ 
                 position: { 
@@ -357,15 +461,23 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
                   x: parseInt(e.target.value) 
                 }
               })}
-              style={{ width: '100%' }}
+              style={{
+                width: '100%',
+                height: '6px',
+                borderRadius: '3px',
+                background: '#444',
+                outline: 'none',
+                appearance: 'none'
+              }}
             />
           </div>
           <div style={{ flex: 1 }}>
-            <label style={{ fontSize: '12px', color: '#ccc' }}>Y: {selectedSegment.style.position.y}</label>
+            <label style={{ fontSize: '12px', color: '#ccc' }}>Y: {selectedSegment.style.position.y}%</label>
             <input
               type="range"
               min="0"
               max="100"
+              step="1"
               value={selectedSegment.style.position.y}
               onChange={(e) => handleStyleUpdate({ 
                 position: { 
@@ -373,27 +485,43 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
                   y: parseInt(e.target.value) 
                 }
               })}
-              style={{ width: '100%' }}
+              style={{
+                width: '100%',
+                height: '6px',
+                borderRadius: '3px',
+                background: '#444',
+                outline: 'none',
+                appearance: 'none'
+              }}
             />
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '10px', marginBottom: '8px' }}>
-          <div style={{ flex: 1 }}>
-            <label style={{ fontSize: '12px', color: '#ccc' }}>Z Rotation: {selectedSegment.style.position.z || 0}°</label>
-            <input
-              type="range"
-              min="-180"
-              max="180"
-              value={selectedSegment.style.position.z || 0}
-              onChange={(e) => handleStyleUpdate({ 
-                position: { 
-                  ...selectedSegment.style.position, 
-                  z: parseInt(e.target.value) 
-                }
-              })}
-              style={{ width: '100%' }}
-            />
-          </div>
+        <div style={{ marginBottom: '8px' }}>
+          <label style={{ fontSize: '12px', color: '#ccc' }}>Z Rotation: {selectedSegment.style.position.z || 0}°</label>
+          <input
+            type="range"
+            min="-180"
+            max="180"
+            step="1"
+            value={selectedSegment.style.position.z || 0}
+            onChange={(e) => handleStyleUpdate({ 
+              position: { 
+                ...selectedSegment.style.position, 
+                z: parseInt(e.target.value) 
+              }
+            })}
+            style={{
+              width: '100%',
+              height: '6px',
+              borderRadius: '3px',
+              background: '#444',
+              outline: 'none',
+              appearance: 'none'
+            }}
+          />
+        </div>
+        <div style={{ fontSize: '12px', color: '#888' }}>
+          Use sliders to position and rotate subtitles
         </div>
       </div>
 
