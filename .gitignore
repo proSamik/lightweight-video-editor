@@ -1,12 +1,12 @@
 # Dependencies
-node_modules/
+node_modules
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
 # Production builds
-dist/
-build/
+dist
+build
 
 # Environment variables
 .env

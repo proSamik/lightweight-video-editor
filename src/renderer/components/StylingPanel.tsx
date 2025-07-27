@@ -1,0 +1,296 @@
+import React from 'react';
+import { CaptionSegment, FontOption, ColorOption } from '../../types';
+
+interface StylingPanelProps {
+  selectedSegment: CaptionSegment | null;
+  onSegmentUpdate: (segmentId: string, updates: Partial<CaptionSegment>) => void;
+  videoFile?: { path: string; name: string } | null;
+  captions?: CaptionSegment[];
+  onExport?: () => void;
+}
+
+const StylingPanel: React.FC<StylingPanelProps> = ({
+  selectedSegment,
+  onSegmentUpdate,
+  videoFile,
+  captions,
+  onExport,
+}) => {
+  if (!selectedSegment) {
+    return (
+      <div style={{
+        padding: '20px',
+        height: '100%',
+        backgroundColor: '#2a2a2a'
+      }}>
+        <h3 style={{ margin: '0 0 20px 0', fontSize: '16px' }}>Styling Controls</h3>
+        <div style={{
+          textAlign: 'center',
+          color: '#888',
+          marginTop: '100px'
+        }}>
+          Select a caption segment to edit its style
+        </div>
+      </div>
+    );
+  }
+
+  const handleStyleUpdate = (styleUpdates: Partial<CaptionSegment['style']>) => {
+    onSegmentUpdate(selectedSegment.id, {
+      style: { ...selectedSegment.style, ...styleUpdates }
+    });
+  };
+
+  const textColors = [
+    ColorOption.WHITE,
+    ColorOption.BLACK,
+    ColorOption.YELLOW,
+    ColorOption.RED,
+    ColorOption.BLUE,
+  ];
+
+  const highlighterColors = [
+    ColorOption.BRIGHT_YELLOW,
+    ColorOption.ORANGE,
+    ColorOption.GREEN,
+    ColorOption.PINK,
+    ColorOption.CYAN,
+  ];
+
+  const backgroundColors = [
+    ColorOption.TRANSPARENT,
+    ColorOption.BLACK_SEMI,
+    ColorOption.WHITE_SEMI,
+    ColorOption.DARK_GRAY,
+    ColorOption.NAVY_BLUE,
+  ];
+
+  const fonts = Object.values(FontOption);
+
+  return (
+    <div style={{
+      padding: '20px',
+      height: '100%',
+      backgroundColor: '#2a2a2a',
+      overflowY: 'auto'
+    }}>
+      <h3 style={{ margin: '0 0 20px 0', fontSize: '16px' }}>Styling Controls</h3>
+      
+      {/* Font Selection */}
+      <div style={{ marginBottom: '25px' }}>
+        <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+          Font
+        </label>
+        <select
+          value={selectedSegment.style.font}
+          onChange={(e) => handleStyleUpdate({ font: e.target.value as FontOption })}
+          style={{
+            width: '100%',
+            padding: '8px',
+            backgroundColor: '#333',
+            color: '#fff',
+            border: '1px solid #555',
+            borderRadius: '4px'
+          }}
+        >
+          {fonts.map(font => (
+            <option key={font} value={font}>{font}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Font Size */}
+      <div style={{ marginBottom: '25px' }}>
+        <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+          Font Size: {selectedSegment.style.fontSize}px
+        </label>
+        <input
+          type="range"
+          min="16"
+          max="72"
+          value={selectedSegment.style.fontSize}
+          onChange={(e) => handleStyleUpdate({ fontSize: parseInt(e.target.value) })}
+          style={{ width: '100%' }}
+        />
+      </div>
+
+      {/* Text Width */}
+      <div style={{ marginBottom: '25px' }}>
+        <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+          Text Width: {selectedSegment.style.width}px
+        </label>
+        <input
+          type="range"
+          min="200"
+          max="800"
+          value={selectedSegment.style.width}
+          onChange={(e) => handleStyleUpdate({ width: parseInt(e.target.value) })}
+          style={{ width: '100%' }}
+        />
+      </div>
+
+      {/* Text Color */}
+      <div style={{ marginBottom: '25px' }}>
+        <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+          Text Color
+        </label>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {textColors.map(color => (
+            <div
+              key={color}
+              style={{
+                width: '30px',
+                height: '30px',
+                backgroundColor: color,
+                border: selectedSegment.style.textColor === color ? '3px solid #fff' : '1px solid #555',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+              onClick={() => handleStyleUpdate({ textColor: color })}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Highlighter Color */}
+      <div style={{ marginBottom: '25px' }}>
+        <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+          Highlighter Color
+        </label>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {highlighterColors.map(color => (
+            <div
+              key={color}
+              style={{
+                width: '30px',
+                height: '30px',
+                backgroundColor: color,
+                border: selectedSegment.style.highlighterColor === color ? '3px solid #fff' : '1px solid #555',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+              onClick={() => handleStyleUpdate({ highlighterColor: color })}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Background Color */}
+      <div style={{ marginBottom: '25px' }}>
+        <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+          Background Color
+        </label>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {backgroundColors.map(color => (
+            <div
+              key={color}
+              style={{
+                width: '30px',
+                height: '30px',
+                backgroundColor: color === 'transparent' ? '#666' : color,
+                border: selectedSegment.style.backgroundColor === color ? '3px solid #fff' : '1px solid #555',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                position: 'relative'
+              }}
+              onClick={() => handleStyleUpdate({ backgroundColor: color })}
+            >
+              {color === 'transparent' && (
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  fontSize: '12px',
+                  color: '#fff'
+                }}>
+                  ∅
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Position Controls */}
+      <div style={{ marginBottom: '25px' }}>
+        <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+          Position
+        </label>
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '8px' }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: '12px', color: '#ccc' }}>X: {selectedSegment.style.position.x}</label>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={selectedSegment.style.position.x}
+              onChange={(e) => handleStyleUpdate({ 
+                position: { 
+                  ...selectedSegment.style.position, 
+                  x: parseInt(e.target.value) 
+                }
+              })}
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: '12px', color: '#ccc' }}>Y: {selectedSegment.style.position.y}</label>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={selectedSegment.style.position.y}
+              onChange={(e) => handleStyleUpdate({ 
+                position: { 
+                  ...selectedSegment.style.position, 
+                  y: parseInt(e.target.value) 
+                }
+              })}
+              style={{ width: '100%' }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Export Section */}
+      {videoFile && captions && captions.length > 0 && (
+        <div style={{ 
+          marginTop: '30px', 
+          paddingTop: '20px', 
+          borderTop: '1px solid #444' 
+        }}>
+          <h4 style={{ margin: '0 0 15px 0', fontSize: '14px', fontWeight: 'bold' }}>
+            Export Video
+          </h4>
+          <button
+            onClick={onExport}
+            style={{
+              width: '100%',
+              padding: '12px 24px',
+              backgroundColor: '#007acc',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '16px',
+              fontWeight: 'bold'
+            }}
+          >
+            Export Video with Captions
+          </button>
+          <div style={{
+            marginTop: '10px',
+            fontSize: '12px',
+            color: '#888',
+            textAlign: 'center'
+          }}>
+            This will render your video with burned-in captions
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default StylingPanel;
