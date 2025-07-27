@@ -493,6 +493,37 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
         </div>
       </div>
 
+      {/* Scale Control */}
+      <div style={{ marginBottom: '25px' }}>
+        <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+          Scale: {Math.round((selectedSegment.style.scale || 1) * 100)}%
+        </label>
+        <input
+          type="range"
+          min="0.5"
+          max="2.0"
+          step="0.05"
+          value={selectedSegment.style.scale || 1}
+          onChange={(e) => handleStyleUpdate({ scale: parseFloat(e.target.value) })}
+          style={{
+            width: '100%',
+            height: '6px',
+            borderRadius: '3px',
+            background: '#444',
+            outline: 'none',
+            appearance: 'none'
+          }}
+        />
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '10px', color: '#888' }}>
+          <span>50%</span>
+          <span>100%</span>
+          <span>200%</span>
+        </div>
+        <div style={{ marginTop: '4px', fontSize: '12px', color: '#888' }}>
+          Resize subtitles proportionally
+        </div>
+      </div>
+
       {/* Position Controls */}
       <div style={{ marginBottom: '25px' }}>
         <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
