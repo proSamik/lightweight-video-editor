@@ -338,7 +338,11 @@ function renderCaptionOnCanvas(
   
   // Draw text with word-level highlighting
   if (words.length > 0) {
-    renderKaraokeTextOnCanvas(ctx, words, caption, currentTime, x, y, scaleFactor);
+    if (caption.style.renderMode === 'progressive') {
+      renderProgressiveTextOnCanvas(ctx, words, caption, currentTime, x, y, scaleFactor);
+    } else {
+      renderKaraokeTextOnCanvas(ctx, words, caption, currentTime, x, y, scaleFactor);
+    }
   } else {
     // Simple text without word-level timing
     renderSimpleTextOnCanvas(ctx, text, caption, x, y, scaleFactor);
@@ -569,6 +573,119 @@ function mapFontName(fontName: string): string {
       return 'Georgia';
     default:
       return 'Arial'; // Default fallback
+  }
+}
+
+// Progressive text reveal rendering (vertical line-by-line)
+function renderProgressiveTextOnCanvas(
+  ctx: CanvasRenderingContext2D,
+  words: any[],
+  caption: CaptionSegment,
+  frameTime: number,
+  centerX: number,
+  centerY: number,
+  scaleFactor: number
+) {
+  const fontSize = caption.style?.fontSize || 32;
+  const textColor = parseColor(caption.style?.textColor || '#ffffff');
+  const highlighterColor = parseColor(caption.style?.highlighterColor || '#ffff00');
+  const backgroundColor = parseColor(caption.style?.backgroundColor || '#80000000');
+  
+  // Set font with actual font from caption style
+  const fontFamily = mapFontName(caption.style?.font || 'SF Pro Display Semibold');
+  ctx.font = `bold ${fontSize}px ${fontFamily}, Arial, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  
+  // Find words that should be visible up to current time
+  const visibleWords: any[] = [];
+  let currentLineWords: any[] = [];
+  
+  for (const word of words) {
+    if (frameTime >= word.start) {
+      visibleWords.push(word);
+      currentLineWords.push(word);
+    }
+  }
+  
+  if (visibleWords.length === 0) return;
+  
+  // Group words into lines - each word becomes a new line
+  const lines: any[][] = [];
+  for (let i = 0; i < visibleWords.length; i++) {
+    // Each line contains all words up to current word (cumulative)
+    lines.push(visibleWords.slice(0, i + 1));
+  }
+  
+  // Show only the line that corresponds to the currently highlighted word
+  const currentWord = words.find(word => frameTime >= word.start && frameTime <= word.end);
+  const currentWordIndex = currentWord ? words.indexOf(currentWord) : visibleWords.length - 1;
+  const displayLineIndex = Math.min(currentWordIndex, lines.length - 1);
+  
+  if (displayLineIndex >= 0 && lines[displayLineIndex]) {
+    const displayLine = lines[displayLineIndex];
+    const lineHeight = fontSize + 8; // Add some padding between lines
+    
+    // Calculate vertical position for the line
+    const lineY = centerY - ((displayLine.length - 1) * lineHeight) / 2;
+    
+    // Draw each word in the line vertically
+    displayLine.forEach((word, wordIndex) => {
+      const wordY = lineY + (wordIndex * lineHeight);
+      const isHighlighted = frameTime >= word.start && frameTime <= word.end;
+      
+      // Measure word for background
+      const wordWidth = ctx.measureText(word.word).width;
+      const boxX = centerX - (wordWidth / 2) - 8;
+      const boxY = wordY - fontSize - 8;
+      const boxWidth = wordWidth + 16;
+      const boxHeight = fontSize + 16;
+      
+      // Draw background for each word if not transparent
+      if (backgroundColor.a > 0) {
+        ctx.fillStyle = `rgba(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b}, ${backgroundColor.a})`;
+        ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+      }
+      
+      // Handle highlighting
+      if (isHighlighted) {
+        if (caption.style.emphasizeMode) {
+          // Emphasis mode
+          const emphasizedFontSize = fontSize + 10;
+          ctx.font = `bold ${emphasizedFontSize}px ${fontFamily}, Arial, sans-serif`;
+          ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.a})`;
+        } else {
+          // Background highlighting
+          ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.a})`;
+          ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+          ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
+        }
+      } else {
+        // Normal text color (slightly transparent for non-current words)
+        const alpha = wordIndex === displayLine.length - 1 ? textColor.a : 0.6;
+        ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${alpha})`;
+      }
+      
+      // Add text shadow
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+      ctx.shadowBlur = 4;
+      ctx.shadowOffsetX = 2;
+      ctx.shadowOffsetY = 2;
+      
+      // Draw the word
+      ctx.fillText(word.word, centerX, wordY);
+      
+      // Reset font size if changed
+      if (isHighlighted && caption.style.emphasizeMode) {
+        ctx.font = `bold ${fontSize}px ${fontFamily}, Arial, sans-serif`;
+      }
+    });
+    
+    // Reset shadow
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
   }
 }
 
