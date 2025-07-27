@@ -496,8 +496,8 @@ export class CanvasVideoRenderer {
           // Handle emphasis mode vs background highlighting
           if (isHighlighted) {
             if (caption.style.emphasizeMode) {
-              // Emphasis mode: increase font size by 2% and use highlighter color as text color
-              const emphasizedFontSize = fontSize + 3;
+              // Emphasis mode: increase font size by 10px and use highlighter color as text color
+              const emphasizedFontSize = fontSize + 10;
               ctx.font = `bold ${emphasizedFontSize}px ${fontFamily}, Arial, sans-serif`;
               ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.a})`;
             } else {
@@ -525,8 +525,9 @@ export class CanvasVideoRenderer {
           ctx.font = `bold ${fontSize}px ${fontFamily}, Arial, sans-serif`;
         }
         
-        // Move to next word position
-        currentX += wordWidth + (wordPadding * 2) + wordSpacing;
+        // Move to next word position - add extra spacing for emphasized words
+        const extraSpacing = (isHighlighted && caption.style.emphasizeMode) ? 8 : 0;
+        currentX += wordWidth + (wordPadding * 2) + wordSpacing + extraSpacing;
       }
       
       // Reset shadow
