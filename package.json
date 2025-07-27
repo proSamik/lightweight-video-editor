@@ -64,6 +64,7 @@
     "directories": {
       "output": "dist"
     },
+    "asar": false,
     "files": [
       "dist/**/*",
       "package.json"
