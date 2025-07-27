@@ -19,6 +19,7 @@ export interface CaptionStyle {
     z?: number; // Added z rotation
   };
   emphasizeMode?: boolean; // When true, highlighted words get emphasized instead of background highlight
+  renderMode?: 'horizontal' | 'progressive'; // New: horizontal (default) or progressive reveal
 }
 
 export interface WordTimestamp {
