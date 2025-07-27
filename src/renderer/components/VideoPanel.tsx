@@ -8,6 +8,8 @@ interface VideoPanelProps {
   onTimeUpdate: (time: number) => void;
   onVideoSelect: () => void;
   onVideoDropped?: (filePath: string) => void;
+  selectedSegmentId?: string | null;
+  onCaptionUpdate?: (segmentId: string, updates: Partial<CaptionSegment>) => void;
 }
 
 const VideoPanel: React.FC<VideoPanelProps> = ({
@@ -17,11 +19,82 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   onTimeUpdate,
   onVideoSelect,
   onVideoDropped,
+  selectedSegmentId,
+  onCaptionUpdate,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [isResizing, setIsResizing] = useState(false);
+
+  // Mouse interaction handlers for text box manipulation
+  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!selectedSegmentId || !onCaptionUpdate) return;
+    
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    const mouseX = (e.clientX - rect.left) * scaleX;
+    const mouseY = (e.clientY - rect.top) * scaleY;
+    
+    // Check if click is on the current caption
+    const currentCaption = captions.find(c => c.id === selectedSegmentId);
+    if (currentCaption && currentTime >= currentCaption.startTime && currentTime <= currentCaption.endTime) {
+      setIsDragging(true);
+      setDragStart({ x: mouseX, y: mouseY });
+    }
+  };
+
+  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDragging || !selectedSegmentId || !onCaptionUpdate) return;
+    
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    const mouseX = (e.clientX - rect.left) * scaleX;
+    const mouseY = (e.clientY - rect.top) * scaleY;
+    
+    const deltaX = mouseX - dragStart.x;
+    const deltaY = mouseY - dragStart.y;
+    
+    // Convert to percentage
+    const deltaXPercent = (deltaX / canvas.width) * 100;
+    const deltaYPercent = (deltaY / canvas.height) * 100;
+    
+    const currentCaption = captions.find(c => c.id === selectedSegmentId);
+    if (currentCaption) {
+      const newX = Math.max(0, Math.min(100, currentCaption.style.position.x + deltaXPercent));
+      const newY = Math.max(0, Math.min(100, currentCaption.style.position.y + deltaYPercent));
+      
+      onCaptionUpdate(selectedSegmentId, {
+        style: {
+          ...currentCaption.style,
+          position: {
+            ...currentCaption.style.position,
+            x: newX,
+            y: newY
+          }
+        }
+      });
+      
+      setDragStart({ x: mouseX, y: mouseY });
+    }
+  };
+
+  const handleCanvasMouseUp = () => {
+    setIsDragging(false);
+  };
 
   useEffect(() => {
     const video = videoRef.current;
@@ -204,6 +277,9 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
         {/* Canvas Overlay - Renders captions exactly like export */}
         <canvas
           ref={canvasRef}
+          onMouseDown={handleCanvasMouseDown}
+          onMouseMove={handleCanvasMouseMove}
+          onMouseUp={handleCanvasMouseUp}
           style={{
             position: 'absolute',
             top: '50%',
@@ -212,7 +288,8 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
             maxWidth: '100%',
             maxHeight: '100%',
             objectFit: 'contain',
-            pointerEvents: 'none'
+            pointerEvents: isDragging ? 'auto' : 'auto',
+            cursor: isDragging ? 'grabbing' : 'grab'
           }}
         />
       </div>
@@ -390,16 +467,18 @@ function renderKaraokeTextOnCanvas(
   const wordPadding = 4; // padding from VideoPanel
   const maxWidth = caption.style.width * scaleFactor; // Apply scale factor to width
   
-  // Wrap text to multiple lines if needed
+  // Since we enforce one line per frame, we don't actually wrap to multiple lines
+  // Instead, we use the first line only
   const textLines = wrapTextToWidth(ctx, words, maxWidth, wordPadding, wordSpacing);
+  const singleLine = textLines.length > 0 ? [textLines[0]] : [words]; // Take only first line
   const lineHeight = fontSize * scaleFactor + 10; // Add some line spacing
   
-  // Calculate total height and max width for background
-  const totalHeight = textLines.length * lineHeight;
+  // Calculate total height and max width for background (single line only)
+  const totalHeight = singleLine.length * lineHeight;
   let maxLineWidth = 0;
   
-  // Calculate width for each line to find the maximum
-  for (const line of textLines) {
+  // Calculate width for the single line
+  for (const line of singleLine) {
     let lineWidth = 0;
     for (const word of line) {
       const wordWidth = ctx.measureText(word.word).width;
@@ -427,9 +506,9 @@ function renderKaraokeTextOnCanvas(
   ctx.shadowOffsetX = 2;
   ctx.shadowOffsetY = 2;
   
-  // Draw each line of words
-  for (let lineIndex = 0; lineIndex < textLines.length; lineIndex++) {
-    const line = textLines[lineIndex];
+  // Draw each line of words (single line only)
+  for (let lineIndex = 0; lineIndex < singleLine.length; lineIndex++) {
+    const line = singleLine[lineIndex];
     const currentY = centerY - (totalHeight / 2) + (lineIndex + 1) * lineHeight;
     
     // Calculate line width for centering
