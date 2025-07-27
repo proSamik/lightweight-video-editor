@@ -451,8 +451,8 @@ export class CanvasVideoRenderer {
       
       // Since we enforce one line per frame and removed width functionality,
       // we render all words in a single line  
-      const wordSpacing = 12; // Increased uniform spacing between words
-      const wordPadding = 4; // padding from editor
+      const wordSpacing = 12 * scale; // Scaled uniform spacing between words
+      const wordPadding = 4 * scale; // Scaled padding
       
       // Calculate total width for single line
       let totalWidth = 0;
@@ -558,7 +558,9 @@ export class CanvasVideoRenderer {
     y: number
   ): Promise<void> {
     try {
-      const fontSize = caption.style?.fontSize || 32;
+      const baseFontSize = caption.style?.fontSize || 32;
+      const scale = caption.style?.scale || 1;
+      const fontSize = baseFontSize * scale;
       const fontFamily = this.mapFontName(caption.style?.font || 'SF Pro Display Semibold');
       const textColor = this.parseColor(caption.style?.textColor || '#ffffff');
       const backgroundColor = this.parseColor(caption.style?.backgroundColor || '#80000000');
@@ -645,7 +647,9 @@ export class CanvasVideoRenderer {
     centerY: number
   ): Promise<void> {
     try {
-      const fontSize = caption.style?.fontSize || 32;
+      const baseFontSize = caption.style?.fontSize || 32;
+      const scale = caption.style?.scale || 1;
+      const fontSize = baseFontSize * scale;
       const fontFamily = this.mapFontName(caption.style?.font || 'SF Pro Display Semibold');
       const textColor = this.parseColor(caption.style?.textColor || '#ffffff');
       const highlighterColor = this.parseColor(caption.style?.highlighterColor || '#ffff00');
