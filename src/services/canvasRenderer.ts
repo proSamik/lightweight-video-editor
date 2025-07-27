@@ -436,7 +436,9 @@ export class CanvasVideoRenderer {
     centerY: number
   ): Promise<void> {
     try {
-      const fontSize = caption.style?.fontSize || 32;
+      const baseFontSize = caption.style?.fontSize || 32;
+      const scale = caption.style?.scale || 1;
+      const fontSize = baseFontSize * scale;
       const fontFamily = this.mapFontName(caption.style?.font || 'SF Pro Display Semibold');
       const textColor = this.parseColor(caption.style?.textColor || '#ffffff');
       const highlighterColor = this.parseColor(caption.style?.highlighterColor || '#ffff00');
@@ -717,9 +719,8 @@ export class CanvasVideoRenderer {
               ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
             }
           } else {
-            // Normal text color (slightly transparent for non-current words)
-            const alpha = wordIndex === displayLine.length - 1 ? textColor.a : 0.6;
-            ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${alpha})`;
+            // Normal text color - all revealed words should have full opacity
+            ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
           }
           
           // Add text shadow
