@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { VideoFile, CaptionSegment } from '../../types';
 
 interface VideoPanelProps {
@@ -7,6 +7,7 @@ interface VideoPanelProps {
   currentTime: number;
   onTimeUpdate: (time: number) => void;
   onVideoSelect: () => void;
+  onVideoDropped?: (filePath: string) => void;
 }
 
 const VideoPanel: React.FC<VideoPanelProps> = ({
@@ -15,8 +16,10 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   currentTime,
   onTimeUpdate,
   onVideoSelect,
+  onVideoDropped,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -30,6 +33,45 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     }
     return undefined;
   }, [onTimeUpdate]);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+
+    const files = Array.from(e.dataTransfer.files);
+    const videoFile = files.find(file => 
+      file.type.startsWith('video/') || 
+      /\.(mp4|mov|avi)$/i.test(file.name)
+    );
+
+    if (videoFile && onVideoDropped) {
+      // In Electron, we can get the file path directly from the File object
+      const filePath = (videoFile as any).path;
+      if (filePath) {
+        onVideoDropped(filePath);
+      } else {
+        // Fallback: try to read the file and create a temporary path
+        console.warn('No file path available, falling back to file picker');
+        onVideoSelect();
+      }
+    } else if (videoFile) {
+      // Fallback to file picker
+      onVideoSelect();
+    }
+  };
 
   const getCurrentCaption = () => {
     return captions.find(
@@ -104,17 +146,24 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
 
   if (!videoFile) {
     return (
-      <div style={{
-        flex: 1,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#2a2a2a',
-        margin: '20px',
-        borderRadius: '8px',
-        border: '2px dashed #555',
-        cursor: 'pointer'
-      }} onClick={onVideoSelect}>
+      <div 
+        style={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: isDragOver ? '#3a3a3a' : '#2a2a2a',
+          margin: '20px',
+          borderRadius: '8px',
+          border: isDragOver ? '2px dashed #007acc' : '2px dashed #555',
+          cursor: 'pointer',
+          transition: 'all 0.2s ease'
+        }} 
+        onClick={onVideoSelect}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: '48px', marginBottom: '20px' }}>📹</div>
           <div style={{ fontSize: '18px', marginBottom: '10px' }}>

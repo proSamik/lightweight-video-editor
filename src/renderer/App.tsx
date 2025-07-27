@@ -5,18 +5,92 @@ import TimelinePanel from './components/TimelinePanel';
 import StylingPanel from './components/StylingPanel';
 import LoadingScreen from './components/LoadingScreen';
 
+interface AppState {
+  captions: CaptionSegment[];
+  selectedSegmentId: string | null;
+}
+
 const App: React.FC = () => {
   const [videoFile, setVideoFile] = useState<VideoFile | null>(null);
   const [captions, setCaptions] = useState<CaptionSegment[]>([]);
+  const [originalCaptions, setOriginalCaptions] = useState<CaptionSegment[]>([]); // Track original captions for word deletion
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [loadingMessage, setLoadingMessage] = useState<string>('');
   const [dependencies, setDependencies] = useState<{ffmpeg: boolean, whisper: boolean} | null>(null);
+  
+  // Undo/Redo state management
+  const [history, setHistory] = useState<AppState[]>([]);
+  const [historyIndex, setHistoryIndex] = useState<number>(-1);
 
   useEffect(() => {
     checkDependencies();
-  }, []);
+    
+    // Set up drag and drop listener
+    const handleFileDropped = (filePath: string) => {
+      processVideoFile(filePath);
+    };
+    
+    window.electronAPI.onFileDropped(handleFileDropped);
+    
+    // Set up keyboard shortcuts
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
+        if (e.shiftKey) {
+          redo();
+        } else {
+          undo();
+        }
+        e.preventDefault();
+      }
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [history, historyIndex]); // Add dependencies to ensure undo/redo works with latest state
+
+  // Save state to history before making changes
+  const saveToHistory = () => {
+    const currentState: AppState = {
+      captions: [...captions],
+      selectedSegmentId
+    };
+    
+    // Remove any future history if we're not at the end
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push(currentState);
+    
+    // Limit history size
+    if (newHistory.length > 50) {
+      newHistory.shift();
+    } else {
+      setHistoryIndex(historyIndex + 1);
+    }
+    
+    setHistory(newHistory);
+  };
+
+  const undo = () => {
+    if (historyIndex > 0) {
+      const previousState = history[historyIndex - 1];
+      setCaptions(previousState.captions);
+      setSelectedSegmentId(previousState.selectedSegmentId);
+      setHistoryIndex(historyIndex - 1);
+    }
+  };
+
+  const redo = () => {
+    if (historyIndex < history.length - 1) {
+      const nextState = history[historyIndex + 1];
+      setCaptions(nextState.captions);
+      setSelectedSegmentId(nextState.selectedSegmentId);
+      setHistoryIndex(historyIndex + 1);
+    }
+  };
 
   const checkDependencies = async () => {
     try {
@@ -31,20 +105,33 @@ const App: React.FC = () => {
     try {
       const filePath = await window.electronAPI.selectVideoFile();
       if (filePath) {
-        setIsLoading(true);
-        setLoadingMessage('Loading video metadata...');
-        
-        // Get video metadata
-        const videoMetadata = await window.electronAPI.getVideoMetadata(filePath);
-        setVideoFile(videoMetadata);
-        
-        // Auto-generate captions
-        await generateCaptions(filePath);
+        await processVideoFile(filePath);
       }
     } catch (error) {
       console.error('Error selecting video file:', error);
       setIsLoading(false);
     }
+  };
+
+  const handleVideoDropped = async (filePath: string) => {
+    try {
+      await processVideoFile(filePath);
+    } catch (error) {
+      console.error('Error processing dropped video file:', error);
+      setIsLoading(false);
+    }
+  };
+
+  const processVideoFile = async (filePath: string) => {
+    setIsLoading(true);
+    setLoadingMessage('Loading video metadata...');
+    
+    // Get video metadata
+    const videoMetadata = await window.electronAPI.getVideoMetadata(filePath);
+    setVideoFile(videoMetadata);
+    
+    // Auto-generate captions
+    await generateCaptions(filePath);
   };
 
   const generateCaptions = async (videoPath: string) => {
@@ -74,6 +161,7 @@ const App: React.FC = () => {
       }));
       
       setCaptions(captionSegments);
+      setOriginalCaptions([...captionSegments]); // Save original captions for comparison
       setIsLoading(false);
     } catch (error) {
       console.error('Error generating captions:', error);
@@ -98,12 +186,37 @@ const App: React.FC = () => {
         return;
       }
 
-      setLoadingMessage('Rendering video with captions...');
-      await window.electronAPI.renderVideoWithCaptions(
-        videoFile.path,
-        captions,
-        outputPath
-      );
+      // Check if any words were deleted (affecting audio/video timing)
+      const hasWordDeletions = JSON.stringify(originalCaptions) !== JSON.stringify(captions);
+      
+      if (hasWordDeletions) {
+        setLoadingMessage('Applying word deletions to video (this may take several minutes)...');
+        
+        // First, create a video with word deletions applied
+        const tempVideoPath = outputPath.replace('.mp4', '_temp.mp4');
+        await window.electronAPI.applyWordDeletions(
+          videoFile.path,
+          originalCaptions,
+          captions,
+          tempVideoPath
+        );
+        
+        setLoadingMessage('Rendering video with captions (this may take several minutes)...');
+        await window.electronAPI.renderVideoWithCaptions(
+          tempVideoPath,
+          captions,
+          outputPath
+        );
+        
+        // Clean up temp file (note: this would need to be handled by the main process)
+      } else {
+        setLoadingMessage('Rendering video with captions (this may take several minutes)...');
+        await window.electronAPI.renderVideoWithCaptions(
+          videoFile.path,
+          captions,
+          outputPath
+        );
+      }
 
       setIsLoading(false);
       alert('Video exported successfully!');
@@ -115,6 +228,9 @@ const App: React.FC = () => {
   };
 
   const handleCaptionUpdate = (segmentId: string, updates: Partial<CaptionSegment>) => {
+    // Save current state to history before making changes
+    saveToHistory();
+    
     setCaptions(prev => 
       prev.map(segment => 
         segment.id === segmentId 
@@ -194,6 +310,7 @@ const App: React.FC = () => {
           currentTime={currentTime}
           onTimeUpdate={setCurrentTime}
           onVideoSelect={handleVideoSelect}
+          onVideoDropped={handleVideoDropped}
         />
         
         {/* Timeline Panel */}

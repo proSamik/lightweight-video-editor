@@ -9,6 +9,12 @@ const electronAPI = {
   checkDependencies: () => ipcRenderer.invoke('check-dependencies'),
   renderVideoWithCaptions: (videoPath: string, captionsData: any[], outputPath: string) => 
     ipcRenderer.invoke('render-video-with-captions', videoPath, captionsData, outputPath),
+  handleFileDrop: (filePath: string) => ipcRenderer.invoke('handle-file-drop', filePath),
+  onFileDropped: (callback: (filePath: string) => void) => {
+    ipcRenderer.on('file-dropped', (_event, filePath) => callback(filePath));
+  },
+  applyWordDeletions: (inputVideoPath: string, originalCaptions: any[], updatedCaptions: any[], outputPath: string) =>
+    ipcRenderer.invoke('apply-word-deletions', inputVideoPath, originalCaptions, updatedCaptions, outputPath)
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

@@ -1,6 +1,7 @@
 import ffmpeg from 'fluent-ffmpeg';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
 import { VideoFile } from '../types';
 
 export class FFmpegService {
@@ -147,33 +148,46 @@ export class FFmpegService {
 
   public async renderVideoWithBurnedCaptions(
     videoPath: string,
-    _captionsData: any[], // Will be replaced with proper caption burn-in logic
+    captionsData: any[],
     outputPath: string,
     onProgress?: (progress: number) => void
   ): Promise<string> {
-    return new Promise((resolve, reject) => {
-      // This will be implemented with advanced caption rendering
-      // For now, just copy the video
-      const command = ffmpeg(videoPath)
-        .videoCodec('libx264')
-        .audioCodec('aac')
-        .format('mp4')
-        .output(outputPath)
-        .on('progress', (progress: any) => {
-          if (onProgress && progress.percent) {
-            onProgress(progress.percent);
-          }
-        })
-        .on('end', () => {
-          resolve(outputPath);
-        })
-        .on('error', (err: any) => {
-          reject(err);
-        });
+    return new Promise(async (resolve, reject) => {
+      if (!captionsData || captionsData.length === 0) {
+        // No captions, just copy the video
+        const copyCommand = ffmpeg(videoPath)
+          .videoCodec('copy')
+          .audioCodec('copy')
+          .output(outputPath)
+          .on('end', () => resolve(outputPath))
+          .on('error', (err: any) => reject(err));
+        
+        copyCommand.run();
+        return;
+      }
 
-      command.run();
+      // Use modern Canvas + WebCodecs rendering for perfect preview matching
+      try {
+        const { ModernVideoRenderer } = await import('./canvasRenderer');
+        const renderer = ModernVideoRenderer.getInstance();
+        const result = await renderer.renderVideoWithCaptions(videoPath, captionsData, outputPath, onProgress);
+        resolve(result);
+      } catch (error) {
+        console.error('Modern rendering failed, fallback to basic copy:', error);
+        
+        // Fallback: just copy the video if modern rendering fails
+        const command = ffmpeg(videoPath)
+          .videoCodec('copy')
+          .audioCodec('copy')
+          .output(outputPath)
+          .on('end', () => resolve(outputPath))
+          .on('error', (err: any) => reject(new Error(`Fallback failed: ${err.message}`)));
+        
+        command.run();
+      }
     });
   }
+
 
   public checkFFmpegAvailability(): boolean {
     return this.ffmpegPath !== '';

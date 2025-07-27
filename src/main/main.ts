@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as os from 'os';
 import FFmpegService from '../services/ffmpeg';
 import WhisperService from '../services/whisper';
+import VideoEditor from '../services/videoEditor';
 
 let mainWindow: BrowserWindow;
 
@@ -16,6 +17,7 @@ function createWindow(): void {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
+      webSecurity: false, // Allow file:// protocol for local video files
     },
     titleBarStyle: 'hiddenInset',
     show: false,
@@ -30,6 +32,38 @@ function createWindow(): void {
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
+  });
+
+  // Enable drag and drop
+  mainWindow.webContents.on('dom-ready', () => {
+    mainWindow.webContents.executeJavaScript(`
+      document.addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const files = Array.from(e.dataTransfer.files);
+        const videoFile = files.find(file => 
+          file.type.startsWith('video/') || 
+          /\\.(mp4|mov|avi)$/i.test(file.name)
+        );
+        
+        if (videoFile) {
+          // In Electron, files from drag and drop have a path property
+          const filePath = videoFile.path || videoFile.webkitRelativePath || videoFile.name;
+          window.electronAPI.handleFileDrop(filePath);
+        }
+      });
+      
+      document.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+      
+      document.addEventListener('dragenter', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+    `);
   });
 }
 
@@ -127,5 +161,20 @@ ipcMain.handle('render-video-with-captions', async (_event, videoPath: string, c
     return await ffmpegService.renderVideoWithBurnedCaptions(videoPath, captionsData, outputPath);
   } catch (error) {
     throw new Error(`Failed to render video: ${error}`);
+  }
+});
+
+ipcMain.handle('handle-file-drop', async (_event, filePath: string) => {
+  // Send the dropped file path to the renderer
+  mainWindow.webContents.send('file-dropped', filePath);
+  return true;
+});
+
+ipcMain.handle('apply-word-deletions', async (_event, inputVideoPath: string, originalCaptions: any[], updatedCaptions: any[], outputPath: string) => {
+  try {
+    const videoEditor = VideoEditor.getInstance();
+    return await videoEditor.applyWordDeletions(inputVideoPath, originalCaptions, updatedCaptions, outputPath);
+  } catch (error) {
+    throw new Error(`Failed to apply word deletions: ${error}`);
   }
 });

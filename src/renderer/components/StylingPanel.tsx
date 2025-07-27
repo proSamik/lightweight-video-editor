@@ -41,6 +41,63 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
     });
   };
 
+  const handleTextUpdate = (newText: string) => {
+    onSegmentUpdate(selectedSegment.id, {
+      text: newText
+    });
+  };
+
+  const handleWordUpdate = (wordIndex: number, newWord: string) => {
+    if (!selectedSegment.words) return;
+    
+    const updatedWords = [...selectedSegment.words];
+    updatedWords[wordIndex] = { ...updatedWords[wordIndex], word: newWord };
+    
+    // Regenerate text from words
+    const newText = updatedWords.map(w => w.word).join(' ');
+    
+    onSegmentUpdate(selectedSegment.id, {
+      text: newText,
+      words: updatedWords
+    });
+  };
+
+  const handleWordDelete = (wordIndex: number) => {
+    if (!selectedSegment.words) return;
+    
+    const wordToDelete = selectedSegment.words[wordIndex];
+    const updatedWords = selectedSegment.words.filter((_, index) => index !== wordIndex);
+    
+    // Calculate new timing: remove the gap left by deleted word
+    const deletedDuration = wordToDelete.end - wordToDelete.start;
+    
+    // Adjust timings of remaining words
+    const adjustedWords = updatedWords.map((word) => {
+      if (word.start > wordToDelete.start) {
+        return {
+          ...word,
+          start: word.start - deletedDuration,
+          end: word.end - deletedDuration
+        };
+      }
+      return word;
+    });
+    
+    // Regenerate text from remaining words
+    const newText = adjustedWords.map(w => w.word).join(' ');
+    
+    // Calculate new segment timing
+    const newStartTime = adjustedWords.length > 0 ? adjustedWords[0].start : selectedSegment.startTime;
+    const newEndTime = adjustedWords.length > 0 ? adjustedWords[adjustedWords.length - 1].end : selectedSegment.endTime;
+    
+    onSegmentUpdate(selectedSegment.id, {
+      text: newText,
+      words: adjustedWords,
+      startTime: newStartTime,
+      endTime: newEndTime
+    });
+  };
+
   const textColors = [
     ColorOption.WHITE,
     ColorOption.BLACK,
@@ -75,6 +132,97 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
       overflowY: 'auto'
     }}>
       <h3 style={{ margin: '0 0 20px 0', fontSize: '16px' }}>Styling Controls</h3>
+      
+      {/* Text Editor Section */}
+      <div style={{ marginBottom: '25px' }}>
+        <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+          Text Content
+        </label>
+        <textarea
+          value={selectedSegment.text}
+          onChange={(e) => handleTextUpdate(e.target.value)}
+          style={{
+            width: '100%',
+            height: '80px',
+            padding: '8px',
+            backgroundColor: '#333',
+            color: '#fff',
+            border: '1px solid #555',
+            borderRadius: '4px',
+            resize: 'vertical',
+            fontFamily: 'monospace',
+            fontSize: '14px'
+          }}
+          placeholder="Enter caption text..."
+        />
+        <div style={{ marginTop: '8px', fontSize: '12px', color: '#888' }}>
+          {selectedSegment.words ? `${selectedSegment.words.length} words with timing` : 'No word-level timing available'}
+        </div>
+      </div>
+
+      {/* Word-Level Editor */}
+      {selectedSegment.words && selectedSegment.words.length > 0 && (
+        <div style={{ marginBottom: '25px' }}>
+          <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+            Word-Level Editor
+          </label>
+          <div style={{
+            maxHeight: '200px',
+            overflowY: 'auto',
+            backgroundColor: '#333',
+            border: '1px solid #555',
+            borderRadius: '4px',
+            padding: '8px'
+          }}>
+            {selectedSegment.words.map((word, index) => (
+              <div
+                key={index}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  marginBottom: '4px',
+                  padding: '4px',
+                  backgroundColor: '#444',
+                  borderRadius: '3px'
+                }}
+              >
+                <input
+                  type="text"
+                  value={word.word}
+                  onChange={(e) => handleWordUpdate(index, e.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: '2px 4px',
+                    backgroundColor: '#555',
+                    color: '#fff',
+                    border: '1px solid #666',
+                    borderRadius: '2px',
+                    fontSize: '12px'
+                  }}
+                />
+                <button
+                  onClick={() => handleWordDelete(index)}
+                  style={{
+                    marginLeft: '8px',
+                    padding: '2px 6px',
+                    backgroundColor: '#d32f2f',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '2px',
+                    fontSize: '10px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: '8px', fontSize: '11px', color: '#888' }}>
+            ⚠️ Deleting words will remove corresponding audio/video segments
+          </div>
+        </div>
+      )}
       
       {/* Font Selection */}
       <div style={{ marginBottom: '25px' }}>
