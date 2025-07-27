@@ -108,13 +108,7 @@
         }
       ],
       "category": "Video",
-      "icon": "build/icons/",
-      "desktop": {
-        "Name": "Lightweight Video Editor",
-        "Comment": "Professional video editor for adding captions",
-        "Type": "Application",
-        "Categories": "Video;AudioVideo;"
-      }
+      "icon": "build/icons/"
     },
     "win": {
       "target": [
