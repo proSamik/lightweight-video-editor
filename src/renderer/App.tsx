@@ -308,6 +308,8 @@ const App: React.FC = () => {
           onTimeUpdate={setCurrentTime}
           onVideoSelect={handleVideoSelect}
           onVideoDropped={handleVideoDropped}
+          selectedSegmentId={selectedSegmentId}
+          onCaptionUpdate={handleCaptionUpdate}
         />
         
         {/* Timeline Panel */}
@@ -318,6 +320,7 @@ const App: React.FC = () => {
           onSegmentSelect={setSelectedSegmentId}
           onTimeSeek={setCurrentTime}
           onSegmentDelete={handleCaptionDelete}
+          videoFile={videoFile}
         />
       </div>
 
