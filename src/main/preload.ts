@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, webUtils } from 'electron';
 
 const electronAPI = {
   selectVideoFile: () => ipcRenderer.invoke('select-video-file'),
@@ -13,6 +13,8 @@ const electronAPI = {
   onFileDropped: (callback: (filePath: string) => void) => {
     ipcRenderer.on('file-dropped', (_event, filePath) => callback(filePath));
   },
+  // New method to get file path from File object using webUtils
+  getFilePath: (file: File) => webUtils.getPathForFile(file),
   applyWordDeletions: (inputVideoPath: string, originalCaptions: any[], updatedCaptions: any[], outputPath: string) =>
     ipcRenderer.invoke('apply-word-deletions', inputVideoPath, originalCaptions, updatedCaptions, outputPath),
   onTranscriptionProgress: (callback: (progress: number) => void) => {
