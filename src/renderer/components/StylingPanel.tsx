@@ -7,6 +7,7 @@ interface StylingPanelProps {
   videoFile?: { path: string; name: string } | null;
   captions?: CaptionSegment[];
   onExport?: () => void;
+  onApplyToAll?: (styleUpdates: Partial<CaptionSegment['style']>) => void;
 }
 
 const StylingPanel: React.FC<StylingPanelProps> = ({
@@ -15,6 +16,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
   videoFile,
   captions,
   onExport,
+  onApplyToAll,
 }) => {
   if (!selectedSegment) {
     return (
@@ -179,30 +181,27 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
       {/* Font Size Control */}
       <div style={{ marginBottom: '25px' }}>
         <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
-          Font Size
+          Font Size: {selectedSegment.style.fontSize}px
         </label>
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-          {[16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 68, 72, 76, 80].map(size => (
-            <button
-              key={size}
-              onClick={() => handleStyleUpdate({ fontSize: size })}
-              style={{
-                padding: '6px 12px',
-                backgroundColor: selectedSegment.style.fontSize === size ? '#007acc' : '#444',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '12px',
-                minWidth: '40px'
-              }}
-            >
-              {size}
-            </button>
-          ))}
-        </div>
-        <div style={{ marginTop: '8px', fontSize: '12px', color: '#888' }}>
-          Current: {selectedSegment.style.fontSize}px
+        <input
+          type="range"
+          min="16"
+          max="200"
+          step="1"
+          value={selectedSegment.style.fontSize}
+          onChange={(e) => handleStyleUpdate({ fontSize: parseInt(e.target.value) })}
+          style={{
+            width: '100%',
+            height: '6px',
+            borderRadius: '3px',
+            background: '#444',
+            outline: 'none',
+            appearance: 'none'
+          }}
+        />
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '10px', color: '#888' }}>
+          <span>16px</span>
+          <span>200px</span>
         </div>
       </div>
 
@@ -398,35 +397,30 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
         </div>
       </div>
 
-      {/* Text Width Control */}
-      <div style={{ marginBottom: '25px' }}>
-        <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
-          Text Width: {selectedSegment.style.width || 600}px
-        </label>
-        <input
-          type="range"
-          min="100"
-          max="2000"
-          step="10"
-          value={selectedSegment.style.width || 600}
-          onChange={(e) => handleStyleUpdate({ width: parseInt(e.target.value) })}
-          style={{
-            width: '100%',
-            height: '6px',
-            borderRadius: '3px',
-            background: '#444',
-            outline: 'none',
-            appearance: 'none'
-          }}
-        />
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '10px', color: '#888' }}>
-          <span>100px</span>
-          <span>2000px</span>
+      {/* Apply to All Section */}
+      {onApplyToAll && (
+        <div style={{ marginBottom: '25px', paddingTop: '20px', borderTop: '1px solid #444' }}>
+          <button
+            onClick={() => onApplyToAll(selectedSegment.style)}
+            style={{
+              width: '100%',
+              padding: '10px 20px',
+              backgroundColor: '#28a745',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: 'bold'
+            }}
+          >
+            Apply Style to All Subtitles
+          </button>
+          <div style={{ marginTop: '4px', fontSize: '12px', color: '#888', textAlign: 'center' }}>
+            This will apply the current style to all subtitle segments
+          </div>
         </div>
-        <div style={{ marginTop: '4px', fontSize: '12px', color: '#888' }}>
-          Maximum width for text wrapping
-        </div>
-      </div>
+      )}
 
       {/* Export Section */}
       {videoFile && captions && captions.length > 0 && (
