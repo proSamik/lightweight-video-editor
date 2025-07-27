@@ -1,7 +1,7 @@
 {
   "name": "lightweight-video-editor",
   "version": "1.0.0",
-  "description": "",
+  "description": "A professional Electron-based video editor that specializes in adding captions to videos with word-level timing. Create karaoke-style subtitles with AI transcription, real-time editing, and pixel-perfect preview.",
   "main": "dist/main/main/main.js",
   "scripts": {
     "build-main": "tsc --project src/main/tsconfig.json",
@@ -11,14 +11,17 @@
     "dev": "npm run build-main && concurrently \"npm run watch-main\" \"npm run dev-renderer\"",
     "watch-main": "tsc --project src/main/tsconfig.json --watch",
     "dev-renderer": "webpack serve --mode development",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "pack": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder",
+    "dist:mac": "npm run build && electron-builder --mac"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/proSamik/lightweight-video-editor.git"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": ["video-editor", "captions", "subtitles", "ai-transcription", "karaoke", "electron", "ffmpeg"],
+  "author": "Lightweight Video Editor Team",
   "license": "ISC",
   "type": "commonjs",
   "bugs": {
@@ -51,5 +54,40 @@
     "react-dom": "^19.1.0",
     "skia-canvas": "^2.0.2",
     "webm-writer": "^1.0.0"
+  },
+  "build": {
+    "appId": "com.lightweight.video-editor",
+    "productName": "Lightweight Video Editor",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "dist/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.video",
+      "icon": "build/icons/icon.png",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
+    },
+    "dmg": {
+      "title": "Lightweight Video Editor",
+      "icon": "build/icons/icon.png",
+      "background": "build/background.png",
+      "window": {
+        "width": 540,
+        "height": 380
+      }
+    }
   }
 }
