@@ -112,6 +112,7 @@ export class WhisperService {
           
           // Convert Whisper format to our format
           const result: TranscriptionResult = {
+            text: whisperResult.segments.map((s: any) => s.text).join(' '),
             segments: whisperResult.segments.map((segment: any) => ({
               start: segment.start * 1000, // Convert to milliseconds
               end: segment.end * 1000,
