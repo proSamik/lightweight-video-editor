@@ -136,10 +136,13 @@ ipcMain.handle('extract-audio', async (_event, videoPath: string) => {
   }
 });
 
-ipcMain.handle('transcribe-audio', async (_event, audioPath: string) => {
+ipcMain.handle('transcribe-audio', async (event, audioPath: string) => {
   try {
     const whisperService = WhisperService.getInstance();
-    return await whisperService.transcribeAudio(audioPath);
+    return await whisperService.transcribeAudio(audioPath, (progress: number) => {
+      // Send progress updates to renderer
+      event.sender.send('transcription-progress', progress);
+    });
   } catch (error) {
     throw new Error(`Failed to transcribe audio: ${error}`);
   }
@@ -155,10 +158,13 @@ ipcMain.handle('check-dependencies', async () => {
   };
 });
 
-ipcMain.handle('render-video-with-captions', async (_event, videoPath: string, captionsData: any[], outputPath: string) => {
+ipcMain.handle('render-video-with-captions', async (event, videoPath: string, captionsData: any[], outputPath: string) => {
   try {
     const ffmpegService = FFmpegService.getInstance();
-    return await ffmpegService.renderVideoWithBurnedCaptions(videoPath, captionsData, outputPath);
+    return await ffmpegService.renderVideoWithBurnedCaptions(videoPath, captionsData, outputPath, (progress: number) => {
+      // Send progress updates to renderer
+      event.sender.send('rendering-progress', progress);
+    });
   } catch (error) {
     throw new Error(`Failed to render video: ${error}`);
   }
