@@ -362,7 +362,9 @@ function renderSimpleTextOnCanvas(
   y: number,
   scaleFactor: number
 ) {
-  const fontSize = caption.style?.fontSize || 32;
+  const baseFontSize = caption.style?.fontSize || 32;
+  const scale = caption.style?.scale || 1;
+  const fontSize = baseFontSize * scale;
   const textColor = parseColor(caption.style?.textColor || '#ffffff');
   const backgroundColor = parseColor(caption.style?.backgroundColor || '#80000000');
   
@@ -451,7 +453,9 @@ function renderKaraokeTextOnCanvas(
   centerY: number,
   scaleFactor: number
 ) {
-  const fontSize = caption.style?.fontSize || 32;
+  const baseFontSize = caption.style?.fontSize || 32;
+  const scale = caption.style?.scale || 1;
+  const fontSize = baseFontSize * scale;
   const textColor = parseColor(caption.style?.textColor || '#ffffff');
   const highlighterColor = parseColor(caption.style?.highlighterColor || '#ffff00');
   const backgroundColor = parseColor(caption.style?.backgroundColor || '#80000000');
@@ -464,8 +468,8 @@ function renderKaraokeTextOnCanvas(
   
   // Since we enforce one line per frame and removed width functionality, 
   // we render all words in a single line
-  const wordSpacing = 12; // Increased uniform spacing between words
-  const wordPadding = 4; // padding from VideoPanel
+  const wordSpacing = 12 * scale; // Scaled uniform spacing between words
+  const wordPadding = 4 * scale; // Scaled padding
   
   // Calculate total width for single line
   let totalWidth = 0;
@@ -585,7 +589,9 @@ function renderProgressiveTextOnCanvas(
   centerY: number,
   scaleFactor: number
 ) {
-  const fontSize = caption.style?.fontSize || 32;
+  const baseFontSize = caption.style?.fontSize || 32;
+  const scale = caption.style?.scale || 1;
+  const fontSize = baseFontSize * scale;
   const textColor = parseColor(caption.style?.textColor || '#ffffff');
   const highlighterColor = parseColor(caption.style?.highlighterColor || '#ffff00');
   const backgroundColor = parseColor(caption.style?.backgroundColor || '#80000000');
@@ -660,9 +666,8 @@ function renderProgressiveTextOnCanvas(
           ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
         }
       } else {
-        // Normal text color (slightly transparent for non-current words)
-        const alpha = wordIndex === displayLine.length - 1 ? textColor.a : 0.6;
-        ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${alpha})`;
+        // Normal text color - all revealed words should have full opacity
+        ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
       }
       
       // Add text shadow
