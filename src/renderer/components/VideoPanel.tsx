@@ -238,20 +238,61 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
       backgroundColor: '#000',
       margin: '20px'
     }}>
-      {/* Canvas-based Preview Header */}
+      {/* Modern Preview Header */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: '10px 20px',
-        backgroundColor: '#2a2a2a',
-        borderBottom: '1px solid #333'
+        padding: '12px 20px',
+        background: 'linear-gradient(135deg, #2a2a2a 0%, #333 100%)',
+        borderBottom: '1px solid #444',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
       }}>
-        <div style={{ fontSize: '14px', color: '#fff' }}>
-          🎨 Canvas-based Preview (Matches Export Exactly)
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '12px' 
+        }}>
+          <div style={{
+            width: '8px',
+            height: '8px',
+            borderRadius: '50%',
+            backgroundColor: '#00ff88',
+            boxShadow: '0 0 8px rgba(0,255,136,0.4)'
+          }} />
+          <div style={{ 
+            fontSize: '14px', 
+            color: '#fff',
+            fontWeight: '600',
+            letterSpacing: '0.5px'
+          }}>
+            Live Preview
+          </div>
+          <div style={{
+            fontSize: '11px',
+            color: '#888',
+            backgroundColor: '#1a1a1a',
+            padding: '2px 8px',
+            borderRadius: '10px',
+            border: '1px solid #444'
+          }}>
+            Real-time
+          </div>
         </div>
-        <div style={{ fontSize: '12px', color: '#888' }}>
-          Font: Arial Bold | Position: {canvasSize.width}x{canvasSize.height}
+        <div style={{ 
+          fontSize: '12px', 
+          color: '#aaa',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <span>Canvas: {canvasSize.width}×{canvasSize.height}</span>
+          <div style={{
+            width: '1px',
+            height: '12px',
+            backgroundColor: '#555'
+          }} />
+          <span>1:1 Export Match</span>
         </div>
       </div>
 
@@ -290,16 +331,75 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
         />
       </div>
 
-      {/* Canvas Info */}
+      {/* Modern Canvas Info Footer */}
       <div style={{
-        padding: '10px 20px',
-        backgroundColor: '#2a2a2a',
-        borderTop: '1px solid #333',
+        padding: '12px 20px',
+        background: 'linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%)',
+        borderTop: '1px solid #444',
         fontSize: '12px',
         color: '#888'
       }}>
-        <div>💡 This preview uses the same Canvas rendering as your export - what you see is what you get!</div>
-        <div>Real-time updates | Pixel-perfect matching | Unified rendering system</div>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <span style={{ fontSize: '16px' }}>✨</span>
+            <span style={{ color: '#ccc', fontWeight: '500' }}>
+              WYSIWYG Preview - Exact export rendering
+            </span>
+          </div>
+          <div style={{
+            display: 'flex',
+            gap: '12px',
+            fontSize: '11px'
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}>
+              <div style={{
+                width: '4px',
+                height: '4px',
+                borderRadius: '50%',
+                backgroundColor: '#00ff88'
+              }} />
+              <span>Real-time</span>
+            </div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}>
+              <div style={{
+                width: '4px',
+                height: '4px',
+                borderRadius: '50%',
+                backgroundColor: '#007acc'
+              }} />
+              <span>Pixel-perfect</span>
+            </div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}>
+              <div style={{
+                width: '4px',
+                height: '4px',
+                borderRadius: '50%',
+                backgroundColor: '#ff6b35'
+              }} />
+              <span>Canvas-based</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
