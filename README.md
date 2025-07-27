@@ -71,44 +71,83 @@ npm run watch-main     # Watch main process changes
 npm run dev-renderer   # Start webpack dev server for renderer
 ```
 
-## Building macOS App
+## Building Apps for All Platforms
 
 ### Prerequisites
-- macOS (required for building)
-- ImageMagick installed: `brew install imagemagick`
-- Node.js and npm
+- **macOS**: ImageMagick (`brew install imagemagick`)
+- **Linux**: ImageMagick (`sudo apt-get install imagemagick` or equivalent)
+- **Windows**: ImageMagick (download from imagemagick.org or `choco install imagemagick`)
+- Node.js and npm on all platforms
 
-### Quick Build
+### Universal Build Script
 ```bash
-# Use the automated build script
-./scripts/build-mac.sh
+# Automatically detects your platform and runs the appropriate build script
+./scripts/build-all.sh
 ```
 
-### Manual Build
+### Platform-Specific Build Scripts
+
+#### macOS
 ```bash
-# Install dependencies
-npm install
+# Automated build script
+./scripts/build-mac.sh
 
-# Build the application
-npm run build
-
-# Build macOS app
+# Manual build
 npm run dist:mac
 ```
 
+#### Linux
+```bash
+# Automated build script
+./scripts/build-linux.sh
+
+# Manual build
+npm run dist:linux
+```
+
+#### Windows
+```bash
+# Automated build script (run in Command Prompt)
+scripts\build-windows.bat
+
+# Automated build script (run in PowerShell)
+scripts\build-windows.ps1
+
+# Manual build
+npm run dist:win
+```
+
+### Build All Platforms
+```bash
+# Build for all platforms at once
+npm run dist:all
+```
+
 ### Build Outputs
-The build process creates:
+
+#### macOS
 - **App Bundles**: `dist/mac/` and `dist/mac-arm64/`
 - **DMG Installers**: 
   - Intel Mac: `dist/Lightweight Video Editor-1.0.0.dmg` (288MB)
   - Apple Silicon: `dist/Lightweight Video Editor-1.0.0-arm64.dmg` (594MB)
 
+#### Linux
+- **AppImage**: `dist/Lightweight Video Editor-1.0.0.AppImage`
+- **Debian Package**: `dist/lightweight-video-editor_1.0.0_amd64.deb`
+- **RPM Package**: `dist/lightweight-video-editor-1.0.0.x86_64.rpm`
+- **Unpacked App**: `dist/linux-unpacked/`
+
+#### Windows
+- **Installer**: `dist/Lightweight Video Editor Setup 1.0.0.exe`
+- **MSI Package**: `dist/Lightweight Video Editor-1.0.0.msi`
+- **Portable App**: `dist/win-unpacked/`
+
 ### App Features
-- ✅ Universal binary (Intel + Apple Silicon)
-- ✅ Professional app icon
-- ✅ Custom DMG installer with background
-- ✅ Proper macOS entitlements
-- ✅ Hardened runtime for security
+- ✅ **Universal Support**: Intel and ARM64 architectures
+- ✅ **Professional Icons**: Custom icons for each platform
+- ✅ **Native Packaging**: Platform-specific installers
+- ✅ **Cross-Platform**: Works on macOS, Linux, and Windows
+- ✅ **Security**: Proper entitlements and code signing ready
 
 ## Usage
 
