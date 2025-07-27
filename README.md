@@ -71,6 +71,45 @@ npm run watch-main     # Watch main process changes
 npm run dev-renderer   # Start webpack dev server for renderer
 ```
 
+## Building macOS App
+
+### Prerequisites
+- macOS (required for building)
+- ImageMagick installed: `brew install imagemagick`
+- Node.js and npm
+
+### Quick Build
+```bash
+# Use the automated build script
+./scripts/build-mac.sh
+```
+
+### Manual Build
+```bash
+# Install dependencies
+npm install
+
+# Build the application
+npm run build
+
+# Build macOS app
+npm run dist:mac
+```
+
+### Build Outputs
+The build process creates:
+- **App Bundles**: `dist/mac/` and `dist/mac-arm64/`
+- **DMG Installers**: 
+  - Intel Mac: `dist/Lightweight Video Editor-1.0.0.dmg` (288MB)
+  - Apple Silicon: `dist/Lightweight Video Editor-1.0.0-arm64.dmg` (594MB)
+
+### App Features
+- ✅ Universal binary (Intel + Apple Silicon)
+- ✅ Professional app icon
+- ✅ Custom DMG installer with background
+- ✅ Proper macOS entitlements
+- ✅ Hardened runtime for security
+
 ## Usage
 
 1. **Import Video**: Drag and drop a video file or click the drop zone to select a video file
