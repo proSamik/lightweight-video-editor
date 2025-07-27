@@ -72,7 +72,7 @@ export enum ColorOption {
   GRAY = '#808080',
   LIGHT_GRAY = '#d3d3d3',
   DARK_GRAY = '#404040',
-  BRIGHT_YELLOW = '#ffff00',
+  LIME_GREEN = '#32cd32',
   BLACK_SEMI = '#80000000',
   TRANSPARENT = 'transparent'
 }
