@@ -95,22 +95,32 @@ npm run dev-renderer  # Start webpack dev server for renderer
 - Implements undo/redo system with keyboard shortcuts (Cmd/Ctrl+Z)
 - Handles dependency checking (FFmpeg/Whisper availability)
 - Coordinates video processing pipeline
+- Sets default caption styling: 85px font, transparent background, emphasis mode enabled
+- Provides progress tracking for transcription and rendering operations
 
 #### VideoPanel.tsx - Video Preview
 - HTML5 video element with Canvas overlay for caption preview
 - Handles drag & drop video import
 - Real-time caption rendering synchronized with video playback
 - Responsive canvas sizing matching video dimensions
+- Video seeking synchronization when currentTime prop changes
+- Modern UI with gradient headers and real-time indicators
 
 #### TimelinePanel.tsx - Caption Timeline
 - Visual timeline representation of caption segments
 - Click-to-seek functionality
+- Double-click segment synchronization (selects segment and seeks to start time)
 - Current time indicator and segment highlighting
 - Scroll support for long videos
+- Segment deletion functionality with confirmation
 
 #### StylingPanel.tsx - Caption Controls
 - Font, color, and positioning controls
 - Word-level editing with deletion support
+- Font size slider control (16-200px range)
+- Scale control slider (50%-200%)
+- Render mode toggle (horizontal/progressive)
+- Emphasis mode for font size enhancement
 - Export functionality with progress tracking
 - Real-time style preview updates
 
@@ -118,8 +128,9 @@ npm run dev-renderer  # Start webpack dev server for renderer
 
 #### Core Types (`src/types/index.ts`)
 - `CaptionSegment`: Individual caption with timing, text, and styling
+- `CaptionStyle`: Includes renderMode ('horizontal' | 'progressive'), scale, emphasizeMode
 - `WordTimestamp`: Word-level timing for karaoke effects
-- `FontOption` & `ColorOption`: Styling enums
+- `FontOption` & `ColorOption`: Styling enums including transparent background option
 - `VideoFile` & `TranscriptionResult`: File and processing interfaces
 
 ### Dependencies & External Tools
@@ -158,6 +169,32 @@ npm run dev-renderer  # Start webpack dev server for renderer
 - Canvas-based rendering for precision
 - Frame-by-frame processing with progress updates
 - Efficient segment merging for video editing
+
+## Recent Features & Improvements
+
+### Transcription Settings
+- **TranscriptionSettings.tsx**: Dialog for configuring caption segmentation
+- Character-based line wrapping (12-200 characters per line)
+- Word-based line wrapping (3-20 words per line)
+- Range slider controls with visual feedback
+- Minimum character validation (12 char minimum)
+
+### Enhanced Timeline Navigation
+- **Double-click functionality**: Click any caption segment to select and seek to its end time
+- **Video synchronization**: Automatic video seeking when timeline position changes
+- **Real-time progress tracking**: Visual progress indicators during transcription and rendering
+
+### Default Caption Styling
+- **Modern defaults**: 85px font size, transparent background, emphasis mode enabled
+- **Progressive text rendering**: Optional vertical line-by-line text reveal
+- **Emphasis mode**: 1.05x font size multiplier for highlighted words
+- **Scale controls**: 50%-200% scaling with independent font size control
+
+### Canvas Rendering Improvements
+- **Pixel-perfect preview**: Canvas overlay matches export rendering exactly
+- **Progressive rendering**: Cumulative word display for vertical text reveal
+- **Smart audio preservation**: Distinguishes between text edits and actual word deletions
+- **Real-time synchronization**: Video seeking integration with timeline controls
 
 ## Common Development Tasks
 
