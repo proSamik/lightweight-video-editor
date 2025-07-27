@@ -34,23 +34,44 @@ function createWindow(): void {
     mainWindow.show();
   });
 
-  // Enable drag and drop
+  // Enable drag and drop using Electron's native support
   mainWindow.webContents.on('dom-ready', () => {
+    // Handle file drops at the window level
+    mainWindow.webContents.on('will-navigate', (event) => {
+      event.preventDefault();
+    });
+    
+    // Inject simpler drag and drop handler
     mainWindow.webContents.executeJavaScript(`
+      console.log('Setting up drag and drop handlers...');
+      
       document.addEventListener('drop', (e) => {
+        console.log('Drop event triggered');
         e.preventDefault();
         e.stopPropagation();
         
         const files = Array.from(e.dataTransfer.files);
-        const videoFile = files.find(file => 
-          file.type.startsWith('video/') || 
-          /\\.(mp4|mov|avi)$/i.test(file.name)
-        );
+        console.log('Dropped files:', files.length);
+        
+        const videoFile = files.find(file => {
+          const isVideoType = file.type.startsWith('video/');
+          const isVideoExtension = /\.(mp4|mov|avi)$/i.test(file.name);
+          console.log('Checking file:', file.name, 'type:', file.type, 'isVideo:', isVideoType || isVideoExtension);
+          return isVideoType || isVideoExtension;
+        });
         
         if (videoFile) {
-          // In Electron, files from drag and drop have a path property
-          const filePath = videoFile.path || videoFile.webkitRelativePath || videoFile.name;
-          window.electronAPI.handleFileDrop(filePath);
+          console.log('Video file found:', videoFile.name);
+          try {
+            const filePath = window.electronAPI.getFilePath(videoFile);
+            console.log('File path obtained via webUtils:', filePath);
+            window.electronAPI.handleFileDrop(filePath);
+            console.log('handleFileDrop called successfully');
+          } catch (error) {
+            console.error('Error getting file path or calling handleFileDrop:', error);
+          }
+        } else {
+          console.log('No video file found in drop');
         }
       });
       
@@ -63,6 +84,8 @@ function createWindow(): void {
         e.preventDefault();
         e.stopPropagation();
       });
+      
+      console.log('Drag and drop handlers set up successfully');
     `);
   });
 }
