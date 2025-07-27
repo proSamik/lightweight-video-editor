@@ -1,68 +1,78 @@
 export interface CaptionSegment {
   id: string;
-  startTime: number; // milliseconds
+  startTime: number;
   endTime: number;
   text: string;
-  words?: WordTimestamp[]; // Word-level timestamps for karaoke
-  style: {
-    font: FontOption;
-    fontSize: number;
-    textColor: ColorOption;
-    highlighterColor: ColorOption;
-    backgroundColor: ColorOption;
-    position: { x: number; y: number };
-    width: number; // pixels
+  words?: WordTimestamp[];
+  style: CaptionStyle;
+}
+
+export interface CaptionStyle {
+  font: string; // Changed from FontOption to string for more flexibility
+  fontSize: number;
+  textColor: string; // Changed from ColorOption to string
+  highlighterColor: string; // Changed from ColorOption to string
+  backgroundColor: string; // Changed from ColorOption to string
+  position: {
+    x: number;
+    y: number;
+    z?: number; // Added z rotation
   };
+  width: number;
+  emphasizeMode?: boolean; // When true, highlighted words get emphasized instead of background highlight
 }
 
 export interface WordTimestamp {
-  start: number; // milliseconds
-  end: number;
   word: string;
-}
-
-export enum FontOption {
-  ARIAL_BOLD = 'Arial Bold',
-  HELVETICA_NEUE_MEDIUM = 'Helvetica Neue Medium',
-  SF_PRO_DISPLAY_SEMIBOLD = 'SF Pro Display Semibold',
-  FUTURA_BOLD = 'Futura Bold',
-  IMPACT = 'Impact',
-}
-
-export enum ColorOption {
-  WHITE = '#FFFFFF',
-  BLACK = '#000000',
-  YELLOW = '#FFD700',
-  RED = '#FF0000',
-  BLUE = '#0080FF',
-  BRIGHT_YELLOW = '#FFFF00',
-  ORANGE = '#FF8C00',
-  GREEN = '#00FF00',
-  PINK = '#FF69B4',
-  CYAN = '#00FFFF',
-  TRANSPARENT = 'transparent',
-  BLACK_SEMI = '#00000080',
-  WHITE_SEMI = '#FFFFFF80',
-  DARK_GRAY = '#333333',
-  NAVY_BLUE = '#000080',
+  start: number;
+  end: number;
 }
 
 export interface VideoFile {
-  path: string;
   name: string;
-  duration: number;
-  size: number;
+  path: string;
+  duration?: number;
+  width?: number;
+  height?: number;
 }
 
 export interface TranscriptionResult {
-  segments: Array<{
-    start: number;
-    end: number;
-    text: string;
-    words: Array<{
-      start: number;
-      end: number;
-      word: string;
-    }>;
-  }>;
+  text: string;
+  segments: TranscriptionSegment[];
+}
+
+export interface TranscriptionSegment {
+  start: number;
+  end: number;
+  text: string;
+  words?: WordTimestamp[];
+}
+
+export enum FontOption {
+  SF_PRO_DISPLAY_SEMIBOLD = 'SF Pro Display Semibold',
+  ARIAL = 'Arial',
+  HELVETICA = 'Helvetica',
+  TIMES_NEW_ROMAN = 'Times New Roman',
+  GEORGIA = 'Georgia'
+}
+
+export enum ColorOption {
+  WHITE = '#ffffff',
+  BLACK = '#000000',
+  RED = '#ff0000',
+  GREEN = '#00ff00',
+  BLUE = '#0000ff',
+  YELLOW = '#ffff00',
+  CYAN = '#00ffff',
+  MAGENTA = '#ff00ff',
+  ORANGE = '#ffa500',
+  PURPLE = '#800080',
+  PINK = '#ffc0cb',
+  BROWN = '#a52a2a',
+  GRAY = '#808080',
+  LIGHT_GRAY = '#d3d3d3',
+  DARK_GRAY = '#404040',
+  BRIGHT_YELLOW = '#ffff00',
+  BLACK_SEMI = '#80000000',
+  TRANSPARENT = 'transparent'
 }
