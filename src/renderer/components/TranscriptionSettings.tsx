@@ -11,8 +11,8 @@ const TranscriptionSettings: React.FC<TranscriptionSettingsProps> = ({
   onClose,
   onConfirm
 }) => {
-  const [maxCharsPerLine, setMaxCharsPerLine] = useState(50);
-  const [maxWordsPerLine, setMaxWordsPerLine] = useState(8);
+  const [maxCharsPerLine, setMaxCharsPerLine] = useState(16);
+  const [maxWordsPerLine, setMaxWordsPerLine] = useState(5);
 
   if (!isOpen) return null;
 
