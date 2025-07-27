@@ -460,11 +460,11 @@ function renderKaraokeTextOnCanvas(
   const fontFamily = mapFontName(caption.style?.font || 'SF Pro Display Semibold');
   ctx.font = `bold ${fontSize}px ${fontFamily}, Arial, sans-serif`;
   ctx.textAlign = 'center';
-  ctx.textBaseline = 'bottom';
+  ctx.textBaseline = 'middle'; // Changed to middle for better centering
   
   // Since we enforce one line per frame and removed width functionality, 
   // we render all words in a single line
-  const wordSpacing = 4; // marginRight from VideoPanel
+  const wordSpacing = 12; // Increased uniform spacing between words
   const wordPadding = 4; // padding from VideoPanel
   
   // Calculate total width for single line
@@ -475,9 +475,9 @@ function renderKaraokeTextOnCanvas(
   }
   totalWidth -= wordSpacing; // Remove last margin
   
-  // Calculate background box for single line caption
+  // Calculate background box for single line caption (adjusted for middle baseline)
   const boxX = centerX - (totalWidth / 2) - 12;
-  const boxY = centerY - fontSize - 12;
+  const boxY = centerY - (fontSize / 2) - 12;
   const boxWidth = totalWidth + 24;
   const boxHeight = fontSize + 24;
   
@@ -510,13 +510,13 @@ function renderKaraokeTextOnCanvas(
     const wordBoxWidth = wordWidth + (wordPadding * 2);
     const wordBoxHeight = fontSize + (wordPadding * 2);
     const wordBoxX = currentX - wordPadding;
-    const wordBoxY = centerY - fontSize - wordPadding;
+    const wordBoxY = centerY - (fontSize / 2) - wordPadding;
       
       // Handle emphasis mode vs background highlighting
       if (isHighlighted) {
         if (caption.style.emphasizeMode) {
-          // Emphasis mode: increase font size by 10px and use highlighter color as text color
-          const emphasizedFontSize = fontSize + 10;
+          // Emphasis mode: increase font size by 5% and use highlighter color as text color
+          const emphasizedFontSize = fontSize * 1.05;
           ctx.font = `bold ${emphasizedFontSize}px ${fontFamily}, Arial, sans-serif`;
           ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.a})`;
         } else {
@@ -544,9 +544,8 @@ function renderKaraokeTextOnCanvas(
       ctx.font = `bold ${fontSize}px ${fontFamily}, Arial, sans-serif`;
     }
     
-    // Move to next word position - add extra spacing for emphasized words
-    const extraSpacing = (isHighlighted && caption.style.emphasizeMode) ? 8 : 0;
-    currentX += wordWidth + (wordPadding * 2) + wordSpacing + extraSpacing;
+    // Move to next word position with uniform spacing
+    currentX += wordWidth + (wordPadding * 2) + wordSpacing;
   }
   
   // Reset shadow
@@ -651,7 +650,7 @@ function renderProgressiveTextOnCanvas(
       if (isHighlighted) {
         if (caption.style.emphasizeMode) {
           // Emphasis mode
-          const emphasizedFontSize = fontSize + 10;
+          const emphasizedFontSize = fontSize * 1.05;
           ctx.font = `bold ${emphasizedFontSize}px ${fontFamily}, Arial, sans-serif`;
           ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.a})`;
         } else {
