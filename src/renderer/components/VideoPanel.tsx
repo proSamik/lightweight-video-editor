@@ -182,33 +182,11 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     setIsDragOver(false);
   };
 
-  const handleDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-
-    const files = Array.from(e.dataTransfer.files);
-    const videoFile = files.find(file => 
-      file.type.startsWith('video/') || 
-      /\.(mp4|mov|avi)$/i.test(file.name)
-    );
-
-    if (videoFile && onVideoDropped) {
-      const filePath = (videoFile as any).path;
-      if (filePath) {
-        onVideoDropped(filePath);
-      } else {
-        console.warn('No file path available, falling back to file picker');
-        onVideoSelect();
-      }
-    } else if (videoFile) {
-      onVideoSelect();
-    }
-  };
-
   if (!videoFile) {
     return (
       <div 
+        data-drop-zone="video"
+        className="video-drop-zone"
         style={{
           flex: 1,
           display: 'flex',
@@ -224,7 +202,6 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
         onClick={onVideoSelect}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
       >
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: '48px', marginBottom: '20px' }}>📹</div>
