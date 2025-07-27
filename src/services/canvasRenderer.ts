@@ -211,7 +211,11 @@ export class CanvasVideoRenderer {
       
       // Draw text with word-level highlighting
       if (words.length > 0) {
-        await this.renderKaraokeTextOnCanvas(ctx, words, caption, frameTime, x, y);
+        if (caption.style.renderMode === 'progressive') {
+          await this.renderProgressiveTextOnCanvas(ctx, words, caption, frameTime, x, y);
+        } else {
+          await this.renderKaraokeTextOnCanvas(ctx, words, caption, frameTime, x, y);
+        }
       } else {
         // Simple text without word-level timing
         await this.renderSimpleTextOnCanvas(ctx, text, caption, x, y);
@@ -626,6 +630,125 @@ export class CanvasVideoRenderer {
         })
         .run();
     });
+  }
+
+  /**
+   * Renders progressive text reveal on Canvas (vertical line-by-line)
+   */
+  private async renderProgressiveTextOnCanvas(
+    ctx: CanvasRenderingContext2D,
+    words: any[],
+    caption: any,
+    frameTime: number,
+    centerX: number,
+    centerY: number
+  ): Promise<void> {
+    try {
+      const fontSize = caption.style?.fontSize || 32;
+      const fontFamily = this.mapFontName(caption.style?.font || 'SF Pro Display Semibold');
+      const textColor = this.parseColor(caption.style?.textColor || '#ffffff');
+      const highlighterColor = this.parseColor(caption.style?.highlighterColor || '#ffff00');
+      const backgroundColor = this.parseColor(caption.style?.backgroundColor || '#80000000');
+      
+      // Set font with precise sizing
+      ctx.font = `bold ${fontSize}px ${fontFamily}, Arial, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      
+      // Find words that should be visible up to current time
+      const visibleWords: any[] = [];
+      
+      for (const word of words) {
+        if (frameTime >= word.start) {
+          visibleWords.push(word);
+        }
+      }
+      
+      if (visibleWords.length === 0) return;
+      
+      // Group words into lines - each word becomes a new line
+      const lines: any[][] = [];
+      for (let i = 0; i < visibleWords.length; i++) {
+        // Each line contains all words up to current word (cumulative)
+        lines.push(visibleWords.slice(0, i + 1));
+      }
+      
+      // Show only the line that corresponds to the currently highlighted word
+      const currentWord = words.find(word => frameTime >= word.start && frameTime <= word.end);
+      const currentWordIndex = currentWord ? words.indexOf(currentWord) : visibleWords.length - 1;
+      const displayLineIndex = Math.min(currentWordIndex, lines.length - 1);
+      
+      if (displayLineIndex >= 0 && lines[displayLineIndex]) {
+        const displayLine = lines[displayLineIndex];
+        const lineHeight = fontSize + 8; // Add some padding between lines
+        
+        // Calculate vertical position for the line
+        const lineY = centerY - ((displayLine.length - 1) * lineHeight) / 2;
+        
+        // Draw each word in the line vertically
+        for (let wordIndex = 0; wordIndex < displayLine.length; wordIndex++) {
+          const word = displayLine[wordIndex];
+          const wordY = lineY + (wordIndex * lineHeight);
+          const isHighlighted = frameTime >= word.start && frameTime <= word.end;
+          
+          // Measure word for background
+          const wordWidth = ctx.measureText(word.word).width;
+          const boxX = centerX - (wordWidth / 2) - 8;
+          const boxY = wordY - fontSize - 8;
+          const boxWidth = wordWidth + 16;
+          const boxHeight = fontSize + 16;
+          
+          // Draw background for each word if not transparent
+          if (backgroundColor.a > 0) {
+            ctx.fillStyle = `rgba(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b}, ${backgroundColor.a})`;
+            ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+          }
+          
+          // Handle highlighting
+          if (isHighlighted) {
+            if (caption.style.emphasizeMode) {
+              // Emphasis mode
+              const emphasizedFontSize = fontSize + 10;
+              ctx.font = `bold ${emphasizedFontSize}px ${fontFamily}, Arial, sans-serif`;
+              ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.a})`;
+            } else {
+              // Background highlighting
+              ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.a})`;
+              ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+              ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
+            }
+          } else {
+            // Normal text color (slightly transparent for non-current words)
+            const alpha = wordIndex === displayLine.length - 1 ? textColor.a : 0.6;
+            ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${alpha})`;
+          }
+          
+          // Add text shadow
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+          ctx.shadowBlur = 4;
+          ctx.shadowOffsetX = 2;
+          ctx.shadowOffsetY = 2;
+          
+          // Draw the word
+          ctx.fillText(word.word, centerX, wordY);
+          
+          // Reset font size if changed
+          if (isHighlighted && caption.style.emphasizeMode) {
+            ctx.font = `bold ${fontSize}px ${fontFamily}, Arial, sans-serif`;
+          }
+        }
+        
+        // Reset shadow
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+      }
+      
+    } catch (error) {
+      console.error('Error in progressive text rendering:', error);
+      throw error;
+    }
   }
 
   /**
