@@ -277,9 +277,6 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
         {/* Canvas Overlay - Renders captions exactly like export */}
         <canvas
           ref={canvasRef}
-          onMouseDown={handleCanvasMouseDown}
-          onMouseMove={handleCanvasMouseMove}
-          onMouseUp={handleCanvasMouseUp}
           style={{
             position: 'absolute',
             top: '50%',
@@ -288,8 +285,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
             maxWidth: '100%',
             maxHeight: '100%',
             objectFit: 'contain',
-            pointerEvents: isDragging ? 'auto' : 'auto',
-            cursor: isDragging ? 'grabbing' : 'grab'
+            pointerEvents: 'none'
           }}
         />
       </div>
@@ -368,14 +364,14 @@ function renderSimpleTextOnCanvas(
   
   // Set font with actual font from caption style (matching VideoPanel exactly)
   const fontFamily = mapFontName(caption.style?.font || 'SF Pro Display Semibold');
-  ctx.font = `bold ${fontSize * scaleFactor}px ${fontFamily}, Arial, sans-serif`;
+  ctx.font = `bold ${fontSize}px ${fontFamily}, Arial, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
   
   // Measure text for background box
   const textMetrics = ctx.measureText(text);
   const textWidth = textMetrics.width;
-  const textHeight = fontSize * scaleFactor;
+  const textHeight = fontSize;
   
   // Calculate background box position and size (matching VideoPanel padding exactly)
   const boxX = x - (textWidth / 2) - 12; // 12px padding from VideoPanel
@@ -458,7 +454,7 @@ function renderKaraokeTextOnCanvas(
   
   // Set font with actual font from caption style (matching VideoPanel exactly)
   const fontFamily = mapFontName(caption.style?.font || 'SF Pro Display Semibold');
-  ctx.font = `bold ${fontSize * scaleFactor}px ${fontFamily}, Arial, sans-serif`;
+  ctx.font = `bold ${fontSize}px ${fontFamily}, Arial, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
   
@@ -477,9 +473,9 @@ function renderKaraokeTextOnCanvas(
   
   // Calculate background box for single line caption
   const boxX = centerX - (totalWidth / 2) - 12;
-  const boxY = centerY - fontSize * scaleFactor - 12;
+  const boxY = centerY - fontSize - 12;
   const boxWidth = totalWidth + 24;
-  const boxHeight = fontSize * scaleFactor + 24;
+  const boxHeight = fontSize + 24;
   
   // Draw main background box - only if not transparent
   if (backgroundColor.a > 0) {
@@ -508,15 +504,15 @@ function renderKaraokeTextOnCanvas(
     // Measure word width
     const wordWidth = ctx.measureText(word.word).width;
     const wordBoxWidth = wordWidth + (wordPadding * 2);
-    const wordBoxHeight = fontSize * scaleFactor + (wordPadding * 2);
+    const wordBoxHeight = fontSize + (wordPadding * 2);
     const wordBoxX = currentX - wordPadding;
-    const wordBoxY = centerY - fontSize * scaleFactor - wordPadding;
+    const wordBoxY = centerY - fontSize - wordPadding;
       
       // Handle emphasis mode vs background highlighting
       if (isHighlighted) {
         if (caption.style.emphasizeMode) {
-          // Emphasis mode: increase font size by 2% and use highlighter color as text color
-          const emphasizedFontSize = fontSize * scaleFactor + 3;
+          // Emphasis mode: increase font size by 10px and use highlighter color as text color
+          const emphasizedFontSize = fontSize + 10;
           ctx.font = `bold ${emphasizedFontSize}px ${fontFamily}, Arial, sans-serif`;
           ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.a})`;
         } else {
@@ -541,11 +537,12 @@ function renderKaraokeTextOnCanvas(
     
     // Reset font size if it was changed for emphasis
     if (isHighlighted && caption.style.emphasizeMode) {
-      ctx.font = `bold ${fontSize * scaleFactor}px ${fontFamily}, Arial, sans-serif`;
+      ctx.font = `bold ${fontSize}px ${fontFamily}, Arial, sans-serif`;
     }
     
-    // Move to next word position
-    currentX += wordWidth + (wordPadding * 2) + wordSpacing;
+    // Move to next word position - add extra spacing for emphasized words
+    const extraSpacing = (isHighlighted && caption.style.emphasizeMode) ? 8 : 0;
+    currentX += wordWidth + (wordPadding * 2) + wordSpacing + extraSpacing;
   }
   
   // Reset shadow
