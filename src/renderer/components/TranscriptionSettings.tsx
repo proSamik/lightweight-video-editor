@@ -57,30 +57,28 @@ const TranscriptionSettings: React.FC<TranscriptionSettingsProps> = ({
         
         <div style={{ marginBottom: '20px' }}>
           <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: '#ccc' }}>
-            Maximum Characters per Line
+            Maximum Characters per Line: {maxCharsPerLine}
           </label>
           <input
-            type="number"
+            type="range"
             min="20"
             max="200"
+            step="5"
             value={maxCharsPerLine}
-            onChange={(e) => {
-              const value = parseInt(e.target.value);
-              if (!isNaN(value) && value > 0) {
-                setMaxCharsPerLine(value);
-              } else if (e.target.value === '') {
-                setMaxCharsPerLine(1); // Minimum value while typing
-              }
-            }}
+            onChange={(e) => setMaxCharsPerLine(parseInt(e.target.value))}
             style={{
               width: '100%',
-              padding: '8px',
-              backgroundColor: '#333',
-              color: '#fff',
-              border: '1px solid #555',
-              borderRadius: '4px'
+              height: '6px',
+              borderRadius: '3px',
+              background: '#444',
+              outline: 'none',
+              appearance: 'none'
             }}
           />
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '10px', color: '#888' }}>
+            <span>20</span>
+            <span>200</span>
+          </div>
           <div style={{ marginTop: '4px', fontSize: '12px', color: '#888' }}>
             Text will wrap when this limit is reached
           </div>
@@ -88,30 +86,28 @@ const TranscriptionSettings: React.FC<TranscriptionSettingsProps> = ({
 
         <div style={{ marginBottom: '30px' }}>
           <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: '#ccc' }}>
-            Maximum Words per Line
+            Maximum Words per Line: {maxWordsPerLine}
           </label>
           <input
-            type="number"
+            type="range"
             min="3"
             max="20"
+            step="1"
             value={maxWordsPerLine}
-            onChange={(e) => {
-              const value = parseInt(e.target.value);
-              if (!isNaN(value) && value > 0) {
-                setMaxWordsPerLine(value);
-              } else if (e.target.value === '') {
-                setMaxWordsPerLine(1); // Minimum value while typing
-              }
-            }}
+            onChange={(e) => setMaxWordsPerLine(parseInt(e.target.value))}
             style={{
               width: '100%',
-              padding: '8px',
-              backgroundColor: '#333',
-              color: '#fff',
-              border: '1px solid #555',
-              borderRadius: '4px'
+              height: '6px',
+              borderRadius: '3px',
+              background: '#444',
+              outline: 'none',
+              appearance: 'none'
             }}
           />
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '10px', color: '#888' }}>
+            <span>3</span>
+            <span>20</span>
+          </div>
           <div style={{ marginTop: '4px', fontSize: '12px', color: '#888' }}>
             Text will wrap after this many words
           </div>
