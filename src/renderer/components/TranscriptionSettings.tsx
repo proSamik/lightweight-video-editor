@@ -18,8 +18,8 @@ const TranscriptionSettings: React.FC<TranscriptionSettingsProps> = ({
 
   const handleConfirm = () => {
     // Validate inputs before confirming
-    if (maxCharsPerLine <= 0) {
-      alert('Maximum characters per line must be greater than 0');
+    if (maxCharsPerLine < 12) {
+      alert('Maximum characters per line must be at least 12');
       return;
     }
     if (maxWordsPerLine <= 0) {
@@ -61,9 +61,9 @@ const TranscriptionSettings: React.FC<TranscriptionSettingsProps> = ({
           </label>
           <input
             type="range"
-            min="20"
+            min="12"
             max="200"
-            step="5"
+            step="1"
             value={maxCharsPerLine}
             onChange={(e) => setMaxCharsPerLine(parseInt(e.target.value))}
             style={{
@@ -76,7 +76,7 @@ const TranscriptionSettings: React.FC<TranscriptionSettingsProps> = ({
             }}
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '10px', color: '#888' }}>
-            <span>20</span>
+            <span>12</span>
             <span>200</span>
           </div>
           <div style={{ marginTop: '4px', fontSize: '12px', color: '#888' }}>
