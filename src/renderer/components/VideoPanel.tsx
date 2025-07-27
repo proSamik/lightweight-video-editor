@@ -72,8 +72,15 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
 
     if (!currentCaption) return;
 
+    // Calculate scale factor for font size
+    // The canvas is scaled down by CSS, so we need to scale the font size accordingly
+    const canvasRect = canvas.getBoundingClientRect();
+    const scaleX = canvasRect.width / canvas.width;
+    const scaleY = canvasRect.height / canvas.height;
+    const scaleFactor = Math.min(scaleX, scaleY); // Use the smaller scale to maintain aspect ratio
+
     // Render caption using the same logic as CanvasVideoRenderer
-    renderCaptionOnCanvas(ctx, currentCaption, canvas.width, canvas.height, currentTime);
+    renderCaptionOnCanvas(ctx, currentCaption, canvas.width, canvas.height, currentTime, scaleFactor);
   }, [captions, currentTime]);
 
   // Re-render when captions or time changes
@@ -231,7 +238,8 @@ function renderCaptionOnCanvas(
   caption: CaptionSegment,
   canvasWidth: number,
   canvasHeight: number,
-  currentTime: number
+  currentTime: number,
+  scaleFactor: number
 ) {
   // Calculate position (matching the VideoPanel exactly)
   // x: percentage from left (0-100)
@@ -249,10 +257,10 @@ function renderCaptionOnCanvas(
   
   // Draw text with word-level highlighting
   if (words.length > 0) {
-    renderKaraokeTextOnCanvas(ctx, words, caption, currentTime, x, y);
+    renderKaraokeTextOnCanvas(ctx, words, caption, currentTime, x, y, scaleFactor);
   } else {
     // Simple text without word-level timing
-    renderSimpleTextOnCanvas(ctx, text, caption, x, y);
+    renderSimpleTextOnCanvas(ctx, text, caption, x, y, scaleFactor);
   }
 }
 
@@ -261,7 +269,8 @@ function renderSimpleTextOnCanvas(
   text: string,
   caption: CaptionSegment,
   x: number,
-  y: number
+  y: number,
+  scaleFactor: number
 ) {
   const fontSize = caption.style?.fontSize || 32;
   const textColor = parseColor(caption.style?.textColor || '#ffffff');
@@ -269,14 +278,14 @@ function renderSimpleTextOnCanvas(
   
   // Set font with actual font from caption style (matching VideoPanel exactly)
   const fontFamily = mapFontName(caption.style?.font || 'SF Pro Display Semibold');
-  ctx.font = `bold ${fontSize}px ${fontFamily}, Arial, sans-serif`;
+  ctx.font = `bold ${fontSize * scaleFactor}px ${fontFamily}, Arial, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
   
   // Measure text for background box
   const textMetrics = ctx.measureText(text);
   const textWidth = textMetrics.width;
-  const textHeight = fontSize;
+  const textHeight = fontSize * scaleFactor;
   
   // Calculate background box position and size (matching VideoPanel padding exactly)
   const boxX = x - (textWidth / 2) - 12; // 12px padding from VideoPanel
@@ -311,7 +320,8 @@ function renderKaraokeTextOnCanvas(
   caption: CaptionSegment,
   frameTime: number,
   centerX: number,
-  centerY: number
+  centerY: number,
+  scaleFactor: number
 ) {
   const fontSize = caption.style?.fontSize || 32;
   const textColor = parseColor(caption.style?.textColor || '#ffffff');
@@ -320,7 +330,7 @@ function renderKaraokeTextOnCanvas(
   
   // Set font with actual font from caption style (matching VideoPanel exactly)
   const fontFamily = mapFontName(caption.style?.font || 'SF Pro Display Semibold');
-  ctx.font = `bold ${fontSize}px ${fontFamily}, Arial, sans-serif`;
+  ctx.font = `bold ${fontSize * scaleFactor}px ${fontFamily}, Arial, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
   
@@ -330,7 +340,7 @@ function renderKaraokeTextOnCanvas(
   const wordPadding = 4; // padding from VideoPanel
   
   for (const word of words) {
-    ctx.font = `bold ${fontSize}px ${fontFamily}, Arial, sans-serif`;
+    ctx.font = `bold ${fontSize * scaleFactor}px ${fontFamily}, Arial, sans-serif`;
     const wordWidth = ctx.measureText(word.word).width;
     totalWidth += wordWidth + (wordPadding * 2) + wordSpacing; // word + padding + margin
   }
@@ -338,9 +348,9 @@ function renderKaraokeTextOnCanvas(
   
   // Calculate background box for entire caption (matching VideoPanel exactly)
   const boxX = centerX - (totalWidth / 2);
-  const boxY = centerY - fontSize - 12;
+  const boxY = centerY - fontSize * scaleFactor - 12;
   const boxWidth = totalWidth;
-  const boxHeight = fontSize + 24; // 12px padding top/bottom
+  const boxHeight = fontSize * scaleFactor + 24; // 12px padding top/bottom
   
   // Draw main background box (matching VideoPanel's caption background exactly)
   ctx.fillStyle = `rgba(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b}, ${backgroundColor.a})`;
@@ -367,9 +377,9 @@ function renderKaraokeTextOnCanvas(
     // Measure word width
     const wordWidth = ctx.measureText(word.word).width;
     const wordBoxWidth = wordWidth + (wordPadding * 2);
-    const wordBoxHeight = fontSize + (wordPadding * 2);
+    const wordBoxHeight = fontSize * scaleFactor + (wordPadding * 2);
     const wordBoxX = currentX - wordPadding;
-    const wordBoxY = centerY - fontSize - wordPadding;
+    const wordBoxY = centerY - fontSize * scaleFactor - wordPadding;
     
     // Draw individual word background (matching VideoPanel's word-level styling exactly)
     if (isHighlighted) {
