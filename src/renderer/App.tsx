@@ -77,6 +77,27 @@ const App: React.FC = () => {
     }
   }, [currentTime, captions, selectedSegmentId]);
 
+  // Progress tracking event listeners
+  useEffect(() => {
+    const handleTranscriptionProgress = (progress: number) => {
+      setLoadingProgress(progress);
+    };
+    
+    const handleRenderingProgress = (progress: number) => {
+      setLoadingProgress(progress);
+    };
+    
+    // Set up progress listeners
+    window.electronAPI.onTranscriptionProgress(handleTranscriptionProgress);
+    window.electronAPI.onRenderingProgress(handleRenderingProgress);
+    
+    return () => {
+      // Clean up listeners
+      window.electronAPI.removeTranscriptionProgressListener();
+      window.electronAPI.removeRenderingProgressListener();
+    };
+  }, []);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -132,10 +153,12 @@ const App: React.FC = () => {
 
   const generateCaptions = async (videoPath: string, settings?: { maxCharsPerLine: number; maxWordsPerLine: number }) => {
     try {
+      setLoadingProgress(0); // Reset progress
       setLoadingMessage('Extracting audio...');
       const audioPath = await window.electronAPI.extractAudio(videoPath);
       
       setLoadingMessage('Transcribing audio (this may take a few minutes)...');
+      setLoadingProgress(0); // Reset for transcription
       const transcriptionResult = await window.electronAPI.transcribeAudio(audioPath);
       
       // Convert transcription to caption segments with optional line wrapping
@@ -165,9 +188,11 @@ const App: React.FC = () => {
       setCaptions(captionSegments);
       setOriginalCaptions([...captionSegments]); // Save original captions for comparison
       setIsLoading(false);
+      setLoadingProgress(undefined); // Clear progress
     } catch (error) {
       console.error('Error generating captions:', error);
       setIsLoading(false);
+      setLoadingProgress(undefined); // Clear progress
       setLoadingMessage('Error generating captions. Please check that FFmpeg and Whisper are installed.');
     }
   };
@@ -242,6 +267,7 @@ const App: React.FC = () => {
   const handleTranscriptionSettingsConfirm = async (settings: { maxCharsPerLine: number; maxWordsPerLine: number }) => {
     if (pendingVideoPath) {
       setIsLoading(true);
+      setLoadingProgress(undefined); // Clear progress during metadata loading
       setLoadingMessage('Loading video metadata...');
       
       // Get video metadata
@@ -290,6 +316,7 @@ const App: React.FC = () => {
 
     try {
       setIsLoading(true);
+      setLoadingProgress(0); // Reset progress
       setLoadingMessage('Choosing export location...');
 
       const outputPath = await window.electronAPI.exportVideo(
@@ -298,6 +325,7 @@ const App: React.FC = () => {
 
       if (!outputPath) {
         setIsLoading(false);
+        setLoadingProgress(undefined); // Clear progress
         return;
       }
 
@@ -317,6 +345,7 @@ const App: React.FC = () => {
         );
         
         setLoadingMessage('Rendering video with captions (this may take several minutes)...');
+        setLoadingProgress(0); // Reset for rendering
         await window.electronAPI.renderVideoWithCaptions(
           tempVideoPath,
           captions,
@@ -326,6 +355,7 @@ const App: React.FC = () => {
         // Clean up temp file (note: this would need to be handled by the main process)
       } else {
         setLoadingMessage('Rendering video with captions (this may take several minutes)...');
+        setLoadingProgress(0); // Reset for rendering
         await window.electronAPI.renderVideoWithCaptions(
           videoFile.path,
           captions,
@@ -334,9 +364,11 @@ const App: React.FC = () => {
       }
 
       setIsLoading(false);
+      setLoadingProgress(undefined); // Clear progress
     } catch (error) {
       console.error('Export error:', error);
       setIsLoading(false);
+      setLoadingProgress(undefined); // Clear progress
       alert(`Export failed: ${error}`);
     }
   };
