@@ -11,6 +11,22 @@ if [[ "$OSTYPE" != "darwin"* ]]; then
     exit 1
 fi
 
+# Detect architecture
+ARCH=$(uname -m)
+echo "🏗️  Detected architecture: $ARCH"
+
+# Check if we're building for the correct architecture
+if [[ "$ARCH" == "x86_64" ]]; then
+    echo "🍎 Building for Intel Mac (x86_64)"
+    BUILD_ARCH="x64"
+elif [[ "$ARCH" == "arm64" ]]; then
+    echo "🍎 Building for Apple Silicon (arm64)"
+    BUILD_ARCH="arm64"
+else
+    echo "⚠️  Unknown architecture: $ARCH, defaulting to x64"
+    BUILD_ARCH="x64"
+fi
+
 # Check if required tools are installed
 if ! command -v magick &> /dev/null; then
     echo "❌ ImageMagick is required but not installed. Please install it with: brew install imagemagick"

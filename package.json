@@ -14,7 +14,10 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "pack": "npm run build && electron-builder --dir",
     "dist": "npm run build && electron-builder",
-    "dist:mac": "npm run build && electron-builder --mac"
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:linux": "npm run build && electron-builder --linux",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:all": "npm run build && electron-builder -mwl"
   },
   "repository": {
     "type": "git",
@@ -88,6 +91,44 @@
         "width": 540,
         "height": 380
       }
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "deb",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "rpm",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "category": "Video",
+      "icon": "build/icons/",
+      "desktop": {
+        "Name": "Lightweight Video Editor",
+        "Comment": "Professional video editor for adding captions",
+        "Type": "Application",
+        "Categories": "Video;AudioVideo;"
+      }
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "msi",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "icon": "build/icons/icon.ico",
+      "requestedExecutionLevel": "asInvoker"
     }
   }
 }
