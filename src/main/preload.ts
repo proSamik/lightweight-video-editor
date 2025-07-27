@@ -14,7 +14,19 @@ const electronAPI = {
     ipcRenderer.on('file-dropped', (_event, filePath) => callback(filePath));
   },
   applyWordDeletions: (inputVideoPath: string, originalCaptions: any[], updatedCaptions: any[], outputPath: string) =>
-    ipcRenderer.invoke('apply-word-deletions', inputVideoPath, originalCaptions, updatedCaptions, outputPath)
+    ipcRenderer.invoke('apply-word-deletions', inputVideoPath, originalCaptions, updatedCaptions, outputPath),
+  onTranscriptionProgress: (callback: (progress: number) => void) => {
+    ipcRenderer.on('transcription-progress', (_, progress) => callback(progress));
+  },
+  removeTranscriptionProgressListener: () => {
+    ipcRenderer.removeAllListeners('transcription-progress');
+  },
+  onRenderingProgress: (callback: (progress: number) => void) => {
+    ipcRenderer.on('rendering-progress', (_, progress) => callback(progress));
+  },
+  removeRenderingProgressListener: () => {
+    ipcRenderer.removeAllListeners('rendering-progress');
+  }
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);
