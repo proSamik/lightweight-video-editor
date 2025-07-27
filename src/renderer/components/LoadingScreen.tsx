@@ -2,9 +2,10 @@ import React from 'react';
 
 interface LoadingScreenProps {
   message: string;
+  progress?: number; // Progress percentage (0-100)
 }
 
-const LoadingScreen: React.FC<LoadingScreenProps> = ({ message }) => {
+const LoadingScreen: React.FC<LoadingScreenProps> = ({ message, progress }) => {
   return (
     <div style={{
       height: '100vh',
@@ -35,7 +36,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ message }) => {
       </h2>
       
       <p style={{ 
-        margin: 0, 
+        margin: '0 0 20px 0', 
         fontSize: '16px',
         color: '#ccc',
         maxWidth: '400px',
@@ -43,6 +44,34 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ message }) => {
       }}>
         {message}
       </p>
+      
+      {progress !== undefined && (
+        <div style={{ width: '300px', marginTop: '10px' }}>
+          <div style={{
+            width: '100%',
+            height: '8px',
+            backgroundColor: '#333',
+            borderRadius: '4px',
+            overflow: 'hidden'
+          }}>
+            <div style={{
+              width: `${Math.max(0, Math.min(100, progress))}%`,
+              height: '100%',
+              backgroundColor: '#007acc',
+              transition: 'width 0.3s ease',
+              borderRadius: '4px'
+            }} />
+          </div>
+          <div style={{
+            marginTop: '8px',
+            fontSize: '14px',
+            color: '#999',
+            textAlign: 'center'
+          }}>
+            {Math.round(progress)}%
+          </div>
+        </div>
+      )}
       
       <style>{`
         @keyframes spin {
