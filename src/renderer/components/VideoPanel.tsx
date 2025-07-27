@@ -462,37 +462,24 @@ function renderKaraokeTextOnCanvas(
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
   
-  // Calculate text wrapping based on style width
+  // Since we enforce one line per frame and removed width functionality, 
+  // we render all words in a single line
   const wordSpacing = 4; // marginRight from VideoPanel
   const wordPadding = 4; // padding from VideoPanel
-  const maxWidth = caption.style.width * scaleFactor; // Apply scale factor to width
   
-  // Since we enforce one line per frame, we don't actually wrap to multiple lines
-  // Instead, we use the first line only
-  const textLines = wrapTextToWidth(ctx, words, maxWidth, wordPadding, wordSpacing);
-  const singleLine = textLines.length > 0 ? [textLines[0]] : [words]; // Take only first line
-  const lineHeight = fontSize * scaleFactor + 10; // Add some line spacing
-  
-  // Calculate total height and max width for background (single line only)
-  const totalHeight = singleLine.length * lineHeight;
-  let maxLineWidth = 0;
-  
-  // Calculate width for the single line
-  for (const line of singleLine) {
-    let lineWidth = 0;
-    for (const word of line) {
-      const wordWidth = ctx.measureText(word.word).width;
-      lineWidth += wordWidth + (wordPadding * 2) + wordSpacing;
-    }
-    lineWidth -= wordSpacing; // Remove last margin
-    maxLineWidth = Math.max(maxLineWidth, lineWidth);
+  // Calculate total width for single line
+  let totalWidth = 0;
+  for (const word of words) {
+    const wordWidth = ctx.measureText(word.word).width;
+    totalWidth += wordWidth + (wordPadding * 2) + wordSpacing;
   }
+  totalWidth -= wordSpacing; // Remove last margin
   
-  // Calculate background box for entire multi-line caption
-  const boxX = centerX - (maxLineWidth / 2) - 12;
-  const boxY = centerY - (totalHeight / 2) - 12;
-  const boxWidth = maxLineWidth + 24;
-  const boxHeight = totalHeight + 24;
+  // Calculate background box for single line caption
+  const boxX = centerX - (totalWidth / 2) - 12;
+  const boxY = centerY - fontSize * scaleFactor - 12;
+  const boxWidth = totalWidth + 24;
+  const boxHeight = fontSize * scaleFactor + 24;
   
   // Draw main background box - only if not transparent
   if (backgroundColor.a > 0) {
@@ -506,42 +493,30 @@ function renderKaraokeTextOnCanvas(
   ctx.shadowOffsetX = 2;
   ctx.shadowOffsetY = 2;
   
-  // Draw each line of words (single line only)
-  for (let lineIndex = 0; lineIndex < singleLine.length; lineIndex++) {
-    const line = singleLine[lineIndex];
-    const currentY = centerY - (totalHeight / 2) + (lineIndex + 1) * lineHeight;
+  // Draw words in single line
+  let currentX = centerX - (totalWidth / 2) + wordPadding; // Start with padding
+  
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+    const wordStart = word.start;
+    const wordEnd = word.end;
     
-    // Calculate line width for centering
-    let lineWidth = 0;
-    for (const word of line) {
-      const wordWidth = ctx.measureText(word.word).width;
-      lineWidth += wordWidth + (wordPadding * 2) + wordSpacing;
-    }
-    lineWidth -= wordSpacing; // Remove last margin
+    // Determine if this word should be highlighted (matching VideoPanel logic exactly)
+    const isHighlighted = frameTime >= wordStart && frameTime <= wordEnd;
+    const hasPassedWord = frameTime > wordEnd;
     
-    let currentX = centerX - (lineWidth / 2) + wordPadding; // Start with padding
-    
-    for (let i = 0; i < line.length; i++) {
-      const word = line[i];
-      const wordStart = word.start;
-      const wordEnd = word.end;
-      
-      // Determine if this word should be highlighted (matching VideoPanel logic exactly)
-      const isHighlighted = frameTime >= wordStart && frameTime <= wordEnd;
-      const hasPassedWord = frameTime > wordEnd;
-      
-      // Measure word width
-      const wordWidth = ctx.measureText(word.word).width;
-      const wordBoxWidth = wordWidth + (wordPadding * 2);
-      const wordBoxHeight = fontSize * scaleFactor + (wordPadding * 2);
-      const wordBoxX = currentX - wordPadding;
-      const wordBoxY = currentY - fontSize * scaleFactor - wordPadding;
+    // Measure word width
+    const wordWidth = ctx.measureText(word.word).width;
+    const wordBoxWidth = wordWidth + (wordPadding * 2);
+    const wordBoxHeight = fontSize * scaleFactor + (wordPadding * 2);
+    const wordBoxX = currentX - wordPadding;
+    const wordBoxY = centerY - fontSize * scaleFactor - wordPadding;
       
       // Handle emphasis mode vs background highlighting
       if (isHighlighted) {
         if (caption.style.emphasizeMode) {
           // Emphasis mode: increase font size by 2% and use highlighter color as text color
-          const emphasizedFontSize = fontSize * scaleFactor * 1.02;
+          const emphasizedFontSize = fontSize * scaleFactor + 3;
           ctx.font = `bold ${emphasizedFontSize}px ${fontFamily}, Arial, sans-serif`;
           ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.a})`;
         } else {
@@ -561,17 +536,16 @@ function renderKaraokeTextOnCanvas(
         }
       }
       
-      // Draw the word
-      ctx.fillText(word.word, currentX + wordWidth/2, currentY);
-      
-      // Reset font size if it was changed for emphasis
-      if (isHighlighted && caption.style.emphasizeMode) {
-        ctx.font = `bold ${fontSize * scaleFactor}px ${fontFamily}, Arial, sans-serif`;
-      }
-      
-      // Move to next word position
-      currentX += wordWidth + (wordPadding * 2) + wordSpacing;
+    // Draw the word
+    ctx.fillText(word.word, currentX + wordWidth/2, centerY);
+    
+    // Reset font size if it was changed for emphasis
+    if (isHighlighted && caption.style.emphasizeMode) {
+      ctx.font = `bold ${fontSize * scaleFactor}px ${fontFamily}, Arial, sans-serif`;
     }
+    
+    // Move to next word position
+    currentX += wordWidth + (wordPadding * 2) + wordSpacing;
   }
   
   // Reset shadow
