@@ -7,6 +7,7 @@ interface TimelinePanelProps {
   selectedSegmentId: string | null;
   onSegmentSelect: (segmentId: string) => void;
   onTimeSeek: (time: number) => void;
+  onSegmentDelete: (segmentId: string) => void;
 }
 
 const TimelinePanel: React.FC<TimelinePanelProps> = ({
@@ -15,6 +16,7 @@ const TimelinePanel: React.FC<TimelinePanelProps> = ({
   selectedSegmentId,
   onSegmentSelect,
   onTimeSeek,
+  onSegmentDelete,
 }) => {
   const formatTime = (ms: number) => {
     const seconds = Math.floor(ms / 1000);
@@ -123,9 +125,32 @@ const TimelinePanel: React.FC<TimelinePanelProps> = ({
                 <span style={{ fontSize: '12px', color: '#888' }}>
                   {formatTime(caption.startTime)} - {formatTime(caption.endTime)}
                 </span>
-                <span style={{ fontSize: '12px', color: '#888' }}>
-                  {Math.round((caption.endTime - caption.startTime) / 1000)}s
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '12px', color: '#888' }}>
+                    {Math.round((caption.endTime - caption.startTime) / 1000)}s
+                  </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation(); // Prevent segment selection
+                      onSegmentDelete(caption.id);
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#ff6b6b',
+                      cursor: 'pointer',
+                      fontSize: '16px',
+                      padding: '2px',
+                      borderRadius: '2px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    title="Delete this caption segment"
+                  >
+                    🗑️
+                  </button>
+                </div>
               </div>
               <div style={{
                 fontSize: '14px',
