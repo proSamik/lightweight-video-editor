@@ -3,6 +3,7 @@ import { VideoFile, CaptionSegment, FontOption, ColorOption } from '../types';
 import VideoPanel from './components/VideoPanel';
 import TimelinePanel from './components/TimelinePanel';
 import StylingPanel from './components/StylingPanel';
+import TranscriptionSettings from './components/TranscriptionSettings';
 import LoadingScreen from './components/LoadingScreen';
 
 interface AppState {
@@ -13,128 +14,108 @@ interface AppState {
 const App: React.FC = () => {
   const [videoFile, setVideoFile] = useState<VideoFile | null>(null);
   const [captions, setCaptions] = useState<CaptionSegment[]>([]);
-  const [originalCaptions, setOriginalCaptions] = useState<CaptionSegment[]>([]); // Track original captions for word deletion
+  const [originalCaptions, setOriginalCaptions] = useState<CaptionSegment[]>([]);
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
-  const [currentTime, setCurrentTime] = useState<number>(0);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [loadingMessage, setLoadingMessage] = useState<string>('');
-  const [dependencies, setDependencies] = useState<{ffmpeg: boolean, whisper: boolean} | null>(null);
-  
-  // Undo/Redo state management
+  const [currentTime, setCurrentTime] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
   const [history, setHistory] = useState<AppState[]>([]);
-  const [historyIndex, setHistoryIndex] = useState<number>(-1);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [showTranscriptionSettings, setShowTranscriptionSettings] = useState(false);
+  const [pendingVideoPath, setPendingVideoPath] = useState<string | null>(null);
 
+  // Initialize history
   useEffect(() => {
-    checkDependencies();
-    
-    // Set up drag and drop listener
-    const handleFileDropped = (filePath: string) => {
-      processVideoFile(filePath);
-    };
-    
-    window.electronAPI.onFileDropped(handleFileDropped);
-    
-    // Set up keyboard shortcuts
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
-        if (e.shiftKey) {
-          redo();
-        } else {
-          undo();
-        }
-        e.preventDefault();
-      }
-    };
-    
-    document.addEventListener('keydown', handleKeyDown);
-    
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [history, historyIndex]); // Add dependencies to ensure undo/redo works with latest state
+    if (historyIndex === -1) {
+      setHistory([{ captions: [], selectedSegmentId: null }]);
+      setHistoryIndex(0);
+    }
+  }, [historyIndex]);
 
-  // Save state to history before making changes
+  // Save state to history
   const saveToHistory = () => {
-    const currentState: AppState = {
-      captions: [...captions],
-      selectedSegmentId
-    };
-    
-    // Remove any future history if we're not at the end
+    const currentState = { captions, selectedSegmentId };
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push(currentState);
-    
-    // Limit history size
-    if (newHistory.length > 50) {
-      newHistory.shift();
-    } else {
-      setHistoryIndex(historyIndex + 1);
-    }
-    
     setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
   };
 
+  // Undo/Redo handlers
   const undo = () => {
     if (historyIndex > 0) {
-      const previousState = history[historyIndex - 1];
-      setCaptions(previousState.captions);
-      setSelectedSegmentId(previousState.selectedSegmentId);
-      setHistoryIndex(historyIndex - 1);
+      const newIndex = historyIndex - 1;
+      const state = history[newIndex];
+      setCaptions(state.captions);
+      setSelectedSegmentId(state.selectedSegmentId);
+      setHistoryIndex(newIndex);
     }
   };
 
   const redo = () => {
     if (historyIndex < history.length - 1) {
-      const nextState = history[historyIndex + 1];
-      setCaptions(nextState.captions);
-      setSelectedSegmentId(nextState.selectedSegmentId);
-      setHistoryIndex(historyIndex + 1);
+      const newIndex = historyIndex + 1;
+      const state = history[newIndex];
+      setCaptions(state.captions);
+      setSelectedSegmentId(state.selectedSegmentId);
+      setHistoryIndex(newIndex);
     }
   };
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      } else if ((e.metaKey || e.ctrlKey) && e.key === 'z' && e.shiftKey) {
+        e.preventDefault();
+        redo();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [historyIndex, history]);
 
   const checkDependencies = async () => {
     try {
       const deps = await window.electronAPI.checkDependencies();
-      setDependencies(deps);
+      
+      if (!deps.ffmpeg || !deps.whisper) {
+        alert('FFmpeg and OpenAI Whisper are required. Please install them first.');
+        return false;
+      }
+      return true;
     } catch (error) {
       console.error('Error checking dependencies:', error);
+      return false;
     }
   };
 
   const handleVideoSelect = async () => {
+    if (!(await checkDependencies())) return;
+    
     try {
       const filePath = await window.electronAPI.selectVideoFile();
       if (filePath) {
-        await processVideoFile(filePath);
+        setShowTranscriptionSettings(true);
+        setPendingVideoPath(filePath);
       }
     } catch (error) {
       console.error('Error selecting video file:', error);
-      setIsLoading(false);
     }
   };
 
   const handleVideoDropped = async (filePath: string) => {
-    try {
-      await processVideoFile(filePath);
-    } catch (error) {
-      console.error('Error processing dropped video file:', error);
-      setIsLoading(false);
-    }
+    if (!(await checkDependencies())) return;
+    
+    setShowTranscriptionSettings(true);
+    setPendingVideoPath(filePath);
   };
 
-  const processVideoFile = async (filePath: string) => {
-    setIsLoading(true);
-    setLoadingMessage('Loading video metadata...');
-    
-    // Get video metadata
-    const videoMetadata = await window.electronAPI.getVideoMetadata(filePath);
-    setVideoFile(videoMetadata);
-    
-    // Auto-generate captions
-    await generateCaptions(filePath);
-  };
 
-  const generateCaptions = async (videoPath: string) => {
+  const generateCaptions = async (videoPath: string, settings?: { maxCharsPerLine: number; maxWordsPerLine: number }) => {
     try {
       setLoadingMessage('Extracting audio...');
       const audioPath = await window.electronAPI.extractAudio(videoPath);
@@ -142,8 +123,8 @@ const App: React.FC = () => {
       setLoadingMessage('Transcribing audio (this may take a few minutes)...');
       const transcriptionResult = await window.electronAPI.transcribeAudio(audioPath);
       
-      // Convert transcription to caption segments
-      const captionSegments: CaptionSegment[] = transcriptionResult.segments.map((segment: any, index: number) => ({
+      // Convert transcription to caption segments with optional line wrapping
+      let captionSegments: CaptionSegment[] = transcriptionResult.segments.map((segment: any, index: number) => ({
         id: `segment-${index}`,
         startTime: segment.start,
         endTime: segment.end,
@@ -153,12 +134,17 @@ const App: React.FC = () => {
           font: FontOption.SF_PRO_DISPLAY_SEMIBOLD,
           fontSize: 32,
           textColor: ColorOption.WHITE,
-          highlighterColor: ColorOption.BRIGHT_YELLOW,
+          highlighterColor: ColorOption.YELLOW,
           backgroundColor: ColorOption.BLACK_SEMI,
-          position: { x: 50, y: 80 },
+          position: { x: 50, y: 80, z: 0 },
           width: 600
         }
       }));
+
+      // Apply line wrapping if settings provided
+      if (settings) {
+        captionSegments = applyLineWrapping(captionSegments, settings);
+      }
       
       setCaptions(captionSegments);
       setOriginalCaptions([...captionSegments]); // Save original captions for comparison
@@ -167,6 +153,52 @@ const App: React.FC = () => {
       console.error('Error generating captions:', error);
       setIsLoading(false);
       setLoadingMessage('Error generating captions. Please check that FFmpeg and Whisper are installed.');
+    }
+  };
+
+  const applyLineWrapping = (segments: CaptionSegment[], settings: { maxCharsPerLine: number; maxWordsPerLine: number }): CaptionSegment[] => {
+    const wrappedSegments: CaptionSegment[] = [];
+    
+    segments.forEach((segment, index) => {
+      const words = segment.text.split(' ');
+      let currentLine = '';
+      let currentWordCount = 0;
+      
+      // Since we enforce one line per frame, we need to fit everything in one line
+      // by truncating if necessary
+      words.forEach(word => {
+        const testLine = currentLine + (currentLine ? ' ' : '') + word;
+        
+        // Check if adding this word would exceed limits
+        if (testLine.length <= settings.maxCharsPerLine && currentWordCount < settings.maxWordsPerLine) {
+          currentLine = testLine;
+          currentWordCount++;
+        }
+        // If we've reached the limit, stop adding words (one line per frame constraint)
+      });
+      
+      // Create single segment with truncated text if necessary
+      wrappedSegments.push({
+        ...segment,
+        text: currentLine.trim() || segment.text.split(' ').slice(0, settings.maxWordsPerLine).join(' ')
+      });
+    });
+    
+    return wrappedSegments;
+  };
+
+  const handleTranscriptionSettingsConfirm = async (settings: { maxCharsPerLine: number; maxWordsPerLine: number }) => {
+    if (pendingVideoPath) {
+      setIsLoading(true);
+      setLoadingMessage('Loading video metadata...');
+      
+      // Get video metadata
+      const videoMetadata = await window.electronAPI.getVideoMetadata(pendingVideoPath);
+      setVideoFile(videoMetadata);
+      
+      // Auto-generate captions with settings
+      await generateCaptions(pendingVideoPath, settings);
+      setPendingVideoPath(null);
     }
   };
 
@@ -239,54 +271,20 @@ const App: React.FC = () => {
     );
   };
 
+  const handleCaptionDelete = (segmentId: string) => {
+    // Save current state to history before making changes
+    saveToHistory();
+    
+    setCaptions(prev => prev.filter(segment => segment.id !== segmentId));
+    
+    // Clear selection if the deleted segment was selected
+    if (selectedSegmentId === segmentId) {
+      setSelectedSegmentId(null);
+    }
+  };
+
   if (isLoading) {
     return <LoadingScreen message={loadingMessage} />;
-  }
-
-  if (dependencies && (!dependencies.ffmpeg || !dependencies.whisper)) {
-    return (
-      <div style={{
-        height: '100vh',
-        backgroundColor: '#1a1a1a',
-        color: '#ffffff',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexDirection: 'column',
-        textAlign: 'center',
-        padding: '40px'
-      }}>
-        <h2 style={{ marginBottom: '20px' }}>Missing Dependencies</h2>
-        <div style={{ marginBottom: '30px', lineHeight: '1.6' }}>
-          {!dependencies.ffmpeg && (
-            <div style={{ marginBottom: '15px' }}>
-              ❌ <strong>FFmpeg not found</strong><br />
-              Install with: <code>brew install ffmpeg</code>
-            </div>
-          )}
-          {!dependencies.whisper && (
-            <div style={{ marginBottom: '15px' }}>
-              ❌ <strong>Whisper not found</strong><br />
-              Install with: <code>pip install openai-whisper</code>
-            </div>
-          )}
-        </div>
-        <button
-          onClick={checkDependencies}
-          style={{
-            padding: '12px 24px',
-            backgroundColor: '#007acc',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '16px'
-          }}
-        >
-          Check Again
-        </button>
-      </div>
-    );
   }
 
   return (
@@ -319,6 +317,7 @@ const App: React.FC = () => {
           selectedSegmentId={selectedSegmentId}
           onSegmentSelect={setSelectedSegmentId}
           onTimeSeek={setCurrentTime}
+          onSegmentDelete={handleCaptionDelete}
         />
       </div>
 
@@ -336,6 +335,16 @@ const App: React.FC = () => {
           onExport={handleExport}
         />
       </div>
+
+      {/* Transcription Settings Dialog */}
+      <TranscriptionSettings
+        isOpen={showTranscriptionSettings}
+        onClose={() => {
+          setShowTranscriptionSettings(false);
+          setPendingVideoPath(null);
+        }}
+        onConfirm={handleTranscriptionSettingsConfirm}
+      />
     </div>
   );
 };
