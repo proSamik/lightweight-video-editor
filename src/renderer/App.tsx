@@ -384,6 +384,7 @@ const App: React.FC = () => {
           captions={captions}
           onExport={handleExport}
           onApplyToAll={handleApplyToAll}
+          onTimeSeek={setCurrentTime}
         />
       </div>
 
