@@ -66,8 +66,14 @@
     },
     "files": [
       "dist/**/*",
-      "node_modules/**/*",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "node_modules/canvas/build/Release/",
+        "to": "canvas/",
+        "filter": ["*.node"]
+      }
     ],
     "mac": {
       "category": "public.app-category.video",
