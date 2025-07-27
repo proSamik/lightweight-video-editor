@@ -8,6 +8,7 @@ interface TimelinePanelProps {
   onSegmentSelect: (segmentId: string) => void;
   onTimeSeek: (time: number) => void;
   onSegmentDelete: (segmentId: string) => void;
+  videoFile?: { path: string; name: string; duration?: number } | null;
 }
 
 const TimelinePanel: React.FC<TimelinePanelProps> = ({
@@ -17,6 +18,7 @@ const TimelinePanel: React.FC<TimelinePanelProps> = ({
   onSegmentSelect,
   onTimeSeek,
   onSegmentDelete,
+  videoFile,
 }) => {
   const formatTime = (ms: number) => {
     const seconds = Math.floor(ms / 1000);
@@ -25,9 +27,12 @@ const TimelinePanel: React.FC<TimelinePanelProps> = ({
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  const totalDuration = captions.length > 0 
-    ? Math.max(...captions.map(c => c.endTime))
-    : 60000; // Default 1 minute
+  // Use video duration if available, otherwise fallback to caption duration
+  const totalDuration = videoFile?.duration 
+    ? videoFile.duration * 1000 // Convert from seconds to milliseconds
+    : captions.length > 0 
+      ? Math.max(...captions.map(c => c.endTime))
+      : 60000; // Default 1 minute
 
   return (
     <div style={{
