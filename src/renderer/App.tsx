@@ -77,7 +77,7 @@ const App: React.FC = () => {
     }
   }, [currentTime, captions, selectedSegmentId]);
 
-  // Progress tracking event listeners
+  // Progress tracking and file drop event listeners
   useEffect(() => {
     const handleTranscriptionProgress = (progress: number) => {
       setLoadingProgress(progress);
@@ -87,9 +87,15 @@ const App: React.FC = () => {
       setLoadingProgress(progress);
     };
     
+    const handleFileDropped = (filePath: string) => {
+      console.log('File drop event received in renderer:', filePath);
+      handleVideoDropped(filePath);
+    };
+    
     // Set up progress listeners
     window.electronAPI.onTranscriptionProgress(handleTranscriptionProgress);
     window.electronAPI.onRenderingProgress(handleRenderingProgress);
+    window.electronAPI.onFileDropped(handleFileDropped);
     
     return () => {
       // Clean up listeners
@@ -144,8 +150,10 @@ const App: React.FC = () => {
   };
 
   const handleVideoDropped = async (filePath: string) => {
+    console.log('handleVideoDropped called with:', filePath);
     if (!(await checkDependencies())) return;
     
+    console.log('Dependencies checked, opening transcription settings');
     setShowTranscriptionSettings(true);
     setPendingVideoPath(filePath);
   };
