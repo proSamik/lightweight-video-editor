@@ -75,14 +75,15 @@ export class FFmpegService {
         }
 
         const duration = metadata.format.duration || 0;
-        const size = metadata.format.size || 0;
-
-        resolve({
-          path: videoPath,
+        const videoFile: VideoFile = {
           name: path.basename(videoPath),
-          duration: duration * 1000, // Convert to milliseconds
-          size: size
-        });
+          path: videoPath,
+          duration: duration,
+          width: metadata.streams.find((s: any) => s.width)?.width || 0,
+          height: metadata.streams.find((s: any) => s.height)?.height || 0
+        };
+
+        resolve(videoFile);
       });
     });
   }
