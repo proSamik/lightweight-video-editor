@@ -1,29 +1,31 @@
-import ffmpeg = require('fluent-ffmpeg');
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import ffmpeg = require('fluent-ffmpeg');
+import { createCanvas, loadImage, Canvas, CanvasRenderingContext2D } from 'canvas';
 
-export class ModernVideoRenderer {
-  private static instance: ModernVideoRenderer;
+/**
+ * True web-compatible Canvas-based video renderer
+ * This approach uses actual Canvas rendering for captions, just like in a web browser:
+ * 1. Extract video frames using FFmpeg (necessary for video decoding)
+ * 2. Use Canvas to render captions on each frame (web-compatible approach)
+ * 3. Encode frames back to video using FFmpeg (necessary for video encoding)
+ */
+export class CanvasVideoRenderer {
+  private static instance: CanvasVideoRenderer;
 
-  private constructor() {
-    // No browser-specific initialization needed
-  }
+  private constructor() {}
 
-  public static getInstance(): ModernVideoRenderer {
-    if (!ModernVideoRenderer.instance) {
-      ModernVideoRenderer.instance = new ModernVideoRenderer();
+  public static getInstance(): CanvasVideoRenderer {
+    if (!CanvasVideoRenderer.instance) {
+      CanvasVideoRenderer.instance = new CanvasVideoRenderer();
     }
-    return ModernVideoRenderer.instance;
+    return CanvasVideoRenderer.instance;
   }
 
   /**
-   * Renders a video with captions using FFmpeg with rich styling
-   * @param videoPath - Path to the input video file
-   * @param captions - Array of caption segments with styling information
-   * @param outputPath - Path where the output video will be saved
-   * @param onProgress - Optional progress callback function
-   * @returns Promise that resolves to the output file path
+   * Main method to render video with captions using true Canvas approach
+   * This mimics the web approach: extract frames, render captions on Canvas, re-encode
    */
   public async renderVideoWithCaptions(
     videoPath: string,
@@ -33,43 +35,263 @@ export class ModernVideoRenderer {
   ): Promise<string> {
     try {
       if (!captions || captions.length === 0) {
-        console.log('No captions provided, copying video without modifications');
         return await this.copyVideo(videoPath, outputPath);
       }
-
-      console.log(`Processing ${captions.length} caption segments with rich styling`);
       
       // Get video metadata
       const metadata = await this.getVideoMetadata(videoPath);
-      console.log('Video metadata:', metadata);
       
-      // Create ASS subtitle file for rich styling
-      const assPath = await this.createASSSubtitles(captions, outputPath);
-      console.log(`Created ASS subtitle file at: ${assPath}`);
+      // Create temporary directory for frame extraction
+      const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'video-frames-'));
       
-      // Debug: Read and log ASS file content
-      const assContent = await fs.promises.readFile(assPath, 'utf8');
-      console.log('ASS file content:');
-      console.log(assContent);
-      
-      // Verify ASS file exists and has content
-      const assExists = await fs.promises.access(assPath).then(() => true).catch(() => false);
-      if (!assExists) {
-        throw new Error('ASS subtitle file was not created');
+      try {
+        // Step 1: Extract video frames (FFmpeg needed for video decoding)
+        const framesDir = path.join(tempDir, 'frames');
+        await fs.promises.mkdir(framesDir);
+        await this.extractVideoFrames(videoPath, framesDir, metadata.fps, onProgress);
+        
+        // Step 2: Render captions on each frame using REAL Canvas (web-compatible)
+        await this.renderCaptionsOnFramesWithCanvas(framesDir, captions, metadata, onProgress);
+        
+        // Step 3: Encode frames back to video with original audio (FFmpeg needed for encoding)
+        const result = await this.encodeFramesToVideo(framesDir, videoPath, outputPath, metadata, onProgress);
+        
+        return result;
+      } finally {
+        // Clean up temporary files
+        await this.cleanupTempFiles(tempDir);
       }
-      
-      // Burn subtitles into video using FFmpeg
-      const result = await this.burnSubtitlesIntoVideo(videoPath, assPath, outputPath, onProgress);
-      
-      // Clean up ASS file
-      await fs.promises.unlink(assPath).catch(() => {});
-      
-      return result;
     } catch (error) {
-      console.error('Rich subtitle rendering failed, fallback to basic copy:', error);
-      // Final fallback: just copy the video
       return await this.copyVideo(videoPath, outputPath);
     }
+  }
+
+  /**
+   * Extracts video frames to individual image files
+   * FFmpeg is necessary here for video decoding
+   */
+  private async extractVideoFrames(
+    videoPath: string, 
+    framesDir: string, 
+    fps: number,
+    onProgress?: (progress: number) => void
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const command = ffmpeg(videoPath)
+        .outputOptions([
+          '-vf', `fps=${fps}`,
+          '-frame_pts', '1'
+        ])
+        .output(path.join(framesDir, 'frame_%06d.png'))
+        .on('start', (commandLine: string) => {
+        })
+        .on('progress', (progress: any) => {
+          if (onProgress && progress.percent) {
+            onProgress(progress.percent * 0.3); // 30% of total progress
+          }
+        })
+        .on('end', () => {
+          resolve();
+        })
+        .on('error', (err: any) => {
+          reject(err);
+        });
+
+      command.run();
+    });
+  }
+
+  /**
+   * Renders captions on each frame using REAL Canvas (web-compatible approach)
+   * This is exactly how you'd do it in a web browser
+   */
+  private async renderCaptionsOnFramesWithCanvas(
+    framesDir: string,
+    captions: any[],
+    metadata: any,
+    onProgress?: (progress: number) => void
+  ): Promise<void> {
+    // Get frame files
+    const frameFiles = await fs.promises.readdir(framesDir);
+    const pngFiles = frameFiles.filter(file => file.endsWith('.png')).sort();
+    
+    // Process each frame
+    for (let i = 0; i < pngFiles.length; i++) {
+      const frameFile = pngFiles[i];
+      const framePath = path.join(framesDir, frameFile);
+      
+      // Calculate current time for this frame
+      const frameTime = (i / metadata.fps) * 1000; // Convert to milliseconds
+      
+      // Find captions that should be displayed at this time
+      const activeCaptions = captions.filter(caption => 
+        frameTime >= caption.startTime && frameTime <= caption.endTime
+      );
+      
+      if (activeCaptions.length > 0) {
+        // Render captions on this frame using Canvas
+        await this.renderCaptionsOnFrameWithCanvas(framePath, activeCaptions, metadata, frameTime);
+      }
+      
+      // Update progress with detailed logging
+      const progress = 30 + (i / pngFiles.length) * 40; // 30-70% of total progress
+      if (onProgress) {
+        onProgress(progress);
+      }
+    }
+  }
+
+  /**
+   * Renders captions on a single frame using REAL Canvas
+   * This is exactly like drawing on HTML5 Canvas in a web browser
+   */
+  private async renderCaptionsOnFrameWithCanvas(
+    framePath: string,
+    activeCaptions: any[],
+    metadata: any,
+    frameTime: number
+  ): Promise<void> {
+    try {
+      // Load the frame image
+      const frameImage = await loadImage(framePath);
+      
+      // Create a canvas with the same dimensions as the video
+      const canvas = createCanvas(metadata.width, metadata.height);
+      const ctx = canvas.getContext('2d');
+      
+      // Draw the original frame
+      ctx.drawImage(frameImage, 0, 0);
+      
+      // Render each active caption on the canvas
+      for (const caption of activeCaptions) {
+        await this.renderCaptionOnCanvas(ctx, caption, metadata, frameTime);
+      }
+      
+      // Save the canvas as a new image
+      const buffer = canvas.toBuffer('image/png');
+      await fs.promises.writeFile(framePath, buffer);
+      
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Renders a single caption on the Canvas context
+   * This replicates the exact styling from the editor
+   */
+  private async renderCaptionOnCanvas(
+    ctx: CanvasRenderingContext2D,
+    caption: any,
+    metadata: any,
+    frameTime: number
+  ): Promise<void> {
+    try {
+      // Calculate position (matching the VideoPanel exactly)
+      // x: percentage from left (0-100)
+      // y: percentage from top (0-100) - NOT from bottom!
+      const x = (metadata.width * caption.style.position.x) / 100;
+      const y = (metadata.height * caption.style.position.y) / 100;
+      
+      // Get text to render
+      let text = caption.text;
+      let words: any[] = [];
+      
+      if (caption.words && caption.words.length > 0) {
+        words = caption.words;
+      }
+      
+      // Draw text with word-level highlighting
+      if (words.length > 0) {
+        await this.renderKaraokeTextOnCanvas(ctx, words, caption, frameTime, x, y);
+      } else {
+        // Simple text without word-level timing
+        await this.renderSimpleTextOnCanvas(ctx, text, caption, x, y);
+      }
+      
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Parses color string to RGBA object
+   */
+  private parseColor(colorStr: string): { r: number, g: number, b: number, a: number } {
+    if (colorStr === 'transparent') {
+      return { r: 0, g: 0, b: 0, a: 0 };
+    }
+    
+    // Handle hex colors
+    if (colorStr.startsWith('#')) {
+      const hex = colorStr.replace('#', '');
+      
+      if (hex.length === 8) {
+        // 8-character hex with alpha
+        const alpha = parseInt(hex.substr(0, 2), 16) / 255;
+        const r = parseInt(hex.substr(2, 2), 16);
+        const g = parseInt(hex.substr(4, 2), 16);
+        const b = parseInt(hex.substr(6, 2), 16);
+        return { r, g, b, a: alpha };
+      } else if (hex.length === 6) {
+        // 6-character hex without alpha
+        const r = parseInt(hex.substr(0, 2), 16);
+        const g = parseInt(hex.substr(2, 2), 16);
+        const b = parseInt(hex.substr(4, 2), 16);
+        return { r, g, b, a: 1 };
+      }
+    }
+    
+    // Default to white
+    return { r: 255, g: 255, b: 255, a: 1 };
+  }
+
+  /**
+   * Encodes processed frames back to video with original audio
+   * FFmpeg is necessary here for video encoding
+   */
+  private async encodeFramesToVideo(
+    framesDir: string,
+    originalVideoPath: string,
+    outputPath: string,
+    metadata: any,
+    onProgress?: (progress: number) => void
+  ): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const command = ffmpeg()
+        .input(path.join(framesDir, 'frame_%06d.png'))
+        .inputOptions(['-framerate', metadata.fps.toString()])
+        .input(originalVideoPath)
+        .complexFilter([
+          '[0:v][1:a]concat=n=1:v=1:a=1[outv][outa]'
+        ])
+        .outputOptions([
+          '-map', '[outv]',
+          '-map', '[outa]',
+          '-c:v', 'libx264',
+          '-c:a', 'aac',
+          '-preset', 'medium',
+          '-crf', '23',
+          '-movflags', '+faststart', // Ensure video is web-compatible
+          '-pix_fmt', 'yuv420p' // Ensure compatibility
+        ])
+        .output(outputPath)
+        .on('start', (commandLine: string) => {
+        })
+        .on('progress', (progress: any) => {
+          if (onProgress && progress.percent) {
+            onProgress(70 + (progress.percent * 0.3)); // 70-100% of total progress
+          }
+        })
+        .on('end', () => {
+          resolve(outputPath);
+        })
+        .on('error', (err: any) => {
+          reject(err);
+        });
+
+      command.run();
+    });
   }
 
   /**
@@ -90,7 +312,7 @@ export class ModernVideoRenderer {
             width: videoStream.width,
             height: videoStream.height,
             duration: metadata.format.duration,
-            fps: eval(videoStream.r_frame_rate || '30') // Convert fraction to number, default to 30fps
+            fps: eval(videoStream.r_frame_rate || '30')
           });
         }
       });
@@ -98,119 +320,193 @@ export class ModernVideoRenderer {
   }
 
   /**
-   * Creates ASS (Advanced SubStation Alpha) subtitle file for rich styling
+   * Maps font names to Canvas-compatible fonts
    */
-  private async createASSSubtitles(captions: any[], outputPath: string): Promise<string> {
-    const assPath = outputPath.replace('.mp4', '_subtitles.ass');
-    
-    let assContent = `[Script Info]
-Title: Video Captions
-ScriptType: v4.00+
-WrapStyle: 1
-ScaledBorderAndShadow: yes
-YCbCr Matrix: TV.601
-
-[V4+ Styles]
-Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Arial,32,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1
-
-[Events]
-Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-`;
-
-    for (const caption of captions) {
-      if (caption.words && caption.words.length > 0) {
-        // For karaoke effect, create individual events for each word
-        for (const word of caption.words) {
-          const startTime = this.formatASSTime(word.start);
-          const endTime = this.formatASSTime(word.end);
-          const text = this.escapeASSText(word.word);
-          
-          assContent += `Dialogue: 0,${startTime},${endTime},Default,,0,0,0,,${text}\n`;
-        }
-      } else {
-        // Handle full caption segments
-        const startTime = this.formatASSTime(caption.startTime);
-        const endTime = this.formatASSTime(caption.endTime);
-        const text = this.escapeASSText(caption.text);
-        
-        assContent += `Dialogue: 0,${startTime},${endTime},Default,,0,0,0,,${text}\n`;
-      }
+  private mapFontName(fontName: string): string {
+    // Use the actual font name from the caption style
+    // For Canvas rendering, we'll use system fonts that are available
+    switch (fontName) {
+      case 'SF Pro Display Semibold':
+      case 'SF Pro Display':
+        return 'Arial'; // Fallback to Arial for consistency
+      case 'Arial':
+      case 'Helvetica':
+        return 'Arial';
+      case 'Times New Roman':
+        return 'Times New Roman';
+      case 'Georgia':
+        return 'Georgia';
+      default:
+        return 'Arial'; // Default fallback
     }
-
-    await fs.promises.writeFile(assPath, assContent, 'utf8');
-    return assPath;
   }
 
   /**
-   * Escapes text for ASS format
+   * Renders karaoke-style text with word-level highlighting on Canvas
+   * This replicates the exact karaoke effect from the editor
    */
-  private escapeASSText(text: string): string {
-    return text
-      .replace(/\\/g, '\\\\')
-      .replace(/\{/g, '\\{')
-      .replace(/\}/g, '\\}');
-  }
-
-  /**
-   * Formats time in milliseconds to ASS format (H:MM:SS.cc)
-   */
-  private formatASSTime(milliseconds: number): string {
-    const totalSeconds = Math.floor(milliseconds / 1000);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-    const centiseconds = Math.floor((milliseconds % 1000) / 10);
-
-    return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${centiseconds.toString().padStart(2, '0')}`;
-  }
-
-  /**
-   * Burns subtitles into video using FFmpeg with audio preservation
-   */
-  private async burnSubtitlesIntoVideo(
-    videoPath: string,
-    assPath: string,
-    outputPath: string,
-    onProgress?: (progress: number) => void
-  ): Promise<string> {
-    return new Promise((resolve, reject) => {
-      console.log(`Burning ASS subtitles from ${assPath} into video`);
+  private async renderKaraokeTextOnCanvas(
+    ctx: CanvasRenderingContext2D,
+    words: any[],
+    caption: any,
+    frameTime: number,
+    centerX: number,
+    centerY: number
+  ): Promise<void> {
+    try {
+      const fontSize = caption.style?.fontSize || 32;
+      const fontFamily = this.mapFontName(caption.style?.font || 'SF Pro Display Semibold');
+      const textColor = this.parseColor(caption.style?.textColor || '#ffffff');
+      const highlighterColor = this.parseColor(caption.style?.highlighterColor || '#ffff00');
+      const backgroundColor = this.parseColor(caption.style?.backgroundColor || '#80000000');
       
-      // Use absolute path for ASS file to avoid path issues
-      const absoluteAssPath = path.resolve(assPath);
-      console.log(`Using absolute ASS path: ${absoluteAssPath}`);
+      // Set font with fallback
+      ctx.font = `bold ${fontSize}px ${fontFamily}, Arial, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
       
-      const command = ffmpeg(videoPath)
-        .outputOptions([
-          '-vf', `ass=${absoluteAssPath}`,
-          '-c:v', 'libx264',
-          '-c:a', 'aac',
-          '-preset', 'medium',
-          '-crf', '23'
-        ])
-        .format('mp4')
-        .output(outputPath)
-        .on('start', (commandLine: string) => {
-          console.log('FFmpeg command:', commandLine);
-        })
-        .on('progress', (progress: any) => {
-          console.log('FFmpeg progress:', progress);
-          if (onProgress && progress.percent) {
-            onProgress(progress.percent);
-          }
-        })
-        .on('end', () => {
-          console.log('FFmpeg processing completed successfully');
-          resolve(outputPath);
-        })
-        .on('error', (err: any) => {
-          console.error('FFmpeg error:', err);
-          reject(err);
-        });
+      // Calculate total width including word spacing and padding
+      let totalWidth = 0;
+      const wordSpacing = 4; // marginRight from editor
+      const wordPadding = 4; // padding from editor
+      
+      for (const word of words) {
+        ctx.font = `bold ${fontSize}px ${fontFamily}, Arial, sans-serif`;
+        const wordWidth = ctx.measureText(word.word).width;
+        totalWidth += wordWidth + (wordPadding * 2) + wordSpacing; // word + padding + margin
+      }
+      totalWidth -= wordSpacing; // Remove last margin
+      
+      
+      // Calculate background box for entire caption (matching editor)
+      const boxX = centerX - (totalWidth / 2);
+      const boxY = centerY - fontSize - 12;
+      const boxWidth = totalWidth;
+      const boxHeight = fontSize + 24; // 12px padding top/bottom
+      
+      // Draw main background box (matching editor's caption background)
+      ctx.fillStyle = `rgba(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b}, ${backgroundColor.a})`;
+      ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+      
+      // Add text shadow for better visibility (matching editor)
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+      ctx.shadowBlur = 4;
+      ctx.shadowOffsetX = 2;
+      ctx.shadowOffsetY = 2;
+      
+      // Draw words with individual highlighting (matching editor exactly)
+      let currentX = centerX - (totalWidth / 2) + wordPadding; // Start with padding
+      
+      for (let i = 0; i < words.length; i++) {
+        const word = words[i];
+        const wordStart = word.start;
+        const wordEnd = word.end;
+        
+        // Determine if this word should be highlighted
+        const isHighlighted = frameTime >= wordStart && frameTime <= wordEnd;
+        const hasPassedWord = frameTime > wordEnd;
+        
+        // Measure word width
+        const wordWidth = ctx.measureText(word.word).width;
+        const wordBoxWidth = wordWidth + (wordPadding * 2);
+        const wordBoxHeight = fontSize + (wordPadding * 2);
+        const wordBoxX = currentX - wordPadding;
+        const wordBoxY = centerY - fontSize - wordPadding;
+        
+        // Draw individual word background (matching editor's word-level styling)
+        if (isHighlighted) {
+          // Highlighted word background
+          ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.a})`;
+          ctx.fillRect(wordBoxX, wordBoxY, wordBoxWidth, wordBoxHeight);
+        }
+        
+        // Set text color based on highlighting (matching editor logic)
+        if (hasPassedWord) {
+          // Passed word - slightly transparent
+          ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, 0.8)`;
+        } else if (isHighlighted) {
+          // Highlighted word - black text on highlight background
+          ctx.fillStyle = 'rgba(0, 0, 0, 1)';
+        } else {
+          // Normal word - white text
+          ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
+        }
+        
+        // Draw the word
+        ctx.fillText(word.word, currentX + wordWidth/2, centerY);
+        
+        // Move to next word position
+        currentX += wordWidth + (wordPadding * 2) + wordSpacing;
+      }
+      
+      // Reset shadow
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+      
+    } catch (error) {
+      console.error('Error in karaoke text rendering:', error);
+      throw error;
+    }
+  }
 
-      command.run();
-    });
+  /**
+   * Renders simple text on Canvas (no karaoke highlighting)
+   */
+  private async renderSimpleTextOnCanvas(
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    caption: any,
+    x: number,
+    y: number
+  ): Promise<void> {
+    try {
+      const fontSize = caption.style?.fontSize || 32;
+      const fontFamily = this.mapFontName(caption.style?.font || 'SF Pro Display Semibold');
+      const textColor = this.parseColor(caption.style?.textColor || '#ffffff');
+      const backgroundColor = this.parseColor(caption.style?.backgroundColor || '#80000000');
+      
+      // Set font with fallback
+      ctx.font = `bold ${fontSize}px ${fontFamily}, Arial, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      
+      // Measure text for background box
+      const textMetrics = ctx.measureText(text);
+      const textWidth = textMetrics.width;
+      const textHeight = fontSize;
+      
+      // Calculate background box position and size (matching editor padding)
+      const boxX = x - (textWidth / 2) - 12; // 12px padding from editor
+      const boxY = y - textHeight - 12;
+      const boxWidth = textWidth + 24; // 12px padding on each side
+      const boxHeight = textHeight + 24; // 12px padding top/bottom
+      
+      // Draw background box (matching editor's caption background)
+      ctx.fillStyle = `rgba(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b}, ${backgroundColor.a})`;
+      ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+      
+      // Add text shadow for better visibility (matching editor)
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+      ctx.shadowBlur = 4;
+      ctx.shadowOffsetX = 2;
+      ctx.shadowOffsetY = 2;
+      
+      // Draw text
+      ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
+      ctx.fillText(text, x, y);
+      
+      // Reset shadow
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+      
+    } catch (error) {
+      console.error('Error in simple text rendering:', error);
+      throw error;
+    }
   }
 
   /**
@@ -240,20 +536,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
   }
 
   /**
-   * Maps font option enum to actual font family names
-   * @param fontOption - The font option from the enum
-   * @returns The actual font family name
+   * Cleans up temporary files
    */
-  private mapFontName(fontOption: string): string {
-    const fontMap: { [key: string]: string } = {
-      'SF_PRO_DISPLAY_SEMIBOLD': 'SF Pro Display',
-      'HELVETICA_NEUE_BOLD': 'Helvetica Neue',
-      'ARIAL_BLACK': 'Arial',
-      'FUTURA_BOLD': 'Futura',
-      'TIMES_NEW_ROMAN_BOLD': 'Times New Roman',
-      'GEORGIA_BOLD': 'Georgia'
-    };
-    
-    return fontMap[fontOption] || 'Arial';
+  private async cleanupTempFiles(tempDir: string): Promise<void> {
+    try {
+      await fs.promises.rm(tempDir, { recursive: true, force: true });
+      console.log('Temporary files cleaned up');
+    } catch (error) {
+      console.warn('Failed to cleanup temporary files:', error);
+    }
   }
 }

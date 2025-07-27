@@ -166,14 +166,25 @@ export class FFmpegService {
         return;
       }
 
-      // Use modern Canvas + WebCodecs rendering for perfect preview matching
+      // Use Canvas-based rendering for perfect preview matching
       try {
-        const { ModernVideoRenderer } = await import('./canvasRenderer');
-        const renderer = ModernVideoRenderer.getInstance();
-        const result = await renderer.renderVideoWithCaptions(videoPath, captionsData, outputPath, onProgress);
+        console.log('Starting Canvas-based video rendering...');
+        const { CanvasVideoRenderer } = await import('./canvasRenderer');
+        const renderer = CanvasVideoRenderer.getInstance();
+        
+        // Create progress wrapper to provide detailed updates
+        const progressWrapper = (progress: number) => {
+          console.log(`Overall rendering progress: ${Math.round(progress)}%`);
+          if (onProgress) {
+            onProgress(progress);
+          }
+        };
+        
+        const result = await renderer.renderVideoWithCaptions(videoPath, captionsData, outputPath, progressWrapper);
+        console.log('Canvas-based rendering completed successfully');
         resolve(result);
       } catch (error) {
-        console.error('Modern rendering failed, fallback to basic copy:', error);
+        console.error('Canvas rendering failed, fallback to basic copy:', error);
         
         // Fallback: just copy the video if modern rendering fails
         const command = ffmpeg(videoPath)

@@ -219,7 +219,6 @@ const App: React.FC = () => {
       }
 
       setIsLoading(false);
-      alert('Video exported successfully!');
     } catch (error) {
       console.error('Export error:', error);
       setIsLoading(false);
