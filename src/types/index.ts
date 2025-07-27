@@ -18,6 +18,7 @@ export interface CaptionStyle {
     y: number;
     z?: number; // Added z rotation
   };
+  scale?: number; // Scale factor for subtitle size (0.5 - 2.0)
   emphasizeMode?: boolean; // When true, highlighted words get emphasized instead of background highlight
   renderMode?: 'horizontal' | 'progressive'; // New: horizontal (default) or progressive reveal
 }
