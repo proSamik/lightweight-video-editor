@@ -18,7 +18,6 @@ export interface CaptionStyle {
     y: number;
     z?: number; // Added z rotation
   };
-  width: number;
   emphasizeMode?: boolean; // When true, highlighted words get emphasized instead of background highlight
 }
 
