@@ -7,6 +7,7 @@ const electronAPI = {
   extractAudio: (videoPath: string) => ipcRenderer.invoke('extract-audio', videoPath),
   transcribeAudio: (audioPath: string) => ipcRenderer.invoke('transcribe-audio', audioPath),
   checkDependencies: () => ipcRenderer.invoke('check-dependencies'),
+  testWhisperInstallation: () => ipcRenderer.invoke('test-whisper-installation'),
   renderVideoWithCaptions: (videoPath: string, captionsData: any[], outputPath: string) => 
     ipcRenderer.invoke('render-video-with-captions', videoPath, captionsData, outputPath),
   handleFileDrop: (filePath: string) => ipcRenderer.invoke('handle-file-drop', filePath),
