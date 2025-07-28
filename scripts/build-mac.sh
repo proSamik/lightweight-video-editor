@@ -36,17 +36,6 @@ fi
 # Clean previous builds
 echo "🧹 Cleaning previous builds..."
 rm -rf dist/
-rm -rf build/icons/*.png
-
-# Create build directories
-echo "📁 Creating build directories..."
-mkdir -p build/icons
-
-# Generate icons from SVG
-echo "🎨 Generating app icons..."
-magick assets/icon.svg -resize 512x512 build/icons/icon.png
-magick assets/icon.svg -resize 256x256 build/icons/icon@2x.png
-magick assets/icon.svg -resize 128x128 build/icons/icon@1x.png
 
 # Generate DMG background
 echo "🖼️  Generating DMG background..."
