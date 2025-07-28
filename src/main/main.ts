@@ -181,6 +181,11 @@ ipcMain.handle('check-dependencies', async () => {
   };
 });
 
+ipcMain.handle('test-whisper-installation', async () => {
+  const whisperService = WhisperService.getInstance();
+  return await whisperService.testWhisperInstallation();
+});
+
 ipcMain.handle('render-video-with-captions', async (event, videoPath: string, captionsData: any[], outputPath: string) => {
   try {
     const ffmpegService = FFmpegService.getInstance();
