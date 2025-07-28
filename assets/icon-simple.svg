@@ -1,6 +1,6 @@
 <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
   <!-- Rounded rectangle background -->
-  <rect width="512" height="512" rx="80" fill="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"/>
+  <rect width="512" height="512" rx="80" fill="#667eea"/>
   
   <!-- Video frame with rounded corners -->
   <rect x="120" y="140" width="272" height="192" rx="16" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
@@ -13,15 +13,4 @@
   <rect x="140" y="360" width="232" height="8" rx="4" fill="rgba(255,255,255,0.8)"/>
   <rect x="160" y="380" width="192" height="8" rx="4" fill="rgba(255,255,255,0.6)"/>
   <rect x="180" y="400" width="152" height="8" rx="4" fill="rgba(255,255,255,0.4)"/>
-  
-  <!-- Subtle glow effect -->
-  <defs>
-    <filter id="glow">
-      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
-      <feMerge> 
-        <feMergeNode in="coloredBlur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-  </defs>
 </svg> 

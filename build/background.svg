@@ -1,0 +1,37 @@
+<svg width="540" height="380" viewBox="0 0 540 380" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a1a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2d2d2d;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="540" height="380" fill="url(#bgGradient)"/>
+  
+  <!-- App icon placeholder -->
+  <circle cx="270" cy="150" r="60" fill="#4a90e2" opacity="0.1" stroke="#4a90e2" stroke-width="2"/>
+  
+  <!-- Video frame icon -->
+  <rect x="230" y="110" width="80" height="50" rx="6" fill="#2d2d2d" stroke="#4a90e2" stroke-width="2"/>
+  <polygon points="245,125 245,145 265,135" fill="#4a90e2"/>
+  
+  <!-- Caption lines -->
+  <rect x="240" y="180" width="60" height="3" rx="2" fill="#4a90e2" opacity="0.7"/>
+  <rect x="250" y="190" width="40" height="3" rx="2" fill="#4a90e2" opacity="0.5"/>
+  
+  <!-- App name -->
+  <text x="270" y="250" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#ffffff">Lightweight Video Editor</text>
+  
+  <!-- Subtitle -->
+  <text x="270" y="275" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="#cccccc">Professional Caption Editor</text>
+  
+  <!-- Instructions -->
+  <text x="270" y="320" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#999999">Drag the app to Applications to install</text>
+  
+  <!-- Decorative elements -->
+  <circle cx="100" cy="80" r="20" fill="#4a90e2" opacity="0.1"/>
+  <circle cx="440" cy="300" r="15" fill="#4a90e2" opacity="0.1"/>
+  <circle cx="80" cy="320" r="12" fill="#4a90e2" opacity="0.1"/>
+</svg> 
