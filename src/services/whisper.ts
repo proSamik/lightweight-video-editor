@@ -25,13 +25,16 @@ export class WhisperService {
       '/usr/local/bin/whisper',
       '/opt/homebrew/bin/whisper',
       '/usr/bin/whisper',
-      'whisper' // System PATH
+      '/opt/homebrew/bin/python3',
+      '/usr/bin/python3'
     ];
 
+    // First try absolute paths
     for (const whisperPath of commonPaths) {
       try {
-        if (fs.existsSync(whisperPath) || whisperPath === 'whisper') {
+        if (fs.existsSync(whisperPath)) {
           this.whisperPath = whisperPath;
+          console.log(`Whisper found at: ${whisperPath}`);
           break;
         }
       } catch (error) {
@@ -39,9 +42,42 @@ export class WhisperService {
       }
     }
 
+    // If no absolute path found, try system PATH with enhanced environment
+    if (!this.whisperPath) {
+      try {
+        const { execSync } = require('child_process');
+        
+        // Set up enhanced environment for PATH detection
+        const env = {
+          ...process.env,
+          PATH: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:${process.env.PATH || ''}`
+        };
+        
+        // Try whisper command
+        try {
+          execSync('which whisper', { stdio: 'pipe', env });
+          this.whisperPath = 'whisper';
+          console.log('Whisper found in PATH');
+        } catch (e) {
+          // Try python3 -m whisper
+          try {
+            execSync('which python3', { stdio: 'pipe', env });
+            this.whisperPath = 'python3 -m whisper';
+            console.log('Python3 found in PATH, will use python3 -m whisper');
+          } catch (e2) {
+            console.log('Neither whisper nor python3 found in PATH');
+          }
+        }
+      } catch (error) {
+        console.log('Error checking system PATH:', error);
+      }
+    }
+
     // Set up model path (will download if needed)
     const homeDir = process.env.HOME || '';
     this.modelPath = path.join(homeDir, '.cache', 'whisper');
+    
+    console.log(`Final whisper path: ${this.whisperPath}`);
   }
 
   public async transcribeAudio(
@@ -58,16 +94,45 @@ export class WhisperService {
       const outputName = path.basename(audioPath, path.extname(audioPath));
       
       // Run whisper with word-level timestamps
-      const args = [
-        audioPath,
-        '--model', 'base',
-        '--output_format', 'json',
-        '--word_timestamps', 'True',
-        '--output_dir', outputDir,
-        '--verbose', 'False'
-      ];
+      let whisperProcess;
+      
+      console.log(`Using Whisper path: ${this.whisperPath}`);
+      console.log(`Audio file: ${audioPath}`);
+      console.log(`Output directory: ${outputDir}`);
+      
+      // Set up enhanced environment for Whisper execution
+      const env = {
+        ...process.env,
+        PATH: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:${process.env.PATH || ''}`,
+        PYTHONPATH: `/opt/homebrew/lib/python3.*/site-packages:${process.env.PYTHONPATH || ''}`
+      };
 
-      const whisperProcess = spawn(this.whisperPath, args);
+      if (this.whisperPath.includes('python3 -m whisper')) {
+        // Use python3 -m whisper
+        const args = [
+          '-m', 'whisper',
+          audioPath,
+          '--model', 'base',
+          '--output_format', 'json',
+          '--word_timestamps', 'True',
+          '--output_dir', outputDir,
+          '--verbose', 'False'
+        ];
+        console.log(`Running: python3 ${args.join(' ')}`);
+        whisperProcess = spawn('python3', args, { env });
+      } else {
+        // Use direct whisper command
+        const args = [
+          audioPath,
+          '--model', 'base',
+          '--output_format', 'json',
+          '--word_timestamps', 'True',
+          '--output_dir', outputDir,
+          '--verbose', 'False'
+        ];
+        console.log(`Running: ${this.whisperPath} ${args.join(' ')}`);
+        whisperProcess = spawn(this.whisperPath, args, { env });
+      }
       
       let errorOutput = '';
       let stdoutOutput = '';
@@ -92,7 +157,16 @@ export class WhisperService {
         console.log('Whisper stderr:', data.toString());
       });
 
+      whisperProcess.on('error', (error) => {
+        console.error('Whisper process error:', error);
+        reject(new Error(`Failed to start Whisper process: ${error.message}`));
+      });
+
       whisperProcess.on('close', (code) => {
+        console.log(`Whisper process exited with code: ${code}`);
+        console.log(`Error output: ${errorOutput}`);
+        console.log(`Stdout output: ${stdoutOutput}`);
+        
         if (code !== 0) {
           reject(new Error(`Whisper process failed with code ${code}: ${errorOutput}`));
           return;
@@ -100,13 +174,26 @@ export class WhisperService {
 
         // Read the generated JSON file
         const jsonPath = path.join(outputDir, `${outputName}.json`);
+        console.log(`Looking for Whisper output file: ${jsonPath}`);
         
         try {
           if (!fs.existsSync(jsonPath)) {
+            console.log(`JSON file not found at: ${jsonPath}`);
+            console.log(`Checking directory contents: ${outputDir}`);
+            
+            // List files in output directory for debugging
+            try {
+              const files = fs.readdirSync(outputDir);
+              console.log(`Files in output directory: ${files.join(', ')}`);
+            } catch (e) {
+              console.log(`Could not read output directory: ${e}`);
+            }
+            
             reject(new Error(`Whisper output file not found: ${jsonPath}`));
             return;
           }
 
+          console.log(`Found Whisper output file: ${jsonPath}`);
           const jsonContent = fs.readFileSync(jsonPath, 'utf8');
           const whisperResult = JSON.parse(jsonContent);
           
@@ -170,6 +257,28 @@ export class WhisperService {
 
   public checkWhisperAvailability(): boolean {
     return this.whisperPath !== '';
+  }
+
+  public getWhisperPath(): string {
+    return this.whisperPath;
+  }
+
+  public async testWhisperInstallation(): Promise<{ available: boolean; path: string; error?: string }> {
+    if (!this.whisperPath) {
+      return { available: false, path: '', error: 'Whisper not found in any common locations' };
+    }
+
+    try {
+      const { execSync } = require('child_process');
+      if (this.whisperPath.includes('python3 -m whisper')) {
+        execSync('python3 -m whisper --help', { stdio: 'pipe' });
+      } else {
+        execSync(`${this.whisperPath} --help`, { stdio: 'pipe' });
+      }
+      return { available: true, path: this.whisperPath };
+    } catch (error) {
+      return { available: false, path: this.whisperPath, error: (error as Error).message };
+    }
   }
 
   public getAvailableModels(): string[] {
