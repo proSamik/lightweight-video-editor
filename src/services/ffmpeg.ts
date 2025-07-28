@@ -4,6 +4,20 @@ import * as fs from 'fs';
 import * as os from 'os';
 import { VideoFile } from '../types';
 
+// Import bundled FFmpeg binaries
+let ffmpegPath: string;
+let ffprobePath: string;
+
+try {
+  // Get the paths to the packaged versions of the binaries
+  ffmpegPath = require('ffmpeg-static').replace('app.asar', 'app.asar.unpacked');
+  ffprobePath = require('ffprobe-static').path.replace('app.asar', 'app.asar.unpacked');
+} catch (error) {
+  // Fallback to system FFmpeg if bundled version is not available
+  ffmpegPath = '';
+  ffprobePath = '';
+}
+
 export class FFmpegService {
   private static instance: FFmpegService;
   private ffmpegPath: string = '';
@@ -21,49 +35,89 @@ export class FFmpegService {
   }
 
   private detectFFmpegPaths(): void {
-    // Check common macOS paths for FFmpeg
-    const commonPaths = [
-      '/usr/local/bin/ffmpeg',
-      '/opt/homebrew/bin/ffmpeg',
-      '/usr/bin/ffmpeg',
-      'ffmpeg' // System PATH
-    ];
-
-    const probePaths = [
-      '/usr/local/bin/ffprobe',
-      '/opt/homebrew/bin/ffprobe',
-      '/usr/bin/ffprobe',
-      'ffprobe' // System PATH
-    ];
-
-    for (const ffmpegPath of commonPaths) {
+    // First try to use bundled FFmpeg binaries
+    if (ffmpegPath && ffprobePath) {
       try {
-        if (fs.existsSync(ffmpegPath) || ffmpegPath === 'ffmpeg') {
+        if (fs.existsSync(ffmpegPath) && fs.existsSync(ffprobePath)) {
           this.ffmpegPath = ffmpegPath;
-          break;
+          this.ffprobePath = ffprobePath;
+          console.log(`Using bundled FFmpeg: ${ffmpegPath}`);
+          console.log(`Using bundled FFprobe: ${ffprobePath}`);
         }
       } catch (error) {
-        continue;
+        console.log('Bundled FFmpeg not found, falling back to system FFmpeg');
       }
     }
 
-    for (const probePath of probePaths) {
-      try {
-        if (fs.existsSync(probePath) || probePath === 'ffprobe') {
-          this.ffprobePath = probePath;
-          break;
+    // If bundled binaries not available, check system paths
+    if (!this.ffmpegPath || !this.ffprobePath) {
+      const commonPaths = [
+        '/usr/local/bin/ffmpeg',
+        '/opt/homebrew/bin/ffmpeg',
+        '/usr/bin/ffmpeg',
+        'C:\\ffmpeg\\bin\\ffmpeg.exe', // Windows
+        'ffmpeg' // System PATH
+      ];
+
+      const probePaths = [
+        '/usr/local/bin/ffprobe',
+        '/opt/homebrew/bin/ffprobe',
+        '/usr/bin/ffprobe',
+        'C:\\ffmpeg\\bin\\ffprobe.exe', // Windows
+        'ffprobe' // System PATH
+      ];
+
+      // Try to find FFmpeg
+      for (const path of commonPaths) {
+        try {
+          if (path === 'ffmpeg') {
+            // Check if ffmpeg is in system PATH
+            const { execSync } = require('child_process');
+            execSync('which ffmpeg', { stdio: 'pipe' });
+            this.ffmpegPath = 'ffmpeg';
+            console.log('FFmpeg found in system PATH');
+            break;
+          } else if (fs.existsSync(path)) {
+            this.ffmpegPath = path;
+            console.log(`FFmpeg found at: ${path}`);
+            break;
+          }
+        } catch (error) {
+          continue;
         }
-      } catch (error) {
-        continue;
+      }
+
+      // Try to find FFprobe
+      for (const path of probePaths) {
+        try {
+          if (path === 'ffprobe') {
+            // Check if ffprobe is in system PATH
+            const { execSync } = require('child_process');
+            execSync('which ffprobe', { stdio: 'pipe' });
+            this.ffprobePath = 'ffprobe';
+            console.log('FFprobe found in system PATH');
+            break;
+          } else if (fs.existsSync(path)) {
+            this.ffprobePath = path;
+            console.log(`FFprobe found at: ${path}`);
+            break;
+          }
+        } catch (error) {
+          continue;
+        }
       }
     }
 
+    // Set the paths for fluent-ffmpeg
     if (this.ffmpegPath) {
       ffmpeg.setFfmpegPath(this.ffmpegPath);
     }
     if (this.ffprobePath) {
       ffmpeg.setFfprobePath(this.ffprobePath);
     }
+
+    console.log(`Final FFmpeg path: ${this.ffmpegPath}`);
+    console.log(`Final FFprobe path: ${this.ffprobePath}`);
   }
 
   public async getVideoMetadata(videoPath: string): Promise<VideoFile> {
