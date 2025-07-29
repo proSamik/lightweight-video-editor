@@ -1,9 +1,10 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
 import * as path from 'path';
 import * as os from 'os';
 import FFmpegService from '../services/ffmpeg';
 import WhisperService from '../services/whisper';
 import VideoEditor from '../services/videoEditor';
+import ProjectManager from '../services/projectManager';
 
 let mainWindow: BrowserWindow;
 
@@ -21,6 +22,7 @@ function createWindow(): void {
     },
     titleBarStyle: 'hiddenInset',
     show: false,
+    resizable: true, // Explicitly enable resizing
   });
 
   if (process.env.NODE_ENV === 'development') {
@@ -186,13 +188,13 @@ ipcMain.handle('test-whisper-installation', async () => {
   return await whisperService.testWhisperInstallation();
 });
 
-ipcMain.handle('render-video-with-captions', async (event, videoPath: string, captionsData: any[], outputPath: string) => {
+ipcMain.handle('render-video-with-captions', async (event, videoPath: string, captionsData: any[], outputPath: string, exportSettings?: any) => {
   try {
     const ffmpegService = FFmpegService.getInstance();
     return await ffmpegService.renderVideoWithBurnedCaptions(videoPath, captionsData, outputPath, (progress: number) => {
       // Send progress updates to renderer
       event.sender.send('rendering-progress', progress);
-    });
+    }, exportSettings);
   } catch (error) {
     throw new Error(`Failed to render video: ${error}`);
   }
@@ -202,6 +204,65 @@ ipcMain.handle('handle-file-drop', async (_event, filePath: string) => {
   // Send the dropped file path to the renderer
   mainWindow.webContents.send('file-dropped', filePath);
   return true;
+});
+
+ipcMain.handle('transcribe-audio-segments', async (event, audioPath: string, timelineSelections: any[]) => {
+  try {
+    const whisperService = WhisperService.getInstance();
+    return await whisperService.transcribeAudioSegments(audioPath, timelineSelections, (progress: number) => {
+      // Send progress updates to renderer
+      event.sender.send('transcription-progress', progress);
+    });
+  } catch (error) {
+    throw new Error(`Failed to transcribe audio segments: ${error}`);
+  }
+});
+
+ipcMain.handle('show-item-in-folder', async (_event, filePath: string) => {
+  try {
+    shell.showItemInFolder(filePath);
+    return true;
+  } catch (error) {
+    console.error('Failed to show item in folder:', error);
+    return false;
+  }
+});
+
+// Project management handlers
+ipcMain.handle('save-project', async (_event, projectData: any, fileName?: string) => {
+  try {
+    const projectManager = ProjectManager.getInstance();
+    return await projectManager.saveProject(projectData, fileName);
+  } catch (error) {
+    throw new Error(`Failed to save project: ${error}`);
+  }
+});
+
+ipcMain.handle('load-project', async (_event, filePath: string) => {
+  try {
+    const projectManager = ProjectManager.getInstance();
+    return await projectManager.loadProject(filePath);
+  } catch (error) {
+    throw new Error(`Failed to load project: ${error}`);
+  }
+});
+
+ipcMain.handle('list-recent-projects', async () => {
+  try {
+    const projectManager = ProjectManager.getInstance();
+    return await projectManager.listRecentProjects();
+  } catch (error) {
+    throw new Error(`Failed to list recent projects: ${error}`);
+  }
+});
+
+ipcMain.handle('delete-project', async (_event, filePath: string) => {
+  try {
+    const projectManager = ProjectManager.getInstance();
+    return await projectManager.deleteProject(filePath);
+  } catch (error) {
+    throw new Error(`Failed to delete project: ${error}`);
+  }
 });
 
 ipcMain.handle('apply-word-deletions', async (_event, inputVideoPath: string, originalCaptions: any[], updatedCaptions: any[], outputPath: string) => {
