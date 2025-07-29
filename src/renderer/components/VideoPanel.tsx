@@ -391,6 +391,22 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   );
 };
 
+// Helper function to apply text transformation to words
+function applyTextTransform(text: string, transform?: string): string {
+  if (!transform) return text;
+  
+  switch (transform) {
+    case 'uppercase':
+      return text.toUpperCase();
+    case 'lowercase':
+      return text.toLowerCase();
+    case 'capitalize':
+      return text.replace(/\b\w/g, l => l.toUpperCase());
+    default:
+      return text;
+  }
+}
+
 // Canvas rendering functions (matching CanvasVideoRenderer exactly)
 function renderCaptionOnCanvas(
   ctx: CanvasRenderingContext2D,
@@ -414,8 +430,21 @@ function renderCaptionOnCanvas(
     ctx.translate(-x, -y);
   }
   
-  // Get text to render
+  // Get text to render and apply text transformation
   let text = caption.text;
+  if (caption.style.textTransform) {
+    switch (caption.style.textTransform) {
+      case 'uppercase':
+        text = text.toUpperCase();
+        break; 
+      case 'lowercase':
+        text = text.toLowerCase();
+        break;
+      case 'capitalize':
+        text = text.replace(/\b\w/g, l => l.toUpperCase());
+        break;
+    }
+  }
   let words: any[] = [];
   
   if (caption.words && caption.words.length > 0) {
@@ -448,11 +477,27 @@ function renderSimpleTextOnCanvas(
   y: number,
   scaleFactor: number
 ) {
+  // Apply text transformation
+  if (caption.style.textTransform) {
+    switch (caption.style.textTransform) {
+      case 'uppercase':
+        text = text.toUpperCase();
+        break; 
+      case 'lowercase':
+        text = text.toLowerCase();
+        break;
+      case 'capitalize':
+        text = text.replace(/\b\w/g, l => l.toUpperCase());
+        break;
+    }
+  }
   const baseFontSize = caption.style?.fontSize || 32;
   const scale = caption.style?.scale || 1;
   const fontSize = baseFontSize * scale;
   const textColor = parseColor(caption.style?.textColor || '#ffffff');
   const backgroundColor = parseColor(caption.style?.backgroundColor || '#80000000');
+  const strokeColor = parseColor(caption.style?.strokeColor || '#000000');
+  const strokeWidth = caption.style?.strokeWidth || 0;
   
   // Set font with actual font from caption style (matching VideoPanel exactly)
   const fontFamily = mapFontName(caption.style?.font || 'SF Pro Display Semibold');
@@ -477,13 +522,28 @@ function renderSimpleTextOnCanvas(
     ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
   }
   
-  // Add text shadow for better visibility (matching VideoPanel exactly)
+  // Clear shadow for stroke (stroke should not have shadow)
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 0;
+  
+  // Draw stroke if specified (must be drawn before fill)
+  if (strokeWidth > 0) {
+    ctx.strokeStyle = `rgba(${strokeColor.r}, ${strokeColor.g}, ${strokeColor.b}, ${strokeColor.a})`;
+    ctx.lineWidth = strokeWidth;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.strokeText(text, x, y);
+  }
+  
+  // Add text shadow for text fill only
   ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
   ctx.shadowBlur = 4;
   ctx.shadowOffsetX = 2;
   ctx.shadowOffsetY = 2;
   
-  // Draw text
+  // Draw text fill
   ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
   ctx.fillText(text, x, y);
   
@@ -545,6 +605,8 @@ function renderKaraokeTextOnCanvas(
   const textColor = parseColor(caption.style?.textColor || '#ffffff');
   const highlighterColor = parseColor(caption.style?.highlighterColor || '#ffff00');
   const backgroundColor = parseColor(caption.style?.backgroundColor || '#80000000');
+  const strokeColor = parseColor(caption.style?.strokeColor || '#000000');
+  const strokeWidth = caption.style?.strokeWidth || 0;
   
   // Set font with actual font from caption style (matching VideoPanel exactly)
   const fontFamily = mapFontName(caption.style?.font || 'SF Pro Display Semibold');
@@ -560,7 +622,8 @@ function renderKaraokeTextOnCanvas(
   // Calculate total width for single line
   let totalWidth = 0;
   for (const word of words) {
-    const wordWidth = ctx.measureText(word.word).width;
+    const transformedWord = applyTextTransform(word.word, caption.style.textTransform);
+    const wordWidth = ctx.measureText(transformedWord).width;
     totalWidth += wordWidth + (wordPadding * 2) + wordSpacing;
   }
   totalWidth -= wordSpacing; // Remove last margin
@@ -595,8 +658,9 @@ function renderKaraokeTextOnCanvas(
     const isHighlighted = frameTime >= wordStart && frameTime <= wordEnd;
     const hasPassedWord = frameTime > wordEnd;
     
-    // Measure word width
-    const wordWidth = ctx.measureText(word.word).width;
+    // Apply text transformation and measure word width
+    const transformedWord = applyTextTransform(word.word, caption.style.textTransform);
+    const wordWidth = ctx.measureText(transformedWord).width;
     const wordBoxWidth = wordWidth + (wordPadding * 2);
     const wordBoxHeight = fontSize + (wordPadding * 2);
     const wordBoxX = currentX - wordPadding;
@@ -626,8 +690,29 @@ function renderKaraokeTextOnCanvas(
         }
       }
       
+    // Clear shadow for stroke
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+    
+    // Draw stroke if specified (must be drawn before fill)
+    if (strokeWidth > 0) {
+      ctx.strokeStyle = `rgba(${strokeColor.r}, ${strokeColor.g}, ${strokeColor.b}, ${strokeColor.a})`;
+      ctx.lineWidth = strokeWidth;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.strokeText(transformedWord, currentX + wordWidth/2, centerY);
+    }
+    
+    // Add shadow for text fill
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 2;
+    
     // Draw the word
-    ctx.fillText(word.word, currentX + wordWidth/2, centerY);
+    ctx.fillText(transformedWord, currentX + wordWidth/2, centerY);
     
     // Reset font size if it was changed for emphasis
     if (isHighlighted && caption.style.emphasizeMode) {
@@ -681,6 +766,8 @@ function renderProgressiveTextOnCanvas(
   const textColor = parseColor(caption.style?.textColor || '#ffffff');
   const highlighterColor = parseColor(caption.style?.highlighterColor || '#ffff00');
   const backgroundColor = parseColor(caption.style?.backgroundColor || '#80000000');
+  const strokeColor = parseColor(caption.style?.strokeColor || '#000000');
+  const strokeWidth = caption.style?.strokeWidth || 0;
   
   // Set font with actual font from caption style
   const fontFamily = mapFontName(caption.style?.font || 'SF Pro Display Semibold');
@@ -725,8 +812,9 @@ function renderProgressiveTextOnCanvas(
       const wordY = lineY + (wordIndex * lineHeight);
       const isHighlighted = frameTime >= word.start && frameTime <= word.end;
       
-      // Measure word for background
-      const wordWidth = ctx.measureText(word.word).width;
+      // Apply text transformation and measure word for background
+      const transformedWord = applyTextTransform(word.word, caption.style.textTransform);
+      const wordWidth = ctx.measureText(transformedWord).width;
       const boxX = centerX - (wordWidth / 2) - 8;
       const boxY = wordY - fontSize - 8;
       const boxWidth = wordWidth + 16;
@@ -756,14 +844,29 @@ function renderProgressiveTextOnCanvas(
         ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
       }
       
-      // Add text shadow
+      // Clear shadow for stroke
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+      
+      // Draw stroke if specified (must be drawn before fill)
+      if (strokeWidth > 0) {
+        ctx.strokeStyle = `rgba(${strokeColor.r}, ${strokeColor.g}, ${strokeColor.b}, ${strokeColor.a})`;
+        ctx.lineWidth = strokeWidth;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.strokeText(transformedWord, centerX, wordY);
+      }
+      
+      // Add text shadow for fill
       ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
       ctx.shadowBlur = 4;
       ctx.shadowOffsetX = 2;
       ctx.shadowOffsetY = 2;
       
       // Draw the word
-      ctx.fillText(word.word, centerX, wordY);
+      ctx.fillText(transformedWord, centerX, wordY);
       
       // Reset font size if changed
       if (isHighlighted && caption.style.emphasizeMode) {
