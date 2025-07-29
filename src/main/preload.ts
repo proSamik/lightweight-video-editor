@@ -6,16 +6,19 @@ const electronAPI = {
   getVideoMetadata: (videoPath: string) => ipcRenderer.invoke('get-video-metadata', videoPath),
   extractAudio: (videoPath: string) => ipcRenderer.invoke('extract-audio', videoPath),
   transcribeAudio: (audioPath: string) => ipcRenderer.invoke('transcribe-audio', audioPath),
+  transcribeAudioSegments: (audioPath: string, timelineSelections: any[]) => 
+    ipcRenderer.invoke('transcribe-audio-segments', audioPath, timelineSelections),
   checkDependencies: () => ipcRenderer.invoke('check-dependencies'),
   testWhisperInstallation: () => ipcRenderer.invoke('test-whisper-installation'),
-  renderVideoWithCaptions: (videoPath: string, captionsData: any[], outputPath: string) => 
-    ipcRenderer.invoke('render-video-with-captions', videoPath, captionsData, outputPath),
+  renderVideoWithCaptions: (videoPath: string, captionsData: any[], outputPath: string, exportSettings?: any) => 
+    ipcRenderer.invoke('render-video-with-captions', videoPath, captionsData, outputPath, exportSettings),
   handleFileDrop: (filePath: string) => ipcRenderer.invoke('handle-file-drop', filePath),
   onFileDropped: (callback: (filePath: string) => void) => {
     ipcRenderer.on('file-dropped', (_event, filePath) => callback(filePath));
   },
   // New method to get file path from File object using webUtils
   getFilePath: (file: File) => webUtils.getPathForFile(file),
+  showItemInFolder: (filePath: string) => ipcRenderer.invoke('show-item-in-folder', filePath),
   applyWordDeletions: (inputVideoPath: string, originalCaptions: any[], updatedCaptions: any[], outputPath: string) =>
     ipcRenderer.invoke('apply-word-deletions', inputVideoPath, originalCaptions, updatedCaptions, outputPath),
   onTranscriptionProgress: (callback: (progress: number) => void) => {
@@ -29,7 +32,16 @@ const electronAPI = {
   },
   removeRenderingProgressListener: () => {
     ipcRenderer.removeAllListeners('rendering-progress');
-  }
+  },
+  // Project management
+  saveProject: (projectData: any, fileName?: string) => 
+    ipcRenderer.invoke('save-project', projectData, fileName),
+  loadProject: (filePath: string) => 
+    ipcRenderer.invoke('load-project', filePath),
+  listRecentProjects: () => 
+    ipcRenderer.invoke('list-recent-projects'),
+  deleteProject: (filePath: string) => 
+    ipcRenderer.invoke('delete-project', filePath)
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);
