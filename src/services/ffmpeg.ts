@@ -205,7 +205,8 @@ export class FFmpegService {
     videoPath: string,
     captionsData: any[],
     outputPath: string,
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number) => void,
+    exportSettings?: { framerate: number; quality: string }
   ): Promise<string> {
     return new Promise(async (resolve, reject) => {
       if (!captionsData || captionsData.length === 0) {
@@ -235,7 +236,7 @@ export class FFmpegService {
           }
         };
         
-        const result = await renderer.renderVideoWithCaptions(videoPath, captionsData, outputPath, progressWrapper);
+        const result = await renderer.renderVideoWithCaptions(videoPath, captionsData, outputPath, progressWrapper, exportSettings);
         console.log('Canvas-based rendering completed successfully');
         resolve(result);
       } catch (error) {
