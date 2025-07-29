@@ -31,7 +31,8 @@ export class CanvasVideoRenderer {
     videoPath: string,
     captions: any[],
     outputPath: string,
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number) => void,
+    exportSettings?: { framerate: number; quality: string }
   ): Promise<string> {
     try {
       if (!captions || captions.length === 0) {
@@ -40,6 +41,11 @@ export class CanvasVideoRenderer {
       
       // Get video metadata
       const metadata = await this.getVideoMetadata(videoPath);
+      
+      // Override FPS if specified in export settings
+      if (exportSettings && exportSettings.framerate) {
+        metadata.fps = exportSettings.framerate;
+      }
       
       // Create temporary directory for frame extraction
       const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'video-frames-'));
@@ -54,7 +60,7 @@ export class CanvasVideoRenderer {
         await this.renderCaptionsOnFramesWithCanvas(framesDir, captions, metadata, onProgress);
         
         // Step 3: Encode frames back to video with original audio (FFmpeg needed for encoding)
-        const result = await this.encodeFramesToVideo(framesDir, videoPath, outputPath, metadata, onProgress);
+        const result = await this.encodeFramesToVideo(framesDir, videoPath, outputPath, metadata, onProgress, exportSettings);
         
         return result;
       } finally {
@@ -115,26 +121,38 @@ export class CanvasVideoRenderer {
     const frameFiles = await fs.promises.readdir(framesDir);
     const pngFiles = frameFiles.filter(file => file.endsWith('.png')).sort();
     
-    // Process each frame
-    for (let i = 0; i < pngFiles.length; i++) {
-      const frameFile = pngFiles[i];
-      const framePath = path.join(framesDir, frameFile);
+    // Process frames in batches for better performance
+    const batchSize = 10; // Process 10 frames at a time
+    
+    for (let batchStart = 0; batchStart < pngFiles.length; batchStart += batchSize) {
+      const batchEnd = Math.min(batchStart + batchSize, pngFiles.length);
+      const batchPromises = [];
       
-      // Calculate current time for this frame
-      const frameTime = (i / metadata.fps) * 1000; // Convert to milliseconds
-      
-      // Find captions that should be displayed at this time
-      const activeCaptions = captions.filter(caption => 
-        frameTime >= caption.startTime && frameTime <= caption.endTime
-      );
-      
-      if (activeCaptions.length > 0) {
-        // Render captions on this frame using Canvas
-        await this.renderCaptionsOnFrameWithCanvas(framePath, activeCaptions, metadata, frameTime);
+      for (let i = batchStart; i < batchEnd; i++) {
+        const frameFile = pngFiles[i];
+        const framePath = path.join(framesDir, frameFile);
+        
+        // Calculate current time for this frame
+        const frameTime = (i / metadata.fps) * 1000; // Convert to milliseconds
+        
+        // Find captions that should be displayed at this time
+        const activeCaptions = captions.filter(caption => 
+          frameTime >= caption.startTime && frameTime <= caption.endTime
+        );
+        
+        if (activeCaptions.length > 0) {
+          // Render captions on this frame using Canvas
+          batchPromises.push(
+            this.renderCaptionsOnFrameWithCanvas(framePath, activeCaptions, metadata, frameTime)
+          );
+        }
       }
       
-      // Update progress with detailed logging
-      const progress = 30 + (i / pngFiles.length) * 40; // 30-70% of total progress
+      // Wait for batch to complete
+      await Promise.all(batchPromises);
+      
+      // Update progress
+      const progress = 30 + (batchEnd / pngFiles.length) * 40; // 30-70% of total progress
       if (onProgress) {
         onProgress(progress);
       }
@@ -298,25 +316,25 @@ export class CanvasVideoRenderer {
     originalVideoPath: string,
     outputPath: string,
     metadata: any,
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number) => void,
+    exportSettings?: { framerate: number; quality: string }
   ): Promise<string> {
     return new Promise((resolve, reject) => {
       const command = ffmpeg()
         .input(path.join(framesDir, 'frame_%06d.png'))
         .inputOptions(['-framerate', metadata.fps.toString()])
         .input(originalVideoPath)
-        .complexFilter([
-          '[0:v][1:a]concat=n=1:v=1:a=1[outv][outa]'
-        ])
+        // Simplified audio mapping to avoid sync issues
         .outputOptions([
-          '-map', '[outv]',
-          '-map', '[outa]',
+          '-map', '0:v', // Map video from frames
+          '-map', '1:a', // Map audio from original video
           '-c:v', 'libx264',
-          '-c:a', 'aac',
-          '-preset', 'medium',
-          '-crf', '23',
+          '-c:a', 'copy', // Copy audio to avoid re-encoding issues
+          '-preset', this.getFFmpegPreset(exportSettings?.quality || 'balanced'),
+          '-crf', this.getFFmpegCRF(exportSettings?.quality || 'balanced'),
           '-movflags', '+faststart', // Ensure video is web-compatible
-          '-pix_fmt', 'yuv420p' // Ensure compatibility
+          '-pix_fmt', 'yuv420p', // Ensure compatibility
+          '-shortest' // Use shortest stream to avoid sync issues
         ])
         .output(outputPath)
         .on('start', (commandLine: string) => {
@@ -338,6 +356,57 @@ export class CanvasVideoRenderer {
   }
 
   /**
+   * Gets FFmpeg preset based on quality setting
+   */
+  private getFFmpegPreset(quality: string): string {
+    switch (quality) {
+      case 'fast':
+        return 'veryfast';
+      case 'high':
+        return 'slower';
+      case 'balanced':
+      default:
+        return 'medium';
+    }
+  }
+
+  /**
+   * Gets CRF value based on quality setting
+   */
+  private getFFmpegCRF(quality: string): string {
+    switch (quality) {
+      case 'fast':
+        return '28'; // Lower quality, faster encoding
+      case 'high':
+        return '18'; // Higher quality, slower encoding
+      case 'balanced':
+      default:
+        return '23'; // Balanced quality
+    }
+  }
+
+  /**
+   * Safely parses frame rate string like "30/1" or "29.97"
+   */
+  private parseFrameRate(frameRateStr: string): number {
+    if (!frameRateStr) return 30;
+    
+    try {
+      // Handle fraction format like "30/1", "24000/1001"
+      if (frameRateStr.includes('/')) {
+        const [numerator, denominator] = frameRateStr.split('/').map(Number);
+        return numerator / denominator;
+      }
+      
+      // Handle decimal format like "29.97"
+      return parseFloat(frameRateStr);
+    } catch (error) {
+      console.warn('Failed to parse frame rate:', frameRateStr, 'using default 30fps');
+      return 30;
+    }
+  }
+
+  /**
    * Gets video metadata using FFmpeg
    */
   private async getVideoMetadata(videoPath: string): Promise<any> {
@@ -355,7 +424,7 @@ export class CanvasVideoRenderer {
             width: videoStream.width,
             height: videoStream.height,
             duration: metadata.format.duration,
-            fps: eval(videoStream.r_frame_rate || '30')
+            fps: this.parseFrameRate(videoStream.r_frame_rate || '30') || 30
           });
         }
       });
@@ -424,6 +493,22 @@ export class CanvasVideoRenderer {
   }
 
   /**
+   * Applies text transformation to a word
+   */
+  private applyTextTransform(word: string, transform?: string): string {
+    switch (transform) {
+      case 'capitalize':
+        return word.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+      case 'uppercase':
+        return word.toUpperCase();
+      case 'lowercase':
+        return word.toLowerCase();
+      default:
+        return word;
+    }
+  }
+
+  /**
    * Renders karaoke-style text with word-level highlighting on Canvas
    * This replicates the exact karaoke effect from the editor
    */
@@ -443,6 +528,9 @@ export class CanvasVideoRenderer {
       const textColor = this.parseColor(caption.style?.textColor || '#ffffff');
       const highlighterColor = this.parseColor(caption.style?.highlighterColor || '#ffff00');
       const backgroundColor = this.parseColor(caption.style?.backgroundColor || '#80000000');
+      const strokeColor = this.parseColor(caption.style?.strokeColor || 'transparent');
+      const strokeWidth = caption.style?.strokeWidth || 0;
+      const textTransform = caption.style?.textTransform || 'none';
       
       // Set font with precise sizing
       ctx.font = `bold ${fontSize}px ${fontFamily}, Arial, sans-serif`;
@@ -488,43 +576,67 @@ export class CanvasVideoRenderer {
         const wordStart = word.start;
         const wordEnd = word.end;
         
+        // Apply text transformation
+        const displayWord = this.applyTextTransform(word.word, textTransform);
+        
         // Determine if this word should be highlighted
         const isHighlighted = frameTime >= wordStart && frameTime <= wordEnd;
         const hasPassedWord = frameTime > wordEnd;
         
-        // Measure word width
-        const wordWidth = ctx.measureText(word.word).width;
+        // Measure transformed word width
+        const wordWidth = ctx.measureText(displayWord).width;
         const wordBoxWidth = wordWidth + (wordPadding * 2);
         const wordBoxHeight = fontSize + (wordPadding * 2);
         const wordBoxX = currentX - wordPadding;
         const wordBoxY = centerY - (fontSize / 2) - wordPadding;
           
-          // Handle emphasis mode vs background highlighting
-          if (isHighlighted) {
-            if (caption.style.emphasizeMode) {
-              // Emphasis mode: increase font size by 5% and use highlighter color as text color
-              const emphasizedFontSize = fontSize * 1.05;
-              ctx.font = `bold ${emphasizedFontSize}px ${fontFamily}, Arial, sans-serif`;
-              ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.a})`;
-            } else {
-              // Background highlighting mode
-              ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.a})`;
-              ctx.fillRect(wordBoxX, wordBoxY, wordBoxWidth, wordBoxHeight);
-              ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
-            }
+        // Handle emphasis mode vs background highlighting
+        if (isHighlighted) {
+          if (caption.style.emphasizeMode) {
+            // Emphasis mode: increase font size by 5% and use highlighter color as text color
+            const emphasizedFontSize = fontSize * 1.05;
+            ctx.font = `bold ${emphasizedFontSize}px ${fontFamily}, Arial, sans-serif`;
+            ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.a})`;
           } else {
-            // Set normal text color
-            if (hasPassedWord) {
-              // Passed word - slightly transparent
-              ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, 0.8)`;
-            } else {
-              // Normal word - original text color
-              ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
-            }
+            // Background highlighting mode
+            ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.a})`;
+            ctx.fillRect(wordBoxX, wordBoxY, wordBoxWidth, wordBoxHeight);
+            ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
           }
-          
+        } else {
+          // Set normal text color
+          if (hasPassedWord) {
+            // Passed word - slightly transparent
+            ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, 0.8)`;
+          } else {
+            // Normal word - original text color
+            ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
+          }
+        }
+        
+        // Clear shadow for stroke
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        
+        // Draw stroke if enabled (must be drawn before fill)
+        if (strokeWidth > 0 && strokeColor.a > 0) {
+          ctx.strokeStyle = `rgba(${strokeColor.r}, ${strokeColor.g}, ${strokeColor.b}, ${strokeColor.a})`;
+          ctx.lineWidth = strokeWidth;
+          ctx.lineJoin = 'round';
+          ctx.lineCap = 'round';
+          ctx.strokeText(displayWord, currentX + wordWidth/2, centerY);
+        }
+        
+        // Add shadow for text fill
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+        ctx.shadowBlur = 4;
+        ctx.shadowOffsetX = 2;
+        ctx.shadowOffsetY = 2;
+        
         // Draw the word
-        ctx.fillText(word.word, currentX + wordWidth/2, centerY);
+        ctx.fillText(displayWord, currentX + wordWidth/2, centerY);
         
         // Reset font size if it was changed for emphasis
         if (isHighlighted && caption.style.emphasizeMode) {
@@ -564,6 +676,12 @@ export class CanvasVideoRenderer {
       const fontFamily = this.mapFontName(caption.style?.font || 'SF Pro Display Semibold');
       const textColor = this.parseColor(caption.style?.textColor || '#ffffff');
       const backgroundColor = this.parseColor(caption.style?.backgroundColor || '#80000000');
+      const strokeColor = this.parseColor(caption.style?.strokeColor || 'transparent');
+      const strokeWidth = caption.style?.strokeWidth || 0;
+      const textTransform = caption.style?.textTransform || 'none';
+      
+      // Apply text transformation
+      const displayText = this.applyTextTransform(text, textTransform);
       
       // Set font with fallback
       ctx.font = `bold ${fontSize}px ${fontFamily}, Arial, sans-serif`;
@@ -571,7 +689,7 @@ export class CanvasVideoRenderer {
       ctx.textBaseline = 'middle'; // Changed to middle for better centering
       
       // Measure text for background box
-      const textMetrics = ctx.measureText(text);
+      const textMetrics = ctx.measureText(displayText);
       const textWidth = textMetrics.width;
       const textHeight = fontSize;
       
@@ -593,9 +711,30 @@ export class CanvasVideoRenderer {
       ctx.shadowOffsetX = 2;
       ctx.shadowOffsetY = 2;
       
+      // Clear shadow for stroke
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+      
+      // Draw stroke if enabled (must be drawn before fill)
+      if (strokeWidth > 0 && strokeColor.a > 0) {
+        ctx.strokeStyle = `rgba(${strokeColor.r}, ${strokeColor.g}, ${strokeColor.b}, ${strokeColor.a})`;
+        ctx.lineWidth = strokeWidth;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.strokeText(displayText, x, y);
+      }
+      
+      // Add shadow for text fill
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+      ctx.shadowBlur = 4;
+      ctx.shadowOffsetX = 2;
+      ctx.shadowOffsetY = 2;
+      
       // Draw text
       ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
-      ctx.fillText(text, x, y);
+      ctx.fillText(displayText, x, y);
       
       // Reset shadow
       ctx.shadowColor = 'transparent';
@@ -696,8 +835,11 @@ export class CanvasVideoRenderer {
           const wordY = lineY + (wordIndex * lineHeight);
           const isHighlighted = frameTime >= word.start && frameTime <= word.end;
           
-          // Measure word for background
-          const wordWidth = ctx.measureText(word.word).width;
+          // Apply text transformation
+          const displayWord = this.applyTextTransform(word.word, caption.style?.textTransform || 'none');
+          
+          // Measure transformed word for background
+          const wordWidth = ctx.measureText(displayWord).width;
           const boxX = centerX - (wordWidth / 2) - 8;
           const boxY = wordY - fontSize - 8;
           const boxWidth = wordWidth + 16;
@@ -733,8 +875,31 @@ export class CanvasVideoRenderer {
           ctx.shadowOffsetX = 2;
           ctx.shadowOffsetY = 2;
           
+          // Draw stroke if enabled
+          // Clear shadow for stroke
+          ctx.shadowColor = 'transparent';
+          ctx.shadowBlur = 0;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 0;
+          
+          const strokeColor = this.parseColor(caption.style?.strokeColor || 'transparent');
+          const strokeWidth = caption.style?.strokeWidth || 0;
+          if (strokeWidth > 0 && strokeColor.a > 0) {
+            ctx.strokeStyle = `rgba(${strokeColor.r}, ${strokeColor.g}, ${strokeColor.b}, ${strokeColor.a})`;
+            ctx.lineWidth = strokeWidth;
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.strokeText(displayWord, centerX, wordY);
+          }
+          
+          // Add shadow for text fill
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+          ctx.shadowBlur = 4;
+          ctx.shadowOffsetX = 2;
+          ctx.shadowOffsetY = 2;
+          
           // Draw the word
-          ctx.fillText(word.word, centerX, wordY);
+          ctx.fillText(displayWord, centerX, wordY);
           
           // Reset font size if changed
           if (isHighlighted && caption.style.emphasizeMode) {
