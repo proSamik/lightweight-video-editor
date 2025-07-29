@@ -136,25 +136,54 @@ export class WhisperService {
       
       let errorOutput = '';
       let stdoutOutput = '';
+      let progressStarted = false;
+      let segmentCount = 0;
+      let processedSegments = 0;
 
       whisperProcess.stdout.on('data', (data) => {
         stdoutOutput += data.toString();
-        // Simple progress estimation based on output
+        const output = data.toString();
+        
+        // Track progress based on Whisper's actual output patterns
         if (onProgress) {
-          const lines = stdoutOutput.split('\n');
-          const progressMatch = lines.find(line => line.includes('%'));
-          if (progressMatch) {
-            const match = progressMatch.match(/(\d+)%/);
-            if (match) {
-              onProgress(parseInt(match[1]));
-            }
+          // Look for segment processing indicators in stderr/stdout
+          if (output.includes('segment')) {
+            segmentCount++;
+          }
+          
+          // Estimate progress based on output activity
+          if (!progressStarted && output.length > 0) {
+            progressStarted = true;
+            onProgress(10); // Start at 10%
+          }
+          
+          // Increment progress gradually as we see output
+          if (progressStarted) {
+            processedSegments++;
+            const estimatedProgress = Math.min(10 + (processedSegments * 3), 90);
+            onProgress(estimatedProgress);
           }
         }
       });
 
       whisperProcess.stderr.on('data', (data) => {
         errorOutput += data.toString();
-        console.log('Whisper stderr:', data.toString());
+        const output = data.toString();
+        console.log('Whisper stderr:', output);
+        
+        // Track progress from stderr output as well
+        if (onProgress) {
+          // Look for Whisper's actual progress indicators
+          if (output.includes('Loading model') || output.includes('Detecting language')) {
+            onProgress(20);
+          } else if (output.includes('transcribing')) {
+            onProgress(40);
+          } else if (output.includes('segment') || output.includes('words')) {
+            processedSegments++;
+            const progress = Math.min(40 + (processedSegments * 2), 85);
+            onProgress(progress);
+          }
+        }
       });
 
       whisperProcess.on('error', (error) => {
@@ -214,6 +243,11 @@ export class WhisperService {
 
           // Clean up the JSON file
           fs.unlinkSync(jsonPath);
+          
+          // Final progress update
+          if (onProgress) {
+            onProgress(100);
+          }
           
           resolve(result);
         } catch (error) {
@@ -279,6 +313,50 @@ export class WhisperService {
     } catch (error) {
       return { available: false, path: this.whisperPath, error: (error as Error).message };
     }
+  }
+
+  public async transcribeAudioSegments(
+    audioPath: string,
+    timelineSelections: any[],
+    onProgress?: (progress: number) => void
+  ): Promise<TranscriptionResult> {
+    // For now, we'll transcribe the whole audio and then filter the results
+    // This is simpler than extracting audio segments
+    const fullTranscription = await this.transcribeAudio(audioPath, onProgress);
+    
+    // Filter segments to only include those within selected timeline ranges
+    const filteredSegments = fullTranscription.segments.filter(segment => {
+      return timelineSelections.some(selection => {
+        const segmentStart = segment.start; // in seconds
+        const segmentEnd = segment.end; // in seconds
+        const selectionStart = selection.startTime / 1000; // Convert milliseconds to seconds
+        const selectionEnd = selection.endTime / 1000; // Convert milliseconds to seconds
+        
+        // Check if segment overlaps with any selection
+        return (segmentStart < selectionEnd && segmentEnd > selectionStart);
+      });
+    });
+
+    // Adjust timing for filtered segments if needed
+    const adjustedSegments = filteredSegments.map(segment => {
+      // Find which selection this segment belongs to
+      const matchingSelection = timelineSelections.find(selection => {
+        const segmentStart = segment.start;
+        const segmentEnd = segment.end;
+        const selectionStart = selection.startTime;
+        const selectionEnd = selection.endTime;
+        
+        return (segmentStart < selectionEnd && segmentEnd > selectionStart);
+      });
+
+      // Keep original timing - user selected these specific time ranges
+      return segment;
+    });
+
+    return {
+      text: adjustedSegments.map(s => s.text).join(' '),
+      segments: adjustedSegments
+    };
   }
 
   public getAvailableModels(): string[] {
