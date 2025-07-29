@@ -13,6 +13,9 @@ export interface CaptionStyle {
   textColor: string; // Changed from ColorOption to string
   highlighterColor: string; // Changed from ColorOption to string
   backgroundColor: string; // Changed from ColorOption to string
+  strokeColor?: string; // Text stroke color
+  strokeWidth?: number; // Text stroke width
+  textTransform?: 'none' | 'capitalize' | 'uppercase' | 'lowercase'; // Text transformation
   position: {
     x: number;
     y: number;
@@ -76,4 +79,31 @@ export enum ColorOption {
   LIME_GREEN = '#32cd32',
   BLACK_SEMI = '#80000000',
   TRANSPARENT = 'transparent'
+}
+
+export interface ExportSettings {
+  framerate: 30 | 60;
+  quality: 'fast' | 'balanced' | 'high';
+}
+
+export interface SearchResult {
+  segmentId: string;
+  segmentIndex: number;
+  matchStart: number;
+  matchEnd: number;
+  context: string;
+}
+
+export interface TimelineSelection {
+  startTime: number;
+  endTime: number;
+  selected: boolean;
+}
+
+export interface ProjectData {
+  version: string;
+  videoFile: VideoFile | null;
+  captions: CaptionSegment[];
+  timeline: TimelineSelection[];
+  lastModified: number;
 }
