@@ -56,6 +56,7 @@ export class VideoEditor {
 
   /**
    * Calculates which time segments were removed by comparing original and updated captions
+   * Only considers actual word deletions, not text edits or merges
    */
   private calculateRemovedSegments(
     originalCaptions: CaptionSegment[],
@@ -80,18 +81,26 @@ export class VideoEditor {
         const originalWords = originalSegment.words;
         const updatedWords = updatedSegment.words;
         
-        // Find words that exist in original but not in updated
+        // Only consider words actually deleted, not edited
         originalWords.forEach(originalWord => {
-          const stillExists = updatedWords.some(updatedWord => 
-            Math.abs(updatedWord.start - originalWord.start) < 10 && // 10ms tolerance
-            updatedWord.word === originalWord.word
-          );
+          // Check if this word was completely removed (not just edited)
+          const wasActuallyDeleted = !updatedWords.some(updatedWord => {
+            // Match by timing rather than text content to allow text edits
+            const timingMatch = Math.abs(updatedWord.start - originalWord.start) < 100; // 100ms tolerance
+            return timingMatch && updatedWord.word.trim() !== ''; // Must have content
+          });
           
-          if (!stillExists) {
-            removedSegments.push({
-              start: originalWord.start,
-              end: originalWord.end
-            });
+          // Only remove audio if the word was actually deleted, not just edited
+          if (wasActuallyDeleted) {
+            // Check if this is an intentional deletion vs a merge/edit
+            const wasIntentionallyDeleted = this.isIntentionalWordDeletion(originalWord, updatedWords);
+            
+            if (wasIntentionallyDeleted) {
+              removedSegments.push({
+                start: originalWord.start,
+                end: originalWord.end
+              });
+            }
           }
         });
       }
@@ -99,6 +108,32 @@ export class VideoEditor {
 
     // Merge overlapping segments
     return this.mergeOverlappingSegments(removedSegments);
+  }
+
+  /**
+   * Determines if a word was intentionally deleted vs merged/edited
+   */
+  private isIntentionalWordDeletion(
+    originalWord: any,
+    updatedWords: any[]
+  ): boolean {
+    // If there are no updated words in the time range, it was deleted
+    const wordsInTimeRange = updatedWords.filter(word => 
+      word.start >= originalWord.start - 200 && 
+      word.end <= originalWord.end + 200
+    );
+    
+    if (wordsInTimeRange.length === 0) {
+      return true; // Definitely deleted
+    }
+    
+    // If the word appears merged into another word (part of a larger word), don't delete audio
+    const mergedIntoLargerWord = wordsInTimeRange.some(word => 
+      word.word.toLowerCase().includes(originalWord.word.toLowerCase()) ||
+      originalWord.word.toLowerCase().includes(word.word.toLowerCase())
+    );
+    
+    return !mergedIntoLargerWord; // Only delete if not merged
   }
 
   /**
