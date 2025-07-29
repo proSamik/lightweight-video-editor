@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { VideoFile, CaptionSegment, FontOption, ColorOption } from '../types';
+import { VideoFile, CaptionSegment, FontOption, ColorOption, ExportSettings, ProjectData } from '../types';
 import VideoPanel from './components/VideoPanel';
 import TimelinePanel from './components/TimelinePanel';
 import StylingPanel from './components/StylingPanel';
 import TranscriptionSettings from './components/TranscriptionSettings';
+import ProjectManagerModal from './components/ProjectManager';
+import SuccessModal from './components/SuccessModal';
 import LoadingScreen from './components/LoadingScreen';
 
 interface AppState {
@@ -23,7 +25,11 @@ const App: React.FC = () => {
   const [history, setHistory] = useState<AppState[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [showTranscriptionSettings, setShowTranscriptionSettings] = useState(false);
+  const [showProjectManager, setShowProjectManager] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [exportedFilePath, setExportedFilePath] = useState<string>('');
   const [pendingVideoPath, setPendingVideoPath] = useState<string | null>(null);
+  const [pendingTranscriptionSettings, setPendingTranscriptionSettings] = useState<{ maxCharsPerLine: number; maxWordsPerLine: number } | null>(null);
 
   // Initialize history
   useEffect(() => {
@@ -77,6 +83,7 @@ const App: React.FC = () => {
     }
   }, [currentTime, captions, selectedSegmentId]);
 
+
   // Progress tracking and file drop event listeners
   useEffect(() => {
     const handleTranscriptionProgress = (progress: number) => {
@@ -113,12 +120,18 @@ const App: React.FC = () => {
       } else if ((e.metaKey || e.ctrlKey) && e.key === 'z' && e.shiftKey) {
         e.preventDefault();
         redo();
+      } else if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        handleSaveProject();
+      } else if ((e.metaKey || e.ctrlKey) && e.key === 'o') {
+        e.preventDefault();
+        setShowProjectManager(true);
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [historyIndex, history]);
+  }, [historyIndex, history, videoFile, captions]);
 
   const checkDependencies = async () => {
     try {
@@ -159,7 +172,10 @@ const App: React.FC = () => {
   };
 
 
-  const generateCaptions = async (videoPath: string, settings?: { maxCharsPerLine: number; maxWordsPerLine: number }) => {
+  const generateCaptions = async (
+    videoPath: string, 
+    settings?: { maxCharsPerLine: number; maxWordsPerLine: number }
+  ) => {
     try {
       setLoadingProgress(0); // Reset progress
       setLoadingMessage('Extracting audio...');
@@ -167,6 +183,8 @@ const App: React.FC = () => {
       
       setLoadingMessage('Transcribing audio (this may take a few minutes)...');
       setLoadingProgress(0); // Reset for transcription
+      
+      // Transcribe entire audio
       const transcriptionResult = await window.electronAPI.transcribeAudio(audioPath);
       
       // Convert transcription to caption segments with optional line wrapping
@@ -182,6 +200,9 @@ const App: React.FC = () => {
           textColor: ColorOption.WHITE,
           highlighterColor: ColorOption.YELLOW,
           backgroundColor: ColorOption.TRANSPARENT,
+          strokeColor: ColorOption.BLACK,
+          strokeWidth: 2,
+          textTransform: 'none',
           position: { x: 50, y: 80, z: 0 },
           renderMode: 'horizontal',
           scale: 1,
@@ -283,11 +304,16 @@ const App: React.FC = () => {
       const videoMetadata = await window.electronAPI.getVideoMetadata(pendingVideoPath);
       setVideoFile(videoMetadata);
       
-      // Auto-generate captions with settings
+      // Close transcription settings dialog
+      setShowTranscriptionSettings(false);
+      
+      // Generate captions directly (skip timeline selection)
       await generateCaptions(pendingVideoPath, settings);
       setPendingVideoPath(null);
+      setPendingTranscriptionSettings(null);
     }
   };
+
 
   // Function to detect actual word deletions (not just edits)
   const hasActualWordDeletions = (original: CaptionSegment[], current: CaptionSegment[]): boolean => {
@@ -320,7 +346,7 @@ const App: React.FC = () => {
     return false; // No actual deletions, just edits
   };
 
-  const handleExport = async () => {
+  const handleExport = async (exportSettings: ExportSettings) => {
     if (!videoFile || captions.length === 0) return;
 
     try {
@@ -358,7 +384,8 @@ const App: React.FC = () => {
         await window.electronAPI.renderVideoWithCaptions(
           tempVideoPath,
           captions,
-          outputPath
+          outputPath,
+          exportSettings
         );
         
         // Clean up temp file (note: this would need to be handled by the main process)
@@ -368,18 +395,63 @@ const App: React.FC = () => {
         await window.electronAPI.renderVideoWithCaptions(
           videoFile.path,
           captions,
-          outputPath
+          outputPath,
+          exportSettings
         );
       }
 
       setIsLoading(false);
       setLoadingProgress(undefined); // Clear progress
+      
+      // Show success modal
+      setExportedFilePath(outputPath);
+      setShowSuccessModal(true);
     } catch (error) {
       console.error('Export error:', error);
       setIsLoading(false);
       setLoadingProgress(undefined); // Clear progress
       alert(`Export failed: ${error}`);
     }
+  };
+
+  const getCurrentProjectData = (): ProjectData => {
+    return {
+      version: '1.0',
+      videoFile,
+      captions,
+      timeline: [], // Empty for now, could be used for timeline selections
+      lastModified: Date.now()
+    };
+  };
+
+  const handleSaveProject = async () => {
+    if (!videoFile && captions.length === 0) {
+      alert('No project data to save. Load a video and create captions first.');
+      return;
+    }
+
+    try {
+      const projectData = getCurrentProjectData();
+      const savedPath = await window.electronAPI.saveProject(projectData);
+      console.log(`Project saved: ${savedPath}`);
+      // Could show a success message or notification here
+    } catch (error) {
+      console.error('Failed to save project:', error);
+      alert('Failed to save project.');
+    }
+  };
+
+  const handleLoadProject = (projectData: ProjectData) => {
+    // Save current state to history before loading
+    saveToHistory();
+
+    setVideoFile(projectData.videoFile);
+    setCaptions(projectData.captions);
+    setOriginalCaptions([...projectData.captions]);
+    setSelectedSegmentId(null);
+    setCurrentTime(0);
+
+    console.log('Project loaded successfully');
   };
 
   const handleCaptionUpdate = (segmentId: string, updates: Partial<CaptionSegment>) => {
@@ -430,6 +502,53 @@ const App: React.FC = () => {
       backgroundColor: '#1a1a1a',
       color: '#ffffff'
     }}>
+      {/* Top Menu Bar */}
+      <div style={{
+        position: 'absolute',
+        top: '10px',
+        right: '20px',
+        zIndex: 100,
+        display: 'flex',
+        gap: '10px'
+      }}>
+        <button
+          onClick={() => setShowProjectManager(true)}
+          style={{
+            padding: '8px 16px',
+            backgroundColor: '#444',
+            color: '#fff',
+            border: '1px solid #555',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}
+          title="Project Manager (Ctrl/Cmd+O)"
+        >
+          📁 Projects
+        </button>
+        <button
+          onClick={handleSaveProject}
+          style={{
+            padding: '8px 16px',
+            backgroundColor: '#28a745',
+            color: '#fff',
+            border: '1px solid #218838',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}
+          title="Save Project (Ctrl/Cmd+S)"
+        >
+          💾 Save
+        </button>
+      </div>
+
       {/* Left Panel - Video Preview */}
       <div style={{ 
         flex: '1 1 60%', 
@@ -456,6 +575,7 @@ const App: React.FC = () => {
           onSegmentSelect={setSelectedSegmentId}
           onTimeSeek={setCurrentTime}
           onSegmentDelete={handleCaptionDelete}
+          onCaptionUpdate={handleCaptionUpdate}
           videoFile={videoFile}
         />
       </div>
@@ -485,6 +605,30 @@ const App: React.FC = () => {
           setPendingVideoPath(null);
         }}
         onConfirm={handleTranscriptionSettingsConfirm}
+      />
+
+
+      {/* Project Manager Dialog */}
+      <ProjectManagerModal
+        isOpen={showProjectManager}
+        onClose={() => setShowProjectManager(false)}
+        onLoadProject={handleLoadProject}
+        onSaveProject={handleSaveProject}
+        currentProject={getCurrentProjectData()}
+      />
+
+      {/* Success Modal */}
+      <SuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        filePath={exportedFilePath}
+        onShowInFinder={async () => {
+          try {
+            await window.electronAPI.showItemInFolder(exportedFilePath);
+          } catch (error) {
+            console.error('Failed to show in finder:', error);
+          }
+        }}
       />
     </div>
   );
