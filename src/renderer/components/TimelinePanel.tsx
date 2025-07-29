@@ -1,5 +1,6 @@
-import React from 'react';
-import { CaptionSegment } from '../../types';
+import React, { useState, useEffect } from 'react';
+import { CaptionSegment, SearchResult } from '../../types';
+import SearchModal from './SearchModal';
 
 interface TimelinePanelProps {
   captions: CaptionSegment[];
@@ -8,6 +9,7 @@ interface TimelinePanelProps {
   onSegmentSelect: (segmentId: string) => void;
   onTimeSeek: (time: number) => void;
   onSegmentDelete: (segmentId: string) => void;
+  onCaptionUpdate: (segmentId: string, updates: Partial<CaptionSegment>) => void;
   videoFile?: { path: string; name: string; duration?: number } | null;
 }
 
@@ -18,8 +20,92 @@ const TimelinePanel: React.FC<TimelinePanelProps> = ({
   onSegmentSelect,
   onTimeSeek,
   onSegmentDelete,
+  onCaptionUpdate,
   videoFile,
 }) => {
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [highlightedSegments, setHighlightedSegments] = useState<Set<string>>(new Set());
+  const [searchHighlight, setSearchHighlight] = useState<{segmentId: string, start: number, end: number} | null>(null);
+
+  // Keyboard shortcut for search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        e.preventDefault();
+        setShowSearchModal(true);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const handleSearchResult = (result: SearchResult) => {
+    // Highlight the segment and navigate to it
+    onSegmentSelect(result.segmentId);
+    setSearchHighlight({
+      segmentId: result.segmentId,
+      start: result.matchStart,
+      end: result.matchEnd
+    });
+
+    // Scroll to the segment if needed
+    const segmentElement = document.querySelector(`[data-segment-id="${result.segmentId}"]`);
+    if (segmentElement) {
+      segmentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    // Navigate to the segment's time
+    const caption = captions.find(c => c.id === result.segmentId);
+    if (caption) {
+      onTimeSeek(caption.startTime);
+    }
+  };
+
+  const handleReplaceAll = (searchTerm: string, replaceTerm: string) => {
+    const searchPattern = new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    
+    captions.forEach(caption => {
+      if (searchPattern.test(caption.text)) {
+        const newText = caption.text.replace(searchPattern, replaceTerm);
+        onCaptionUpdate(caption.id, { text: newText });
+      }
+    });
+
+    setShowSearchModal(false);
+    setSearchHighlight(null);
+  };
+
+  const handleReplace = (segmentId: string, newText: string) => {
+    onCaptionUpdate(segmentId, { text: newText });
+  };
+
+  const renderHighlightedText = (text: string, segmentId: string) => {
+    if (!searchHighlight || searchHighlight.segmentId !== segmentId) {
+      return text;
+    }
+
+    const beforeMatch = text.substring(0, searchHighlight.start);
+    const match = text.substring(searchHighlight.start, searchHighlight.end);
+    const afterMatch = text.substring(searchHighlight.end);
+
+    return (
+      <>
+        {beforeMatch}
+        <span style={{
+          backgroundColor: '#ffff00',
+          color: '#000',
+          padding: '2px 4px',
+          borderRadius: '2px',
+          fontWeight: 'bold'
+        }}>
+          {match}
+        </span>
+        {afterMatch}
+      </>
+    );
+  };
+
   const formatTime = (ms: number) => {
     const seconds = Math.floor(ms / 1000);
     const minutes = Math.floor(seconds / 60);
@@ -42,7 +128,27 @@ const TimelinePanel: React.FC<TimelinePanelProps> = ({
       padding: '20px',
       overflow: 'hidden'
     }}>
-      <h3 style={{ margin: '0 0 15px 0', fontSize: '16px' }}>Caption Timeline</h3>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+        <h3 style={{ margin: 0, fontSize: '16px' }}>Caption Timeline</h3>
+        <button
+          onClick={() => setShowSearchModal(true)}
+          style={{
+            padding: '6px 12px',
+            backgroundColor: '#444',
+            color: '#fff',
+            border: '1px solid #555',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}
+          title="Search in timeline (Ctrl/Cmd+F)"
+        >
+          🔍 Search
+        </button>
+      </div>
       
       {/* Timeline Ruler */}
       <div style={{
@@ -110,6 +216,7 @@ const TimelinePanel: React.FC<TimelinePanelProps> = ({
           captions.map((caption) => (
             <div
               key={caption.id}
+              data-segment-id={caption.id}
               style={{
                 padding: '8px 12px',
                 marginBottom: '8px',
@@ -167,12 +274,25 @@ const TimelinePanel: React.FC<TimelinePanelProps> = ({
                 lineHeight: '1.4',
                 color: selectedSegmentId === caption.id ? '#fff' : '#ccc'
               }}>
-                {caption.text}
+                {renderHighlightedText(caption.text, caption.id)}
               </div>
             </div>
           ))
         )}
       </div>
+
+      {/* Search Modal */}
+      <SearchModal
+        isOpen={showSearchModal}
+        onClose={() => {
+          setShowSearchModal(false);
+          setSearchHighlight(null);
+        }}
+        captions={captions}
+        onSearchResult={handleSearchResult}
+        onReplaceAll={handleReplaceAll}
+        onReplace={handleReplace}
+      />
     </div>
   );
 };
