@@ -1,12 +1,13 @@
-import React from 'react';
-import { CaptionSegment, FontOption, ColorOption } from '../../types';
+import React, { useState } from 'react';
+import { CaptionSegment, FontOption, ColorOption, ExportSettings } from '../../types';
+import ExportSettingsModal from './ExportSettings';
 
 interface StylingPanelProps {
   selectedSegment: CaptionSegment | null;
   onSegmentUpdate: (segmentId: string, updates: Partial<CaptionSegment>) => void;
   videoFile?: { path: string; name: string } | null;
   captions?: CaptionSegment[];
-  onExport?: () => void;
+  onExport?: (settings: ExportSettings) => void;
   onApplyToAll?: (styleUpdates: Partial<CaptionSegment['style']>) => void;
   onTimeSeek?: (time: number) => void;
 }
@@ -20,6 +21,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
   onApplyToAll,
   onTimeSeek,
 }) => {
+  const [showExportSettings, setShowExportSettings] = useState(false);
   if (!selectedSegment) {
     return (
       <div style={{
@@ -134,6 +136,32 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
     const updatedWords = selectedSegment.words.filter((_, index) => index !== wordIndex);
     
     // Regenerate text from remaining words
+    const newText = updatedWords.map(w => w.word).join(' ');
+    
+    onSegmentUpdate(selectedSegment.id, {
+      text: newText,
+      words: updatedWords
+    });
+  };
+
+  const handleWordMerge = (wordIndex: number) => {
+    if (!selectedSegment?.words || wordIndex >= selectedSegment.words.length - 1) return;
+    
+    const updatedWords = [...selectedSegment.words];
+    const currentWord = updatedWords[wordIndex];
+    const nextWord = updatedWords[wordIndex + 1];
+    
+    // Merge the words - combine text and extend timing
+    const mergedWord = {
+      ...currentWord,
+      word: (currentWord.word + ' ' + nextWord.word).trim(),
+      end: nextWord.end // Extend timing to include next word
+    };
+    
+    // Replace current word with merged word and remove next word
+    updatedWords[wordIndex] = mergedWord;
+    updatedWords.splice(wordIndex + 1, 1);
+    
     const newText = updatedWords.map(w => w.word).join(' ');
     
     onSegmentUpdate(selectedSegment.id, {
@@ -262,6 +290,24 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
                   >
                     {Math.round(wordDuration)}ms
                   </div>
+                  {index < (selectedSegment.words?.length || 0) - 1 && (
+                    <button
+                      onClick={() => handleWordMerge(index)}
+                      style={{
+                        marginLeft: '8px',
+                        padding: '2px 6px',
+                        backgroundColor: '#2e7d32',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '2px',
+                        fontSize: '10px',
+                        cursor: 'pointer'
+                      }}
+                      title="Merge with next word"
+                    >
+                      ⟷
+                    </button>
+                  )}
                   <button
                     onClick={() => handleWordDelete(index)}
                     style={{
@@ -283,6 +329,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
           </div>
           <div style={{ marginTop: '8px', fontSize: '11px', color: '#888' }}>
             ✎ Green highlighted words have extended timing for better highlighting visibility<br/>
+            ⟷ Merge button combines words while preserving audio timing<br/>
             ⚠️ Deleting words will remove corresponding audio/video segments
           </div>
         </div>
@@ -524,6 +571,98 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
         </div>
       </div>
 
+      {/* Text Stroke Controls */}
+      <div style={{ marginBottom: '25px' }}>
+        <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+          Text Stroke
+        </label>
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'center' }}>
+          <label style={{ fontSize: '12px', color: '#ccc', minWidth: '60px' }}>Width: {selectedSegment.style.strokeWidth || 0}px</label>
+          <input
+            type="range"
+            min="0"
+            max="10"
+            step="1"
+            value={selectedSegment.style.strokeWidth || 0}
+            onChange={(e) => handleStyleUpdate({ strokeWidth: parseInt(e.target.value) })}
+            style={{
+              flex: 1,
+              height: '6px',
+              borderRadius: '3px',
+              background: '#444',
+              outline: 'none',
+              appearance: 'none'
+            }}
+          />
+        </div>
+        <div style={{ marginBottom: '8px', fontSize: '12px', color: '#ccc' }}>Stroke Color</div>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          {/* Transparent stroke option */}
+          <button
+            onClick={() => handleStyleUpdate({ strokeColor: 'transparent' })}
+            style={{
+              width: '30px',
+              height: '30px',
+              backgroundColor: 'transparent',
+              border: (selectedSegment.style.strokeColor || '#000000') === 'transparent' ? '3px solid #007acc' : '1px solid #555',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              position: 'relative',
+              backgroundImage: 'linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)',
+              backgroundSize: '8px 8px',
+              backgroundPosition: '0 0, 0 4px, 4px -4px, -4px 0px'
+            }}
+            title="No Stroke"
+          />
+          {Object.values(ColorOption).filter(color => color !== 'transparent').map(color => (
+            <button
+              key={color}
+              onClick={() => handleStyleUpdate({ strokeColor: color })}
+              style={{
+                width: '30px',
+                height: '30px',
+                backgroundColor: color,
+                border: (selectedSegment.style.strokeColor || '#000000') === color ? '3px solid #007acc' : '1px solid #555',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+              title={color}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Text Transform Controls */}
+      <div style={{ marginBottom: '25px' }}>
+        <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+          Text Transform
+        </label>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+          {[
+            { value: 'none', label: 'None' },
+            { value: 'capitalize', label: 'Capitalize' },
+            { value: 'uppercase', label: 'UPPERCASE' },
+            { value: 'lowercase', label: 'lowercase' }
+          ].map(option => (
+            <button
+              key={option.value}
+              onClick={() => handleStyleUpdate({ textTransform: option.value as any })}
+              style={{
+                padding: '8px 12px',
+                backgroundColor: (selectedSegment.style.textTransform || 'none') === option.value ? '#007acc' : '#444',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px'
+              }}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Position Controls */}
       <div style={{ marginBottom: '25px' }}>
         <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
@@ -644,7 +783,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
             Export Video
           </h4>
           <button
-            onClick={onExport}
+            onClick={() => setShowExportSettings(true)}
             style={{
               width: '100%',
               padding: '12px 24px',
@@ -669,6 +808,18 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
           </div>
         </div>
       )}
+
+      {/* Export Settings Modal */}
+      <ExportSettingsModal
+        isOpen={showExportSettings}
+        onClose={() => setShowExportSettings(false)}
+        onConfirm={(settings) => {
+          setShowExportSettings(false);
+          if (onExport) {
+            onExport(settings);
+          }
+        }}
+      />
     </div>
   );
 };
