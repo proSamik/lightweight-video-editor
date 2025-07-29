@@ -2,6 +2,12 @@
 
 A professional Electron-based video editor that specializes in adding captions to videos with word-level timing. Create karaoke-style subtitles with AI transcription, real-time editing, and pixel-perfect preview.
 
+
+
+https://github.com/user-attachments/assets/8ae92f44-2fe0-4df4-91ab-221dc1178fee
+
+
+
 ## Features
 
 - **Video Import**: Support for MP4, MOV, AVI video formats with drag-and-drop interface
