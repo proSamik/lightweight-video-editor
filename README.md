@@ -15,9 +15,11 @@ https://github.com/user-attachments/assets/8ae92f44-2fe0-4df4-91ab-221dc1178fee
 - **Karaoke Highlighting**: Word-by-word highlighting synchronized with video playback
 - **Visual Editor**: Customize fonts, colors, positioning, and sizing with real-time preview
 - **Advanced Timeline**: Interactive timeline with click-to-seek and double-click segment selection
+- **Project Management**: Save, load, and manage multiple video editing projects with recent projects list
 - **Transcription Settings**: Configurable caption segmentation (character/word-based line wrapping)
 - **Progressive Rendering**: Optional vertical line-by-line text reveal for dynamic captions
 - **Word-Level Editing**: Delete individual words with automatic video segment processing
+- **Export Settings**: Customizable framerate and rendering quality with estimated rendering time
 - **Export**: Render final video with burned-in subtitles using canvas-based rendering
 
 ## Prerequisites
@@ -177,8 +179,13 @@ npm run dist:all
    - Click any segment to seek to that position
    - Double-click segments to select and seek to start time
    - Visual progress indicators during processing
-6. **Preview**: Watch your video with real-time karaoke-style highlighting
-7. **Export**: Click "Export Video with Captions" to render the final video with pixel-perfect caption rendering
+6. **Project Management**: 
+   - Save projects with Cmd/Ctrl + S
+   - Load projects with Cmd/Ctrl + O
+   - Access recent projects list through the project manager
+7. **Preview**: Watch your video with real-time karaoke-style highlighting
+8. **Export Settings**: Configure framerate (24/30/60 fps) and quality (draft/standard/high) with estimated rendering time
+9. **Export**: Click "Export Video with Captions" to render the final video with pixel-perfect caption rendering
 
 ## Architecture
 
@@ -234,10 +241,24 @@ npm run dist:all
 - **Segment Merging**: Efficient processing of overlapping time segments
 - **Change Detection**: Comparison-based system for identifying word-level modifications
 
+### Project Management
+- **Save/Load Projects**: Persistent project storage with all video, caption, and styling data
+- **Recent Projects**: Quick access to recently edited projects with visual previews
+- **Project Operations**: Load, save, and delete projects with confirmation dialogs
+- **Keyboard Integration**: Full keyboard shortcut support for project operations
+
+### Export Settings
+- **Framerate Options**: Choose from 24fps, 30fps, or 60fps for optimal quality/file size balance
+- **Quality Settings**: Draft (fast), Standard (balanced), or High (best quality) rendering modes
+- **Rendering Estimates**: Real-time estimates of processing time based on selected settings
+- **Progress Tracking**: Visual progress indicators during video export process
+
 ## Keyboard Shortcuts
 
 - **Undo**: Cmd/Ctrl + Z
 - **Redo**: Cmd/Ctrl + Shift + Z (when available)
+- **Save Project**: Cmd/Ctrl + S
+- **Load Project**: Cmd/Ctrl + O
 
 ## Troubleshooting
 
@@ -280,7 +301,3 @@ If you see dependency errors:
 - Canvas-based rendering for precision
 - Frame-by-frame processing with progress updates
 - Efficient segment merging for video editing
-
-## License
-
-ISC
