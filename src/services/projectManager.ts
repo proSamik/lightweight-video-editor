@@ -6,6 +6,8 @@ import { ProjectData } from '../types';
 export class ProjectManager {
   private static instance: ProjectManager;
   private projectsDir: string;
+  private currentProjectPath: string | null = null;
+  private projectModified: boolean = false;
 
   private constructor() {
     // Create projects directory in user's documents folder
@@ -31,11 +33,94 @@ export class ProjectManager {
     }
   }
 
+  /**
+   * Get current project path
+   */
+  public getCurrentProjectPath(): string | null {
+    return this.currentProjectPath;
+  }
+
+  /**
+   * Check if project has been modified
+   */
+  public isProjectModified(): boolean {
+    return this.projectModified;
+  }
+
+  /**
+   * Mark project as modified
+   */
+  public markProjectModified(): void {
+    this.projectModified = true;
+  }
+
+  /**
+   * Get current project name for display
+   */
+  public getCurrentProjectName(): string {
+    if (!this.currentProjectPath) {
+      return 'Untitled Project';
+    }
+    return path.basename(this.currentProjectPath, '.lvep');
+  }
+
+  /**
+   * Save project - defaults to current project path if exists, otherwise creates new
+   */
   public async saveProject(projectData: ProjectData, fileName?: string): Promise<string> {
     try {
+      let filePath: string;
+
+      if (fileName) {
+        // Explicit filename provided - always create new file
+        filePath = path.join(this.projectsDir, fileName);
+      } else if (this.currentProjectPath) {
+        // Save to existing project path
+        filePath = this.currentProjectPath;
+        console.log(`Saving to existing project: ${filePath}`);
+      } else {
+        // Create new project with timestamp
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const defaultFileName = `project-${timestamp}.lvep`;
+        filePath = path.join(this.projectsDir, defaultFileName);
+        console.log(`Creating new project: ${filePath}`);
+      }
+
+      const dataToSave = {
+        ...projectData,
+        lastModified: Date.now(),
+        version: '1.0'
+      };
+
+      await fs.promises.writeFile(filePath, JSON.stringify(dataToSave, null, 2), 'utf8');
+      
+      // Update current project path and reset modified flag
+      this.currentProjectPath = filePath;
+      this.projectModified = false;
+      
+      console.log(`Project saved: ${filePath}`);
+      return filePath;
+    } catch (error) {
+      throw new Error(`Failed to save project: ${error}`);
+    }
+  }
+
+  /**
+   * Save project as new file (Save As functionality)
+   */
+  public async saveProjectAs(projectData: ProjectData, fileName?: string): Promise<string> {
+    try {
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const defaultFileName = `project-${timestamp}.lvep`;
-      const finalFileName = fileName || defaultFileName;
+      let finalFileName: string;
+
+      if (fileName) {
+        finalFileName = fileName.endsWith('.lvep') ? fileName : `${fileName}.lvep`;
+      } else {
+        const baseName = this.currentProjectPath ? 
+          path.basename(this.currentProjectPath, '.lvep') : 'project';
+        finalFileName = `${baseName}-copy-${timestamp}.lvep`;
+      }
+
       const filePath = path.join(this.projectsDir, finalFileName);
 
       const dataToSave = {
@@ -45,10 +130,15 @@ export class ProjectManager {
       };
 
       await fs.promises.writeFile(filePath, JSON.stringify(dataToSave, null, 2), 'utf8');
-      console.log(`Project saved: ${filePath}`);
+      
+      // Update current project path to the new file
+      this.currentProjectPath = filePath;
+      this.projectModified = false;
+      
+      console.log(`Project saved as: ${filePath}`);
       return filePath;
     } catch (error) {
-      throw new Error(`Failed to save project: ${error}`);
+      throw new Error(`Failed to save project as: ${error}`);
     }
   }
 
@@ -62,10 +152,24 @@ export class ProjectManager {
         throw new Error('Invalid project file format');
       }
 
+      // Update current project path and reset modified flag
+      this.currentProjectPath = filePath;
+      this.projectModified = false;
+      
+      console.log(`Project loaded: ${filePath}`);
       return projectData;
     } catch (error) {
       throw new Error(`Failed to load project: ${error}`);
     }
+  }
+
+  /**
+   * Create a new project (reset current project state)
+   */
+  public createNewProject(): void {
+    this.currentProjectPath = null;
+    this.projectModified = false;
+    console.log('New project created');
   }
 
   public async listRecentProjects(limit: number = 10): Promise<Array<{
