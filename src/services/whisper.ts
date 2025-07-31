@@ -139,6 +139,19 @@ export class WhisperService {
       let progressStarted = false;
       let segmentCount = 0;
       let processedSegments = 0;
+      let progressTimer: NodeJS.Timeout | null = null;
+      let lastProgressUpdate = 0;
+
+      // Start a timer to provide regular progress updates
+      if (onProgress) {
+        progressTimer = setInterval(() => {
+          if (progressStarted && lastProgressUpdate < 85) {
+            // Gradually increase progress over time to show activity
+            lastProgressUpdate = Math.min(lastProgressUpdate + 1, 85);
+            onProgress(lastProgressUpdate);
+          }
+        }, 2000); // Update every 2 seconds
+      }
 
       whisperProcess.stdout.on('data', (data) => {
         stdoutOutput += data.toString();
@@ -154,14 +167,15 @@ export class WhisperService {
           // Estimate progress based on output activity
           if (!progressStarted && output.length > 0) {
             progressStarted = true;
-            onProgress(10); // Start at 10%
+            lastProgressUpdate = 10;
+            onProgress(lastProgressUpdate); // Start at 10%
           }
           
           // Increment progress gradually as we see output
           if (progressStarted) {
             processedSegments++;
-            const estimatedProgress = Math.min(10 + (processedSegments * 3), 90);
-            onProgress(estimatedProgress);
+            lastProgressUpdate = Math.min(10 + (processedSegments * 2), 80);
+            onProgress(lastProgressUpdate);
           }
         }
       });
@@ -175,23 +189,42 @@ export class WhisperService {
         if (onProgress) {
           // Look for Whisper's actual progress indicators
           if (output.includes('Loading model') || output.includes('Detecting language')) {
-            onProgress(20);
+            lastProgressUpdate = 15;
+            onProgress(lastProgressUpdate);
           } else if (output.includes('transcribing')) {
-            onProgress(40);
+            lastProgressUpdate = 25;
+            onProgress(lastProgressUpdate);
           } else if (output.includes('segment') || output.includes('words')) {
             processedSegments++;
-            const progress = Math.min(40 + (processedSegments * 2), 85);
-            onProgress(progress);
+            lastProgressUpdate = Math.min(25 + (processedSegments * 3), 85);
+            onProgress(lastProgressUpdate);
+          } else if (output.includes('Processing')) {
+            // Increment progress for any processing activity
+            processedSegments++;
+            lastProgressUpdate = Math.min(25 + (processedSegments * 2), 85);
+            onProgress(lastProgressUpdate);
           }
         }
       });
 
       whisperProcess.on('error', (error) => {
+        // Clean up the progress timer
+        if (progressTimer) {
+          clearInterval(progressTimer);
+          progressTimer = null;
+        }
+
         console.error('Whisper process error:', error);
         reject(new Error(`Failed to start Whisper process: ${error.message}`));
       });
 
       whisperProcess.on('close', (code) => {
+        // Clean up the progress timer
+        if (progressTimer) {
+          clearInterval(progressTimer);
+          progressTimer = null;
+        }
+
         console.log(`Whisper process exited with code: ${code}`);
         console.log(`Error output: ${errorOutput}`);
         console.log(`Stdout output: ${stdoutOutput}`);
@@ -319,7 +352,7 @@ export class WhisperService {
     audioPath: string,
     timelineSelections: any[],
     onProgress?: (progress: number) => void
-  ): Promise<TranscriptionResult> {
+  ): Promise<TranscriptionResult[]> {
     // For now, we'll transcribe the whole audio and then filter the results
     // This is simpler than extracting audio segments
     const fullTranscription = await this.transcribeAudio(audioPath, onProgress);
@@ -327,10 +360,10 @@ export class WhisperService {
     // Filter segments to only include those within selected timeline ranges
     const filteredSegments = fullTranscription.segments.filter(segment => {
       return timelineSelections.some(selection => {
-        const segmentStart = segment.start; // in seconds
-        const segmentEnd = segment.end; // in seconds
-        const selectionStart = selection.startTime / 1000; // Convert milliseconds to seconds
-        const selectionEnd = selection.endTime / 1000; // Convert milliseconds to seconds
+        const segmentStart = segment.start; // Already in milliseconds from transcribeAudio
+        const segmentEnd = segment.end; // Already in milliseconds from transcribeAudio
+        const selectionStart = selection.startTime; // Already in milliseconds
+        const selectionEnd = selection.endTime; // Already in milliseconds
         
         // Check if segment overlaps with any selection
         return (segmentStart < selectionEnd && segmentEnd > selectionStart);
@@ -341,10 +374,10 @@ export class WhisperService {
     const adjustedSegments = filteredSegments.map(segment => {
       // Find which selection this segment belongs to
       const matchingSelection = timelineSelections.find(selection => {
-        const segmentStart = segment.start;
-        const segmentEnd = segment.end;
-        const selectionStart = selection.startTime;
-        const selectionEnd = selection.endTime;
+        const segmentStart = segment.start; // Already in milliseconds
+        const segmentEnd = segment.end; // Already in milliseconds
+        const selectionStart = selection.startTime; // Already in milliseconds
+        const selectionEnd = selection.endTime; // Already in milliseconds
         
         return (segmentStart < selectionEnd && segmentEnd > selectionStart);
       });
@@ -353,10 +386,11 @@ export class WhisperService {
       return segment;
     });
 
-    return {
+    // Return as array of TranscriptionResult objects, one for each timeline selection
+    return timelineSelections.map(selection => ({
       text: adjustedSegments.map(s => s.text).join(' '),
       segments: adjustedSegments
-    };
+    }));
   }
 
   public getAvailableModels(): string[] {
