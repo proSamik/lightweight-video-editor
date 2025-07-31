@@ -35,17 +35,25 @@ export class CanvasVideoRenderer {
     exportSettings?: { framerate: number; quality: string }
   ): Promise<string> {
     try {
-      if (!captions || captions.length === 0) {
-        return await this.copyVideo(videoPath, outputPath);
-      }
+      // Validate inputs
+      await this.validateInputs(videoPath, captions, outputPath);
       
-      // Get video metadata
+          if (!captions || captions.length === 0) {
+      return await this.copyVideo(videoPath, outputPath);
+    }
+      
+      // Get and validate video metadata
       const metadata = await this.getVideoMetadata(videoPath);
+      if (!this.validateMetadata(metadata)) {
+        throw new Error('Invalid video metadata');
+      }
       
       // Override FPS if specified in export settings
       if (exportSettings && exportSettings.framerate) {
         metadata.fps = exportSettings.framerate;
       }
+      
+  
       
       // Create temporary directory for frame extraction
       const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'video-frames-'));
@@ -56,18 +64,27 @@ export class CanvasVideoRenderer {
         await fs.promises.mkdir(framesDir);
         await this.extractVideoFrames(videoPath, framesDir, metadata.fps, onProgress);
         
+        // Validate frame extraction
+        await this.validateFrameExtraction(framesDir);
+        
         // Step 2: Render captions on each frame using REAL Canvas (web-compatible)
         await this.renderCaptionsOnFramesWithCanvas(framesDir, captions, metadata, onProgress);
         
         // Step 3: Encode frames back to video with original audio (FFmpeg needed for encoding)
         const result = await this.encodeFramesToVideo(framesDir, videoPath, outputPath, metadata, onProgress, exportSettings);
         
+        // Validate output
+        await this.validateOutput(result, videoPath);
+        
+    
         return result;
       } finally {
         // Clean up temporary files
         await this.cleanupTempFiles(tempDir);
       }
     } catch (error) {
+      console.error('Video rendering failed:', error);
+      
       return await this.copyVideo(videoPath, outputPath);
     }
   }
@@ -85,11 +102,15 @@ export class CanvasVideoRenderer {
     return new Promise((resolve, reject) => {
       const command = ffmpeg(videoPath)
         .outputOptions([
-          '-vf', `fps=${fps}`,
-          '-frame_pts', '1'
+          '-vf', `fps=${fps}:round=near`, // Better frame timing accuracy
+          '-vsync', 'cfr', // Constant frame rate to prevent frame drops
+          '-frame_pts', '1',
+          '-start_number', '0', // Start numbering from 0 for consistency
+          '-q:v', '1' // High quality frames to prevent compression artifacts
         ])
         .output(path.join(framesDir, 'frame_%06d.png'))
         .on('start', (commandLine: string) => {
+          // Frame extraction started
         })
         .on('progress', (progress: any) => {
           if (onProgress && progress.percent) {
@@ -100,6 +121,7 @@ export class CanvasVideoRenderer {
           resolve();
         })
         .on('error', (err: any) => {
+          console.error('Frame extraction error:', err);
           reject(err);
         });
 
@@ -117,46 +139,57 @@ export class CanvasVideoRenderer {
     metadata: any,
     onProgress?: (progress: number) => void
   ): Promise<void> {
-    // Get frame files
+    // Get frame files sorted numerically (important for timeline consistency)
     const frameFiles = await fs.promises.readdir(framesDir);
-    const pngFiles = frameFiles.filter(file => file.endsWith('.png')).sort();
+    const pngFiles = frameFiles
+      .filter(file => file.endsWith('.png'))
+      .sort((a, b) => {
+        // Extract frame numbers for proper sorting
+        const aNum = parseInt(a.match(/frame_(\d+)\.png/)?.[1] || '0');
+        const bNum = parseInt(b.match(/frame_(\d+)\.png/)?.[1] || '0');
+        return aNum - bNum;
+      });
     
-    // Process frames in batches for better performance
-    const batchSize = 10; // Process 10 frames at a time
+
     
-    for (let batchStart = 0; batchStart < pngFiles.length; batchStart += batchSize) {
-      const batchEnd = Math.min(batchStart + batchSize, pngFiles.length);
-      const batchPromises = [];
+    // Process frames sequentially to ensure timeline consistency
+    for (let i = 0; i < pngFiles.length; i++) {
+      const frameFile = pngFiles[i];
+      const framePath = path.join(framesDir, frameFile);
       
-      for (let i = batchStart; i < batchEnd; i++) {
-        const frameFile = pngFiles[i];
-        const framePath = path.join(framesDir, frameFile);
-        
-        // Calculate current time for this frame
-        const frameTime = (i / metadata.fps) * 1000; // Convert to milliseconds
-        
-        // Find captions that should be displayed at this time
-        const activeCaptions = captions.filter(caption => 
-          frameTime >= caption.startTime && frameTime <= caption.endTime
-        );
-        
-        if (activeCaptions.length > 0) {
-          // Render captions on this frame using Canvas
-          batchPromises.push(
-            this.renderCaptionsOnFrameWithCanvas(framePath, activeCaptions, metadata, frameTime)
-          );
+      // Calculate frame time more accurately
+      const frameNumber = parseInt(frameFile.match(/frame_(\d+)\.png/)?.[1] || '0');
+      const frameTime = (frameNumber / metadata.fps) * 1000; // Convert to milliseconds
+      
+      // Find captions that should be displayed at this exact time
+      const activeCaptions = captions.filter(caption => {
+        const isActive = frameTime >= caption.startTime && frameTime <= caption.endTime;
+        const shouldBurnIn = caption.style?.burnInSubtitles !== false; // Default to true
+        return isActive && shouldBurnIn;
+      });
+      
+      if (activeCaptions.length > 0) {
+        try {
+          await this.renderCaptionsOnFrameWithCanvas(framePath, activeCaptions, metadata, frameTime);
+        } catch (error) {
+          console.error(`Failed to render captions on frame ${frameNumber}:`, error);
+          // Continue processing other frames even if one fails
         }
       }
       
-      // Wait for batch to complete
-      await Promise.all(batchPromises);
-      
-      // Update progress
-      const progress = 30 + (batchEnd / pngFiles.length) * 40; // 30-70% of total progress
-      if (onProgress) {
+      // Update progress more frequently for better user feedback
+      if (onProgress && i % 10 === 0) {
+        const progress = 30 + ((i / pngFiles.length) * 40); // 30-70% of total progress
         onProgress(progress);
       }
     }
+    
+    // Final progress update
+    if (onProgress) {
+      onProgress(70);
+    }
+    
+
   }
 
   /**
@@ -319,25 +352,38 @@ export class CanvasVideoRenderer {
     onProgress?: (progress: number) => void,
     exportSettings?: { framerate: number; quality: string }
   ): Promise<string> {
+    // Get original video duration to ensure output matches
+    const originalDuration = await this.getVideoDuration(originalVideoPath);
+    
     return new Promise((resolve, reject) => {
+      const targetFps = exportSettings?.framerate || metadata.fps;
+      
       const command = ffmpeg()
         .input(path.join(framesDir, 'frame_%06d.png'))
-        .inputOptions(['-framerate', metadata.fps.toString()])
+        .inputOptions([
+          '-framerate', metadata.fps.toString(),
+          '-start_number', '0'
+        ])
         .input(originalVideoPath)
-        // Simplified audio mapping to avoid sync issues
         .outputOptions([
           '-map', '0:v', // Map video from frames
           '-map', '1:a', // Map audio from original video
           '-c:v', 'libx264',
-          '-c:a', 'copy', // Copy audio to avoid re-encoding issues
+          '-c:a', 'aac', // Re-encode audio to ensure compatibility
+          '-b:a', '128k', // Audio bitrate
           '-preset', this.getFFmpegPreset(exportSettings?.quality || 'balanced'),
           '-crf', this.getFFmpegCRF(exportSettings?.quality || 'balanced'),
-          '-movflags', '+faststart', // Ensure video is web-compatible
-          '-pix_fmt', 'yuv420p', // Ensure compatibility
-          '-shortest' // Use shortest stream to avoid sync issues
+          '-r', targetFps.toString(), // Explicit output framerate
+          '-vsync', 'cfr', // Constant frame rate
+          '-async', '1', // Audio sync method
+          '-movflags', '+faststart',
+          '-pix_fmt', 'yuv420p',
+          '-t', originalDuration.toString(), // Match original duration exactly
+          '-avoid_negative_ts', 'make_zero' // Fix timestamp issues
         ])
         .output(outputPath)
         .on('start', (commandLine: string) => {
+          // Video encoding started
         })
         .on('progress', (progress: any) => {
           if (onProgress && progress.percent) {
@@ -348,10 +394,111 @@ export class CanvasVideoRenderer {
           resolve(outputPath);
         })
         .on('error', (err: any) => {
+          console.error('Video encoding error:', err);
           reject(err);
         });
 
       command.run();
+    });
+  }
+
+  /**
+   * Validates input parameters
+   */
+  private async validateInputs(videoPath: string, captions: any[], outputPath: string): Promise<void> {
+    // Check if input video exists
+    if (!fs.existsSync(videoPath)) {
+      throw new Error(`Input video file not found: ${videoPath}`);
+    }
+    
+    // Check if output directory exists
+    const outputDir = path.dirname(outputPath);
+    if (!fs.existsSync(outputDir)) {
+      await fs.promises.mkdir(outputDir, { recursive: true });
+    }
+    
+    // Validate captions structure
+    if (captions && captions.length > 0) {
+      for (let i = 0; i < captions.length; i++) {
+        const caption = captions[i];
+        
+        if (caption.startTime === undefined || caption.startTime === null || caption.endTime === undefined || caption.endTime === null || !caption.text) {
+          throw new Error(`Invalid caption structure at index ${i}: missing required fields`);
+        }
+        if (caption.startTime >= caption.endTime) {
+          throw new Error('Invalid caption timing: start time must be before end time');
+        }
+      }
+    }
+  }
+
+  /**
+   * Validates video metadata
+   */
+  private validateMetadata(metadata: any): boolean {
+    return (
+      metadata &&
+      metadata.width > 0 &&
+      metadata.height > 0 &&
+      metadata.fps > 0 &&
+      metadata.duration > 0
+    );
+  }
+
+  /**
+   * Validates frame extraction results
+   */
+  private async validateFrameExtraction(framesDir: string): Promise<void> {
+    const frameFiles = await fs.promises.readdir(framesDir);
+    const pngFiles = frameFiles.filter(file => file.endsWith('.png'));
+    
+    if (pngFiles.length === 0) {
+      throw new Error('Frame extraction failed: no frames were created');
+    }
+    
+    console.log(`Frame extraction successful: ${pngFiles.length} frames created`);
+  }
+
+  /**
+   * Validates output video
+   */
+  private async validateOutput(outputPath: string, originalPath: string): Promise<void> {
+    if (!fs.existsSync(outputPath)) {
+      throw new Error('Output video was not created');
+    }
+    
+    const stats = await fs.promises.stat(outputPath);
+    if (stats.size === 0) {
+      throw new Error('Output video file is empty');
+    }
+    
+    // Quick validation: output should have reasonable size compared to input
+    const originalStats = await fs.promises.stat(originalPath);
+    if (stats.size < originalStats.size * 0.1) { // Less than 10% of original is suspicious
+      console.warn('Output video is significantly smaller than input - may indicate encoding issues');
+    }
+    
+    console.log(`Output validation passed: ${Math.round(stats.size / 1024 / 1024)}MB`);
+  }
+
+  /**
+   * Gets video duration in seconds
+   */
+  private async getVideoDuration(videoPath: string): Promise<number> {
+    return new Promise((resolve, reject) => {
+      ffmpeg.ffprobe(videoPath, (err, metadata) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        
+        const duration = metadata.format.duration;
+        if (typeof duration === 'number') {
+          resolve(duration);
+        } else {
+          reject(new Error('Could not determine video duration'));
+        }
+      });
     });
   }
 
@@ -487,6 +634,8 @@ export class CanvasVideoRenderer {
         return 'Times New Roman';
       case 'Georgia':
         return 'Georgia';
+      case 'Montserrat':
+        return 'Montserrat, Arial';
       default:
         return 'Arial'; // Default fallback
     }
