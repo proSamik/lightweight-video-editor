@@ -10,6 +10,11 @@ interface StylingPanelProps {
   onExport?: (settings: ExportSettings) => void;
   onApplyToAll?: (styleUpdates: Partial<CaptionSegment['style']>) => void;
   onTimeSeek?: (time: number) => void;
+  transcriptionStatus?: {
+    isTranscribing: boolean;
+    progress: number;
+    message: string;
+  };
 }
 
 const StylingPanel: React.FC<StylingPanelProps> = ({
@@ -20,8 +25,45 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
   onExport,
   onApplyToAll,
   onTimeSeek,
+  transcriptionStatus,
 }) => {
   const [showExportSettings, setShowExportSettings] = useState(false);
+  
+  // Transcription status component (shown in both selected and non-selected states)
+  const transcriptionStatusComponent = transcriptionStatus?.isTranscribing ? (
+    <div style={{
+      backgroundColor: '#2a4a2a',
+      border: '1px solid #4a7a4a',
+      borderRadius: '6px',
+      padding: '12px',
+      marginBottom: '20px'
+    }}>
+      <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span>🎤 Transcribing Audio...</span>
+        <span style={{ fontSize: '12px', color: '#4a7a4a', fontWeight: 'bold' }}>
+          {Math.round(transcriptionStatus.progress)}%
+        </span>
+      </div>
+      <div style={{ 
+        backgroundColor: '#333',
+        borderRadius: '4px',
+        height: '8px',
+        overflow: 'hidden',
+        marginBottom: '8px'
+      }}>
+        <div style={{
+          backgroundColor: '#4a7a4a',
+          height: '100%',
+          width: `${transcriptionStatus.progress}%`,
+          transition: 'width 0.3s ease'
+        }} />
+      </div>
+      <div style={{ fontSize: '12px', color: '#ccc' }}>
+        {transcriptionStatus.message}
+      </div>
+    </div>
+  ) : null;
+  
   if (!selectedSegment) {
     return (
       <div style={{
@@ -30,6 +72,9 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
         backgroundColor: '#2a2a2a'
       }}>
         <h3 style={{ margin: '0 0 20px 0', fontSize: '16px' }}>Styling Controls</h3>
+        
+        {transcriptionStatusComponent}
+        
         <div style={{
           textAlign: 'center',
           color: '#888',
@@ -184,6 +229,8 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
       overflowY: 'auto'
     }}>
       <h3 style={{ margin: '0 0 20px 0', fontSize: '16px' }}>Styling Controls</h3>
+      
+      {transcriptionStatusComponent}
       
       {/* Text Editor Section */}
       <div style={{ marginBottom: '25px' }}>
@@ -384,6 +431,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
           <option value="Helvetica">Helvetica</option>
           <option value="Times New Roman">Times New Roman</option>
           <option value="Georgia">Georgia</option>
+          <option value="Montserrat">Montserrat</option>
         </select>
       </div>
 
@@ -450,6 +498,25 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
           {selectedSegment.style.emphasizeMode 
             ? 'Highlighted words will be emphasized (larger + color change)'
             : 'Highlighted words will have background highlighting'
+          }
+        </div>
+      </div>
+
+      {/* Burn-in Subtitles Control */}
+      <div style={{ marginBottom: '25px' }}>
+        <label style={{ display: 'flex', alignItems: 'center', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={selectedSegment.style.burnInSubtitles !== false} // Default true
+            onChange={(e) => handleStyleUpdate({ burnInSubtitles: e.target.checked })}
+            style={{ marginRight: '8px' }}
+          />
+          Burn-in Subtitles
+        </label>
+        <div style={{ marginTop: '4px', fontSize: '12px', color: '#888' }}>
+          {selectedSegment.style.burnInSubtitles !== false
+            ? 'Subtitles will be permanently embedded in the exported video'
+            : 'Subtitles will not appear in the exported video (SRT file only)'
           }
         </div>
       </div>
@@ -780,8 +847,45 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
           borderTop: '1px solid #444' 
         }}>
           <h4 style={{ margin: '0 0 15px 0', fontSize: '14px', fontWeight: 'bold' }}>
-            Export Video
+            Export Options
           </h4>
+          
+          {/* SRT Export Button */}
+          <button
+            onClick={async () => {
+              try {
+                const result = await window.electronAPI.exportSrt(captions, `${videoFile.name.replace(/\.[^/.]+$/, '')}_subtitles.srt`);
+                if (result.success && !result.canceled) {
+                  alert(`SRT file exported successfully to: ${result.filePath}`);
+                }
+              } catch (error) {
+                console.error('Failed to export SRT:', error);
+                alert('Failed to export SRT file. Please try again.');
+              }
+            }}
+            style={{
+              width: '100%',
+              padding: '10px 20px',
+              backgroundColor: '#28a745',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: 'bold',
+              marginBottom: '10px'
+            }}
+          >
+            📄 Export SRT Subtitles
+          </button>
+          <div style={{
+            marginBottom: '15px',
+            fontSize: '12px',
+            color: '#888',
+            textAlign: 'center'
+          }}>
+            Export subtitles for YouTube uploads
+          </div>
           <button
             onClick={() => setShowExportSettings(true)}
             style={{
