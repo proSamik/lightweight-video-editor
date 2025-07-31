@@ -24,6 +24,7 @@ export interface CaptionStyle {
   scale?: number; // Scale factor for subtitle size (0.5 - 2.0)
   emphasizeMode?: boolean; // When true, highlighted words get emphasized instead of background highlight
   renderMode?: 'horizontal' | 'progressive'; // New: horizontal (default) or progressive reveal
+  burnInSubtitles?: boolean; // Whether to burn subtitles into video or not (default: true)
 }
 
 export interface WordTimestamp {
@@ -57,7 +58,8 @@ export enum FontOption {
   ARIAL = 'Arial',
   HELVETICA = 'Helvetica',
   TIMES_NEW_ROMAN = 'Times New Roman',
-  GEORGIA = 'Georgia'
+  GEORGIA = 'Georgia',
+  MONTSERRAT = 'Montserrat'
 }
 
 export enum ColorOption {
@@ -106,4 +108,34 @@ export interface ProjectData {
   captions: CaptionSegment[];
   timeline: TimelineSelection[];
   lastModified: number;
+  description?: string;
+  title?: string;
+  aiGeneratedTitles?: string[];
+}
+
+export interface AIModel {
+  id: string;
+  name: string;
+  provider: string;
+  contextLength?: number;
+  pricing?: {
+    input: number;
+    output: number;
+  };
+}
+
+export interface AISettings {
+  openrouterApiKey?: string;
+  anthropicApiKey?: string;
+  googleAiApiKey?: string;
+  descriptionPrompt?: string;
+  titlePrompt?: string;
+  selectedProvider: 'openrouter' | 'anthropic' | 'google';
+  selectedModel?: string;
+  availableModels?: AIModel[];
+}
+
+export interface GeneratedContent {
+  description?: string;
+  titles?: { title: string; characterCount: number }[];
 }
