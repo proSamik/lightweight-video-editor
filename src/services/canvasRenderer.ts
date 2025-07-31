@@ -99,29 +99,110 @@ export class CanvasVideoRenderer {
     fps: number,
     onProgress?: (progress: number) => void
   ): Promise<void> {
+    return new Promise(async (resolve, reject) => {
+      try {
+        // Get video duration first
+        const duration = await this.getVideoDuration(videoPath);
+        const totalFrames = Math.ceil(duration * fps);
+        
+        // Determine batch size based on video length
+        const batchSize = totalFrames > 5000 ? 2000 : totalFrames; // Process 2000 frames at a time for large videos
+        const numBatches = Math.ceil(totalFrames / batchSize);
+        
+        // Create batches directory
+        const batchesDir = path.join(framesDir, 'batches');
+        await fs.promises.mkdir(batchesDir, { recursive: true });
+        
+        let processedFrames = 0;
+        
+        for (let batchIndex = 0; batchIndex < numBatches; batchIndex++) {
+          const startFrame = batchIndex * batchSize;
+          const endFrame = Math.min((batchIndex + 1) * batchSize - 1, totalFrames - 1);
+          const batchFrames = endFrame - startFrame + 1;
+          
+          const batchDir = path.join(batchesDir, `batch_${batchIndex.toString().padStart(3, '0')}`);
+          await fs.promises.mkdir(batchDir, { recursive: true });
+          
+          // Extract frames for this batch
+          await this.extractFrameBatch(videoPath, batchDir, fps, startFrame, batchFrames, onProgress, processedFrames, totalFrames);
+          
+          // Move frames to main directory with correct numbering
+          const batchFiles = await fs.promises.readdir(batchDir);
+          const pngFiles = batchFiles.filter(file => file.endsWith('.png')).sort();
+          
+          for (let i = 0; i < pngFiles.length; i++) {
+            const oldPath = path.join(batchDir, pngFiles[i]);
+            const newPath = path.join(framesDir, `frame_${(startFrame + i).toString().padStart(6, '0')}.png`);
+            await fs.promises.rename(oldPath, newPath);
+          }
+          
+          // Clean up batch directory
+          await fs.promises.rmdir(batchDir);
+          
+          processedFrames += batchFrames;
+          
+          // Update progress
+          if (onProgress) {
+            const progress = (processedFrames / totalFrames) * 30; // 30% of total progress
+            onProgress(progress);
+          }
+        }
+        
+        // Clean up batches directory
+        await fs.promises.rmdir(batchesDir);
+        
+        resolve();
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  /**
+   * Extract a batch of frames from the video
+   */
+  private async extractFrameBatch(
+    videoPath: string,
+    batchDir: string,
+    fps: number,
+    startFrame: number,
+    numFrames: number,
+    onProgress?: (progress: number) => void,
+    processedFrames: number = 0,
+    totalFrames: number = 0
+  ): Promise<void> {
     return new Promise((resolve, reject) => {
+      const startTime = startFrame / fps;
+      
       const command = ffmpeg(videoPath)
-        .outputOptions([
-          '-vf', `fps=${fps}:round=near`, // Better frame timing accuracy
-          '-vsync', 'cfr', // Constant frame rate to prevent frame drops
-          '-frame_pts', '1',
-          '-start_number', '0', // Start numbering from 0 for consistency
-          '-q:v', '1' // High quality frames to prevent compression artifacts
+        .inputOptions([
+          '-ss', startTime.toString(), // Seek to start time
+          '-threads', '2' // Limit threads to prevent resource exhaustion
         ])
-        .output(path.join(framesDir, 'frame_%06d.png'))
+        .outputOptions([
+          '-vf', `fps=${fps}:round=near`,
+          '-vsync', 'cfr',
+          '-frame_pts', '1',
+          '-start_number', '0',
+          '-q:v', '1', // Maintain high quality
+          '-frames:v', numFrames.toString(), // Limit frames for this batch
+          '-avoid_negative_ts', 'make_zero'
+        ])
+        .output(path.join(batchDir, 'frame_%06d.png'))
         .on('start', (commandLine: string) => {
-          // Frame extraction started
+          // Batch extraction started
         })
         .on('progress', (progress: any) => {
           if (onProgress && progress.percent) {
-            onProgress(progress.percent * 0.3); // 30% of total progress
+            const batchProgress = (processedFrames / totalFrames) + (progress.percent / 100) * (numFrames / totalFrames);
+            onProgress(batchProgress * 30); // 30% of total progress
           }
         })
         .on('end', () => {
           resolve();
         })
         .on('error', (err: any) => {
-          console.error('Frame extraction error:', err);
+          console.error('Batch frame extraction error:', err);
           reject(err);
         });
 
@@ -150,46 +231,55 @@ export class CanvasVideoRenderer {
         return aNum - bNum;
       });
     
-
+    // Process frames in batches for better memory management
+    const batchSize = 500; // Process 500 frames at a time
+    const numBatches = Math.ceil(pngFiles.length / batchSize);
     
-    // Process frames sequentially to ensure timeline consistency
-    for (let i = 0; i < pngFiles.length; i++) {
-      const frameFile = pngFiles[i];
-      const framePath = path.join(framesDir, frameFile);
+    for (let batchIndex = 0; batchIndex < numBatches; batchIndex++) {
+      const startIndex = batchIndex * batchSize;
+      const endIndex = Math.min((batchIndex + 1) * batchSize, pngFiles.length);
+      const batchFiles = pngFiles.slice(startIndex, endIndex);
       
-      // Calculate frame time more accurately
-      const frameNumber = parseInt(frameFile.match(/frame_(\d+)\.png/)?.[1] || '0');
-      const frameTime = (frameNumber / metadata.fps) * 1000; // Convert to milliseconds
-      
-      // Find captions that should be displayed at this exact time
-      const activeCaptions = captions.filter(caption => {
-        const isActive = frameTime >= caption.startTime && frameTime <= caption.endTime;
-        const shouldBurnIn = caption.style?.burnInSubtitles !== false; // Default to true
-        return isActive && shouldBurnIn;
-      });
-      
-      if (activeCaptions.length > 0) {
-        try {
-          await this.renderCaptionsOnFrameWithCanvas(framePath, activeCaptions, metadata, frameTime);
-        } catch (error) {
-          console.error(`Failed to render captions on frame ${frameNumber}:`, error);
-          // Continue processing other frames even if one fails
+      // Process frames in this batch
+      for (let i = 0; i < batchFiles.length; i++) {
+        const frameFile = batchFiles[i];
+        const framePath = path.join(framesDir, frameFile);
+        
+        // Calculate frame time more accurately
+        const frameNumber = parseInt(frameFile.match(/frame_(\d+)\.png/)?.[1] || '0');
+        const frameTime = (frameNumber / metadata.fps) * 1000; // Convert to milliseconds
+        
+        // Find captions that should be displayed at this exact time
+        const activeCaptions = captions.filter(caption => {
+          const isActive = frameTime >= caption.startTime && frameTime <= caption.endTime;
+          const shouldBurnIn = caption.style?.burnInSubtitles !== false; // Default to true
+          return isActive && shouldBurnIn;
+        });
+        
+        if (activeCaptions.length > 0) {
+          try {
+            await this.renderCaptionsOnFrameWithCanvas(framePath, activeCaptions, metadata, frameTime);
+          } catch (error) {
+            console.error(`Failed to render captions on frame ${frameNumber}:`, error);
+            // Continue processing other frames even if one fails
+          }
         }
       }
       
-      // Update progress more frequently for better user feedback
-      if (onProgress && i % 10 === 0) {
-        const progress = 30 + ((i / pngFiles.length) * 40); // 30-70% of total progress
+      // Update progress after each batch
+      if (onProgress) {
+        const progress = 30 + ((batchIndex + 1) / numBatches) * 40; // 30-70% of total progress
         onProgress(progress);
       }
+      
+      // Small delay to prevent memory buildup
+      await new Promise(resolve => setTimeout(resolve, 10));
     }
     
     // Final progress update
     if (onProgress) {
       onProgress(70);
     }
-    
-
   }
 
   /**
@@ -361,7 +451,7 @@ export class CanvasVideoRenderer {
       const command = ffmpeg()
         .input(path.join(framesDir, 'frame_%06d.png'))
         .inputOptions([
-          '-framerate', metadata.fps.toString(),
+          '-framerate', targetFps.toString(), // Use target FPS for input frames
           '-start_number', '0'
         ])
         .input(originalVideoPath)
@@ -373,12 +463,10 @@ export class CanvasVideoRenderer {
           '-b:a', '128k', // Audio bitrate
           '-preset', this.getFFmpegPreset(exportSettings?.quality || 'balanced'),
           '-crf', this.getFFmpegCRF(exportSettings?.quality || 'balanced'),
-          '-r', targetFps.toString(), // Explicit output framerate
           '-vsync', 'cfr', // Constant frame rate
           '-async', '1', // Audio sync method
           '-movflags', '+faststart',
           '-pix_fmt', 'yuv420p',
-          '-t', originalDuration.toString(), // Match original duration exactly
           '-avoid_negative_ts', 'make_zero' // Fix timestamp issues
         ])
         .output(outputPath)
@@ -394,7 +482,6 @@ export class CanvasVideoRenderer {
           resolve(outputPath);
         })
         .on('error', (err: any) => {
-          console.error('Video encoding error:', err);
           reject(err);
         });
 
