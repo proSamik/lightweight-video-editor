@@ -1,7 +1,6 @@
 import ffmpeg from 'fluent-ffmpeg';
 import * as path from 'path';
 import * as fs from 'fs';
-import * as os from 'os';
 import { VideoFile } from '../types';
 
 // Import bundled FFmpeg binaries
