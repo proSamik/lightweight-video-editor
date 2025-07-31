@@ -11,6 +11,7 @@ interface TimelinePanelProps {
   onSegmentDelete: (segmentId: string) => void;
   onCaptionUpdate: (segmentId: string, updates: Partial<CaptionSegment>) => void;
   videoFile?: { path: string; name: string; duration?: number } | null;
+  onReTranscribeSegment?: (startTime: number, endTime: number) => void;
 }
 
 const TimelinePanel: React.FC<TimelinePanelProps> = ({
@@ -22,10 +23,13 @@ const TimelinePanel: React.FC<TimelinePanelProps> = ({
   onSegmentDelete,
   onCaptionUpdate,
   videoFile,
+  onReTranscribeSegment,
 }) => {
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [highlightedSegments, setHighlightedSegments] = useState<Set<string>>(new Set());
   const [searchHighlight, setSearchHighlight] = useState<{segmentId: string, start: number, end: number} | null>(null);
+  const [selectedTimeRange, setSelectedTimeRange] = useState<{start: number, end: number} | null>(null);
+  const [isSelectingRange, setIsSelectingRange] = useState(false);
 
   // Keyboard shortcut for search
   useEffect(() => {
@@ -130,24 +134,71 @@ const TimelinePanel: React.FC<TimelinePanelProps> = ({
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
         <h3 style={{ margin: 0, fontSize: '16px' }}>Caption Timeline</h3>
-        <button
-          onClick={() => setShowSearchModal(true)}
-          style={{
-            padding: '6px 12px',
-            backgroundColor: '#444',
-            color: '#fff',
-            border: '1px solid #555',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px'
-          }}
-          title="Search in timeline (Ctrl/Cmd+F)"
-        >
-          🔍 Search
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            onClick={() => {
+              setIsSelectingRange(!isSelectingRange);
+              setSelectedTimeRange(null);
+            }}
+            style={{
+              padding: '6px 12px',
+              backgroundColor: isSelectingRange ? '#28a745' : '#6c757d',
+              color: '#fff',
+              border: '1px solid #555',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+            title="Select timeline range for re-transcription"
+          >
+            📐 {isSelectingRange ? 'Cancel Selection' : 'Select Range'}
+          </button>
+          {selectedTimeRange && onReTranscribeSegment && (
+            <button
+              onClick={() => {
+                onReTranscribeSegment(selectedTimeRange.start, selectedTimeRange.end);
+                setSelectedTimeRange(null);
+                setIsSelectingRange(false);
+              }}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: '#dc3545',
+                color: '#fff',
+                border: '1px solid #c82333',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+              title="Re-transcribe selected range"
+            >
+              🎤 Re-transcribe
+            </button>
+          )}
+          <button
+            onClick={() => setShowSearchModal(true)}
+            style={{
+              padding: '6px 12px',
+              backgroundColor: '#444',
+              color: '#fff',
+              border: '1px solid #555',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+            title="Search in timeline (Ctrl/Cmd+F)"
+          >
+            🔍 Search
+          </button>
+        </div>
       </div>
       
       {/* Timeline Ruler */}
@@ -163,8 +214,36 @@ const TimelinePanel: React.FC<TimelinePanelProps> = ({
         const clickX = e.clientX - rect.left;
         const percentage = clickX / rect.width;
         const seekTime = percentage * totalDuration;
-        onTimeSeek(seekTime);
+        
+        if (isSelectingRange) {
+          if (!selectedTimeRange) {
+            // First click - set start time
+            setSelectedTimeRange({ start: seekTime, end: seekTime });
+          } else {
+            // Second click - set end time
+            const start = Math.min(selectedTimeRange.start, seekTime);
+            const end = Math.max(selectedTimeRange.start, seekTime);
+            setSelectedTimeRange({ start, end });
+          }
+        } else {
+          onTimeSeek(seekTime);
+        }
       }}>
+        {/* Selected Time Range */}
+        {selectedTimeRange && (
+          <div style={{
+            position: 'absolute',
+            left: `${(selectedTimeRange.start / totalDuration) * 100}%`,
+            width: `${((selectedTimeRange.end - selectedTimeRange.start) / totalDuration) * 100}%`,
+            top: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(40, 167, 69, 0.3)',
+            border: '1px solid #28a745',
+            borderRadius: '2px',
+            zIndex: 1
+          }} />
+        )}
+        
         {/* Current Time Indicator */}
         <div style={{
           position: 'absolute',
