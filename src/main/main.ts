@@ -1,10 +1,14 @@
 import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
 import * as path from 'path';
 import * as os from 'os';
+import * as fs from 'fs';
 import FFmpegService from '../services/ffmpeg';
 import WhisperService from '../services/whisper';
 import VideoEditor from '../services/videoEditor';
 import ProjectManager from '../services/projectManager';
+import { SrtExporter } from '../services/srtExporter';
+import { AIService } from '../services/aiService';
+import { SettingsManager } from '../services/settingsManager';
 
 let mainWindow: BrowserWindow;
 
@@ -265,11 +269,155 @@ ipcMain.handle('delete-project', async (_event, filePath: string) => {
   }
 });
 
+// Enhanced project management handlers
+ipcMain.handle('save-project-as', async (_event, projectData: any, fileName?: string) => {
+  try {
+    const projectManager = ProjectManager.getInstance();
+    return await projectManager.saveProjectAs(projectData, fileName);
+  } catch (error) {
+    throw new Error(`Failed to save project as: ${error}`);
+  }
+});
+
+ipcMain.handle('get-current-project-info', async () => {
+  try {
+    const projectManager = ProjectManager.getInstance();
+    return {
+      projectPath: projectManager.getCurrentProjectPath(),
+      projectName: projectManager.getCurrentProjectName(),
+      isModified: projectManager.isProjectModified()
+    };
+  } catch (error) {
+    console.error('Failed to get current project info:', error);
+    return {
+      projectPath: null,
+      projectName: 'Untitled Project',
+      isModified: false
+    };
+  }
+});
+
+ipcMain.handle('mark-project-modified', async () => {
+  try {
+    const projectManager = ProjectManager.getInstance();
+    projectManager.markProjectModified();
+    return true;
+  } catch (error) {
+    console.error('Failed to mark project as modified:', error);
+    return false;
+  }
+});
+
+ipcMain.handle('create-new-project', async () => {
+  try {
+    const projectManager = ProjectManager.getInstance();
+    projectManager.createNewProject();
+    return true;
+  } catch (error) {
+    console.error('Failed to create new project:', error);
+    return false;
+  }
+});
+
 ipcMain.handle('apply-word-deletions', async (_event, inputVideoPath: string, originalCaptions: any[], updatedCaptions: any[], outputPath: string) => {
   try {
     const videoEditor = VideoEditor.getInstance();
     return await videoEditor.applyWordDeletions(inputVideoPath, originalCaptions, updatedCaptions, outputPath);
   } catch (error) {
     throw new Error(`Failed to apply word deletions: ${error}`);
+  }
+});
+
+// SRT export handler
+ipcMain.handle('export-srt', async (_event, captions: any[], defaultFileName?: string) => {
+  try {
+    const result = await dialog.showSaveDialog(mainWindow, {
+      defaultPath: defaultFileName || 'subtitles.srt',
+      filters: [
+        { name: 'SubRip Subtitle', extensions: ['srt'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    });
+
+    if (result.canceled || !result.filePath) {
+      return { success: false, canceled: true };
+    }
+
+    const srtContent = SrtExporter.exportToSrt(captions);
+    fs.writeFileSync(result.filePath, srtContent, 'utf8');
+
+    return { success: true, filePath: result.filePath };
+  } catch (error) {
+    console.error('Failed to export SRT:', error);
+    throw new Error(`Failed to export SRT: ${error}`);
+  }
+});
+
+// AI and Settings handlers
+ipcMain.handle('load-ai-settings', async () => {
+  try {
+    const settingsManager = SettingsManager.getInstance();
+    return settingsManager.loadDecryptedSettings();
+  } catch (error) {
+    console.error('Failed to load AI settings:', error);
+    throw new Error(`Failed to load AI settings: ${error}`);
+  }
+});
+
+ipcMain.handle('save-ai-settings', async (_event, settings: any) => {
+  try {
+    const settingsManager = SettingsManager.getInstance();
+    settingsManager.saveSettings(settings);
+    
+    // Update AI service with new settings
+    const aiService = AIService.getInstance();
+    aiService.setSettings(settings);
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to save AI settings:', error);
+    throw new Error(`Failed to save AI settings: ${error}`);
+  }
+});
+
+ipcMain.handle('test-ai-connection', async (_event, settings: any) => {
+  try {
+    const aiService = AIService.getInstance();
+    aiService.setSettings(settings);
+    return await aiService.testConnection();
+  } catch (error) {
+    console.error('AI connection test failed:', error);
+    return false;
+  }
+});
+
+ipcMain.handle('generate-description', async (_event, captions: any[], customPrompt?: string) => {
+  try {
+    const aiService = AIService.getInstance();
+    return await aiService.generateDescription(captions, customPrompt);
+  } catch (error) {
+    console.error('Failed to generate description:', error);
+    throw new Error(`Failed to generate description: ${error}`);
+  }
+});
+
+ipcMain.handle('generate-titles', async (_event, description: string, captions: any[], customPrompt?: string) => {
+  try {
+    const aiService = AIService.getInstance();
+    return await aiService.generateTitles(description, captions, customPrompt);
+  } catch (error) {
+    console.error('Failed to generate titles:', error);
+    throw new Error(`Failed to generate titles: ${error}`);
+  }
+});
+
+ipcMain.handle('get-available-models', async (_event, settings: any) => {
+  try {
+    const aiService = AIService.getInstance();
+    aiService.setSettings(settings);
+    return await aiService.getAvailableModels();
+  } catch (error) {
+    console.error('Failed to get available models:', error);
+    throw new Error(`Failed to get available models: ${error}`);
   }
 });
