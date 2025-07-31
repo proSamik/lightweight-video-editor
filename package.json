@@ -57,9 +57,13 @@
     "webpack-dev-server": "^5.2.2"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^1.2.12",
+    "@ai-sdk/google": "^1.2.22",
+    "@openrouter/ai-sdk-provider": "^0.7.3",
     "@types/fluent-ffmpeg": "^2.1.27",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
+    "ai": "^4.3.19",
     "canvas": "^3.1.2",
     "canvas-record": "^5.0.1",
     "ffmpeg-static": "^5.2.0",
