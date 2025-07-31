@@ -229,7 +229,6 @@ export class FFmpegService {
         
         // Create progress wrapper to provide detailed updates
         const progressWrapper = (progress: number) => {
-          console.log(`Overall rendering progress: ${Math.round(progress)}%`);
           if (onProgress) {
             onProgress(progress);
           }
