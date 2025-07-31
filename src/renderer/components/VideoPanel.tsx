@@ -416,6 +416,11 @@ function renderCaptionOnCanvas(
   currentTime: number,
   scaleFactor: number
 ) {
+  // Skip rendering if burn-in subtitles is disabled
+  if (caption.style.burnInSubtitles === false) {
+    return;
+  }
+  
   // Calculate position (matching the VideoPanel exactly)
   // x: percentage from left (0-100)
   // y: percentage from top (0-100) - NOT from bottom!
@@ -745,6 +750,8 @@ function mapFontName(fontName: string): string {
       return 'Times New Roman';
     case 'Georgia':
       return 'Georgia';
+    case 'Montserrat':
+      return 'Montserrat, Arial';
     default:
       return 'Arial'; // Default fallback
   }
