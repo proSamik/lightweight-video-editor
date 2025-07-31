@@ -26,7 +26,10 @@ src/
 │   ├── ffmpeg.ts          # Video processing via FFmpeg
 │   ├── whisper.ts         # Audio transcription via OpenAI Whisper
 │   ├── videoEditor.ts     # Video editing operations (word deletions)
-│   └── canvasRenderer.ts  # Canvas-based caption rendering
+│   ├── canvasRenderer.ts  # Canvas-based caption rendering
+│   ├── srtExporter.ts     # SRT subtitle export for YouTube
+│   ├── aiService.ts       # AI content generation (descriptions/titles)
+│   └── settingsManager.ts # Persistent settings storage
 └── types/
     └── index.ts           # TypeScript type definitions
 ```
@@ -195,6 +198,27 @@ npm run dev-renderer  # Start webpack dev server for renderer
 - **Progressive rendering**: Cumulative word display for vertical text reveal
 - **Smart audio preservation**: Distinguishes between text edits and actual word deletions
 - **Real-time synchronization**: Video seeking integration with timeline controls
+
+### AI-Powered Content Generation
+- **Multi-provider support**: OpenRouter, Anthropic (Claude), and Google AI (Gemini)
+- **YouTube description generation**: AI generates SEO-optimized descriptions from captions
+- **Title generation**: Creates 4 optimized title options with character counts
+- **Custom prompts**: User-configurable prompts for description and title generation
+- **Secure storage**: Encrypted API key storage in user's home directory
+- **Project integration**: Generated content saved with projects for future reference
+
+### Enhanced Export Options
+- **SRT subtitle export**: Export captions as SRT files for YouTube uploads
+- **Montserrat font support**: Added popular web font for modern styling
+- **Improved video rendering**: Fixed frame mixing and timeline synchronization issues
+- **Smart text filtering**: Automatic cleanup of empty captions in exports
+
+### Keyboard Shortcuts
+- **Cmd/Ctrl + ,**: Open AI Settings
+- **Cmd/Ctrl + G**: Generate AI content (when captions exist)
+- **Cmd/Ctrl + S**: Save project
+- **Cmd/Ctrl + O**: Open project manager
+- **Cmd/Ctrl + Z**: Undo/Redo
 
 ## Common Development Tasks
 
