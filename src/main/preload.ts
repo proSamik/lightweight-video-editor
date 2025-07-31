@@ -41,7 +41,32 @@ const electronAPI = {
   listRecentProjects: () => 
     ipcRenderer.invoke('list-recent-projects'),
   deleteProject: (filePath: string) => 
-    ipcRenderer.invoke('delete-project', filePath)
+    ipcRenderer.invoke('delete-project', filePath),
+  // Enhanced project management
+  saveProjectAs: (projectData: any, fileName?: string) =>
+    ipcRenderer.invoke('save-project-as', projectData, fileName),
+  getCurrentProjectInfo: () =>
+    ipcRenderer.invoke('get-current-project-info'),
+  markProjectModified: () =>
+    ipcRenderer.invoke('mark-project-modified'),
+  createNewProject: () =>
+    ipcRenderer.invoke('create-new-project'),
+  // SRT export
+  exportSrt: (captions: any[], defaultFileName?: string) =>
+    ipcRenderer.invoke('export-srt', captions, defaultFileName),
+  // AI and Settings
+  loadAISettings: () => 
+    ipcRenderer.invoke('load-ai-settings'),
+  saveAISettings: (settings: any) =>
+    ipcRenderer.invoke('save-ai-settings', settings),
+  testAIConnection: (settings: any) =>
+    ipcRenderer.invoke('test-ai-connection', settings),
+  generateDescription: (captions: any[], customPrompt?: string) =>
+    ipcRenderer.invoke('generate-description', captions, customPrompt),
+  generateTitles: (description: string, captions: any[], customPrompt?: string) =>
+    ipcRenderer.invoke('generate-titles', description, captions, customPrompt),
+  getAvailableModels: (settings: any) =>
+    ipcRenderer.invoke('get-available-models', settings)
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);
