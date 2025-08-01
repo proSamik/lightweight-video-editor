@@ -112,8 +112,8 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   // Sync video time when currentTime prop changes (for seeking)
   useEffect(() => {
     const video = videoRef.current;
-    if (video && Math.abs(video.currentTime * 1000 - currentTime) > 500) {
-      // Only seek if the difference is significant (> 500ms) to avoid loops
+    if (video && Math.abs(video.currentTime * 1000 - currentTime) > 100) {
+      // Only seek if the difference is significant (> 100ms) to avoid loops
       video.currentTime = currentTime / 1000;
     }
   }, [currentTime]);
@@ -299,6 +299,14 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
             objectFit: 'contain'
           }}
           controls
+          onSeeking={() => {
+            // Force canvas re-render on seeking
+            setTimeout(() => renderCaptionsOnCanvas(), 50);
+          }}
+          onSeeked={() => {
+            // Force canvas re-render when seek is complete
+            setTimeout(() => renderCaptionsOnCanvas(), 50);
+          }}
         />
         
         {/* Canvas Overlay - Renders captions exactly like export */}
