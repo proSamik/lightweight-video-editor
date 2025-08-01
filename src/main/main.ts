@@ -27,6 +27,7 @@ function createWindow(): void {
     titleBarStyle: 'hiddenInset',
     show: false,
     resizable: true, // Explicitly enable resizing
+    trafficLightPosition: { x: 20, y: 20 }
   });
 
   if (process.env.NODE_ENV === 'development') {
