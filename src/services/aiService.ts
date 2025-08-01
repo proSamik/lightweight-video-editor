@@ -273,7 +273,7 @@ ${srtContent}`;
       const { text } = await generateText({
         model: provider,
         prompt: finalPrompt,
-        maxTokens: 800,
+        maxTokens: 2000,
         temperature: 0.7,
       });
 
@@ -293,7 +293,7 @@ ${srtContent}`;
     // Generate full SRT content
     const srtContent = SrtExporter.exportToSrt(captions);
 
-    const defaultPrompt = `You are a YouTube content creator assistant. Based on the following video description and transcript with timestamps, generate 4 compelling YouTube video titles that will maximize click-through rates and discoverability.
+    const defaultPrompt = `You are a YouTube content creator assistant. Based on the following video description and transcript with timestamps, generate 4 compelling YouTube video titles that will maximize click-through rates, SEO and discoverability.
 
 Guidelines:
 - Each title should be 40-70 characters (YouTube optimal length)
