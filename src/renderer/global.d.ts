@@ -5,3 +5,10 @@ declare global {
     electronAPI: ElectronAPI;
   }
 }
+
+// Add CSS properties for Electron
+declare module 'react' {
+  interface CSSProperties {
+    WebkitAppRegion?: 'drag' | 'no-drag';
+  }
+}
