@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { VideoFile, CaptionSegment, FontOption, ColorOption, ExportSettings, ProjectData, AISettings, GeneratedContent } from '../types';
 import VideoPanel from './components/VideoPanel';
 import TimelinePanel from './components/TimelinePanel';
+import UnifiedTimeline from './components/UnifiedTimeline';
 import StylingPanel from './components/StylingPanel';
 import TranscriptionSettings from './components/TranscriptionSettings';
 import ProjectManagerModal from './components/ProjectManager';
@@ -654,6 +655,55 @@ const App: React.FC = () => {
     markProjectModified();
   };
 
+  const handleSplitSegment = (segmentId: string, splitTime: number) => {
+    // Save current state to history
+    saveToHistory();
+    
+    const segmentToSplit = captions.find(c => c.id === segmentId);
+    if (!segmentToSplit) return;
+    
+    // Split words based on timing
+    const firstWords = segmentToSplit.words ? segmentToSplit.words.filter(w => w.end <= splitTime) : [];
+    const secondWords = segmentToSplit.words ? segmentToSplit.words.filter(w => w.start >= splitTime) : [];
+    
+    // Split text based on words
+    const firstText = firstWords.length > 0 
+      ? firstWords.map(w => w.word).join(' ').trim()
+      : segmentToSplit.text.split(' ').slice(0, Math.ceil(segmentToSplit.text.split(' ').length / 2)).join(' ');
+    
+    const secondText = secondWords.length > 0
+      ? secondWords.map(w => w.word).join(' ').trim()
+      : segmentToSplit.text.split(' ').slice(Math.ceil(segmentToSplit.text.split(' ').length / 2)).join(' ');
+    
+    // Create two new segments
+    const firstSegment: CaptionSegment = {
+      ...segmentToSplit,
+      id: `${segmentId}-split-1`,
+      endTime: splitTime,
+      text: firstText,
+      words: firstWords
+    };
+    
+    const secondSegment: CaptionSegment = {
+      ...segmentToSplit,
+      id: `${segmentId}-split-2`,
+      startTime: splitTime,
+      text: secondText,
+      words: secondWords
+    };
+    
+    // Update captions array
+    setCaptions(prev => {
+      const newCaptions = prev.filter(c => c.id !== segmentId);
+      newCaptions.push(firstSegment, secondSegment);
+      return newCaptions.sort((a, b) => a.startTime - b.startTime);
+    });
+    
+    // Select the first segment
+    setSelectedSegmentId(firstSegment.id);
+    markProjectModified();
+  };
+
   const handleReTranscribeSegment = async (startTime: number, endTime: number) => {
     if (!videoFile) {
       alert('No video file loaded.');
@@ -743,16 +793,50 @@ const App: React.FC = () => {
       backgroundColor: '#1a1a1a',
       color: '#ffffff'
     }}>
+      {/* Window Drag Region */}
+      <div 
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '80px', // Increased height for better dragging
+          WebkitAppRegion: 'drag',
+          zIndex: 50,
+          pointerEvents: 'none', // Allow clicks to pass through to buttons
+          borderBottom: '1px solid rgba(255, 255, 255, 0.1)', // Visual indicator line
+          background: 'linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.01) 100%)', // Subtle gradient
+          cursor: 'grab'
+        }}
+        className="drag-region"
+      />
+
+      {/* Drag Region Indicator - Top Center
+      <div style={{
+        position: 'absolute',
+        top: '8px', // Much closer to the top
+        left: '50%',
+        transform: 'translateX(-50%)',
+        fontSize: '10px',
+        color: 'rgba(255, 255, 255, 0.4)',
+        pointerEvents: 'none',
+        zIndex: 51,
+        letterSpacing: '1px',
+        fontWeight: '500'
+      }}>
+      </div> */}
+      
       {/* Top Menu Bar */}
       <div style={{
         position: 'absolute',
-        top: '10px',
-        left: '20px',
+        top: '30px', // Moved down to give space for drag indicator
+        left: '80px', // Leave space for traffic lights
         right: '20px',
         zIndex: 100,
         display: 'flex',
         justifyContent: 'space-between',
-        alignItems: 'center'
+        alignItems: 'center',
+        WebkitAppRegion: 'no-drag' // Make buttons clickable
       }}>
         {/* Project Info */}
         <div style={{
@@ -776,141 +860,175 @@ const App: React.FC = () => {
         {/* Action Buttons */}
         <div style={{
           display: 'flex',
-          gap: '10px'
+          gap: '6px',
+          flexWrap: 'wrap'
         }}>
-        <button
-          onClick={() => setShowProjectManager(true)}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#444',
-            color: '#fff',
-            border: '1px solid #555',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}
-          title="Project Manager (Ctrl/Cmd+O)"
-        >
-          📁 Projects
-        </button>
-        <button
-          onClick={handleNewProject}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#6c757d',
-            color: '#fff',
-            border: '1px solid #545b62',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}
-          title="New Project (Ctrl/Cmd+N)"
-        >
-          📄 New
-        </button>
-        <button
-          onClick={handleSaveProject}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#28a745',
-            color: '#fff',
-            border: '1px solid #218838',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}
-          title="Save Project (Ctrl/Cmd+S)"
-        >
-          💾 {currentProjectInfo.projectPath ? 'Save' : 'Save'}
-        </button>
-        <button
-          onClick={handleSaveProjectAs}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#17a2b8',
-            color: '#fff',
-            border: '1px solid #138496',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}
-          title="Save Project As (Ctrl/Cmd+Shift+S)"
-        >
-          💾 Save As
-        </button>
-        <button
-          onClick={() => setShowAISettings(true)}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#6f42c1',
-            color: '#fff',
-            border: '1px solid #5a359e',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}
-          title="AI Settings (Ctrl/Cmd+,)"
-        >
-          ⚙️ AI Settings
-        </button>
-        <button
-          onClick={() => captions.length > 0 && setShowAIContent(true)}
-          disabled={captions.length === 0}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: captions.length > 0 ? '#17a2b8' : '#6c757d',
-            color: '#fff',
-            border: captions.length > 0 ? '1px solid #138496' : '1px solid #545b62',
-            borderRadius: '4px',
-            cursor: captions.length > 0 ? 'pointer' : 'not-allowed',
-            fontSize: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            opacity: captions.length > 0 ? 1 : 0.6
-          }}
-          title="Generate AI Content (Ctrl/Cmd+G)"
-        >
-          🤖 AI Content
-        </button>
+          {/* Primary Actions Group */}
+          <div style={{ display: 'flex', gap: '4px' }}>
+            <button
+              onClick={() => setShowProjectManager(true)}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: '#444',
+                color: '#fff',
+                border: '1px solid #555',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '11px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+              title="Project Manager (Ctrl/Cmd+O)"
+            >
+              📁
+            </button>
+            <button
+              onClick={handleNewProject}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: '#6c757d',
+                color: '#fff',
+                border: '1px solid #545b62',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '11px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+              title="New Project (Ctrl/Cmd+N)"
+            >
+              📄
+            </button>
+            <button
+              onClick={handleSaveProject}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: '#28a745',
+                color: '#fff',
+                border: '1px solid #218838',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '11px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+              title="Save Project (Ctrl/Cmd+S)"
+            >
+              💾
+            </button>
+          </div>
+          
+          {/* Secondary Actions */}
+          <div style={{ display: 'flex', gap: '4px' }}>
+            <button
+              onClick={handleSaveProjectAs}
+              style={{
+                padding: '6px 10px',
+                backgroundColor: '#17a2b8',
+                color: '#fff',
+                border: '1px solid #138496',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '11px'
+              }}
+              title="Save Project As (Ctrl/Cmd+Shift+S)"
+            >
+              💾+
+            </button>
+            <button
+              onClick={() => setShowAISettings(true)}
+              style={{
+                padding: '6px 10px',
+                backgroundColor: '#6f42c1',
+                color: '#fff',
+                border: '1px solid #5a359e',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '11px'
+              }}
+              title="AI Settings (Ctrl/Cmd+,)"
+            >
+              ⚙️
+            </button>
+            <button
+              onClick={() => captions.length > 0 && setShowAIContent(true)}
+              disabled={captions.length === 0}
+              style={{
+                padding: '6px 10px',
+                backgroundColor: captions.length > 0 ? '#17a2b8' : '#6c757d',
+                color: '#fff',
+                border: captions.length > 0 ? '1px solid #138496' : '1px solid #545b62',
+                borderRadius: '4px',
+                cursor: captions.length > 0 ? 'pointer' : 'not-allowed',
+                fontSize: '11px',
+                opacity: captions.length > 0 ? 1 : 0.6
+              }}
+              title="Generate AI Content (Ctrl/Cmd+G)"
+            >
+              🤖
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Left Panel - Video Preview */}
+      {/* Main Content Area */}
       <div style={{ 
-        flex: '1 1 60%', 
-        display: 'flex', 
+        flex: 1,
+        display: 'flex',
         flexDirection: 'column',
-        borderRight: '1px solid #333'
+        paddingTop: '80px' // Account for increased drag region
       }}>
-        <VideoPanel
-          videoFile={videoFile}
-          captions={captions}
-          currentTime={currentTime}
-          onTimeUpdate={setCurrentTime}
-          onVideoSelect={handleVideoSelect}
-          onVideoDropped={handleVideoDropped}
-          selectedSegmentId={selectedSegmentId}
-          onCaptionUpdate={handleCaptionUpdate}
-        />
+        {/* Content Panel */}
+        <div style={{ 
+          flex: 1,
+          display: 'flex',
+          minHeight: 0 // Important for proper flex sizing
+        }}>
+          {/* Left Panel - Video Preview */}
+          <div style={{ 
+            flex: '1 1 60%', 
+            display: 'flex', 
+            flexDirection: 'column',
+            borderRight: '1px solid #333',
+            minHeight: 0
+          }}>
+            <VideoPanel
+              videoFile={videoFile}
+              captions={captions}
+              currentTime={currentTime}
+              onTimeUpdate={setCurrentTime}
+              onVideoSelect={handleVideoSelect}
+              onVideoDropped={handleVideoDropped}
+              selectedSegmentId={selectedSegmentId}
+              onCaptionUpdate={handleCaptionUpdate}
+            />
+          </div>
+
+          {/* Right Panel - Styling Controls */}
+          <div style={{ 
+            flex: '1 1 40%', 
+            minWidth: '350px',
+            maxWidth: '450px',
+            minHeight: 0
+          }}>
+            <StylingPanel
+              selectedSegment={captions.find(c => c.id === selectedSegmentId) || null}
+              onSegmentUpdate={handleCaptionUpdate}
+              videoFile={videoFile}
+              captions={captions}
+              onExport={handleExport}
+              onApplyToAll={handleApplyToAll}
+              onTimeSeek={setCurrentTime}
+              transcriptionStatus={transcriptionStatus}
+            />
+          </div>
+        </div>
         
-        {/* Timeline Panel */}
-        <TimelinePanel
+        {/* Bottom Unified Timeline */}
+        <UnifiedTimeline
           captions={captions}
           currentTime={currentTime}
           selectedSegmentId={selectedSegmentId}
@@ -920,24 +1038,7 @@ const App: React.FC = () => {
           onCaptionUpdate={handleCaptionUpdate}
           videoFile={videoFile}
           onReTranscribeSegment={handleReTranscribeSegment}
-        />
-      </div>
-
-      {/* Right Panel - Styling Controls */}
-      <div style={{ 
-        flex: '1 1 40%', 
-        minWidth: '350px',
-        maxWidth: '450px'
-      }}>
-        <StylingPanel
-          selectedSegment={captions.find(c => c.id === selectedSegmentId) || null}
-          onSegmentUpdate={handleCaptionUpdate}
-          videoFile={videoFile}
-          captions={captions}
-          onExport={handleExport}
-          onApplyToAll={handleApplyToAll}
-          onTimeSeek={setCurrentTime}
-          transcriptionStatus={transcriptionStatus}
+          onSplitSegment={handleSplitSegment}
         />
       </div>
 
