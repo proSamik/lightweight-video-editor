@@ -161,6 +161,68 @@ export class FFmpegService {
     });
   }
 
+  public async extractAudioToFile(videoPath: string, outputPath: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const fileExtension = path.extname(outputPath).toLowerCase();
+      let audioCodec = 'mp3';
+      let format = 'mp3';
+      
+      // Set codec and format based on output file extension
+      switch (fileExtension) {
+        case '.wav':
+          audioCodec = 'pcm_s16le';
+          format = 'wav';
+          break;
+        case '.aac':
+        case '.m4a':
+          audioCodec = 'aac';
+          format = 'aac';
+          break;
+        case '.mp3':
+        default:
+          audioCodec = 'mp3';
+          format = 'mp3';
+          break;
+      }
+      
+      ffmpeg(videoPath)
+        .audioCodec(audioCodec)
+        .format(format)
+        .output(outputPath)
+        .on('end', () => {
+          resolve(outputPath);
+        })
+        .on('error', (err: any) => {
+          reject(err);
+        })
+        .run();
+    });
+  }
+
+  public async replaceAudioTrack(videoPath: string, audioPath: string, outputPath: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      ffmpeg()
+        .input(videoPath)
+        .input(audioPath)
+        .outputOptions([
+          '-c:v copy',        // Copy video stream without re-encoding
+          '-c:a aac',         // Re-encode audio to AAC
+          '-map 0:v:0',       // Use video from first input
+          '-map 1:a:0',       // Use audio from second input
+          '-shortest'         // Match duration to shortest input
+        ])
+        .format('mp4')
+        .output(outputPath)
+        .on('end', () => {
+          resolve(outputPath);
+        })
+        .on('error', (err: any) => {
+          reject(err);
+        })
+        .run();
+    });
+  }
+
   public async renderVideoWithSubtitles(
     videoPath: string,
     subtitlePath: string,
