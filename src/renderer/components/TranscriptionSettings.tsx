@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface TranscriptionSettingsProps {
   isOpen: boolean;
@@ -11,6 +12,7 @@ const TranscriptionSettings: React.FC<TranscriptionSettingsProps> = ({
   onClose,
   onConfirm
 }) => {
+  const { theme } = useTheme();
   const [maxCharsPerLine, setMaxCharsPerLine] = useState(16);
   const [maxWordsPerLine, setMaxWordsPerLine] = useState(5);
 
@@ -45,13 +47,13 @@ const TranscriptionSettings: React.FC<TranscriptionSettingsProps> = ({
       zIndex: 1000
     }}>
       <div style={{
-        backgroundColor: '#2a2a2a',
+        backgroundColor: theme.colors.surface,
         padding: '30px',
         borderRadius: '8px',
         minWidth: '400px',
-        border: '1px solid #444'
+        border: `1px solid ${theme.colors.border}`
       }}>
-        <h3 style={{ margin: '0 0 20px 0', fontSize: '18px', color: '#fff' }}>
+        <h3 style={{ margin: '0 0 20px 0', fontSize: '18px', color: theme.colors.text }}>
           Transcription Settings
         </h3>
         
@@ -70,16 +72,16 @@ const TranscriptionSettings: React.FC<TranscriptionSettingsProps> = ({
               width: '100%',
               height: '6px',
               borderRadius: '3px',
-              background: '#444',
+              background: theme.colors.surface,
               outline: 'none',
               appearance: 'none'
             }}
           />
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '10px', color: '#888' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '10px', color: theme.colors.textSecondary }}>
             <span>12</span>
             <span>200</span>
           </div>
-          <div style={{ marginTop: '4px', fontSize: '12px', color: '#888' }}>
+          <div style={{ marginTop: '4px', fontSize: '12px', color: theme.colors.textSecondary }}>
             Text will wrap when this limit is reached
           </div>
         </div>
