@@ -68,6 +68,10 @@ const electronAPI = {
     ipcRenderer.invoke('generate-description', captions, customPrompt),
   generateTitles: (description: string, captions: any[], customPrompt?: string) =>
     ipcRenderer.invoke('generate-titles', description, captions, customPrompt),
+  generateTweetHooks: (captions: any[], customPrompt?: string) =>
+    ipcRenderer.invoke('generate-tweet-hooks', captions, customPrompt),
+  generateThumbnailIdeas: (captions: any[], customPrompt?: string) =>
+    ipcRenderer.invoke('generate-thumbnail-ideas', captions, customPrompt),
   getAvailableModels: (settings: any) =>
     ipcRenderer.invoke('get-available-models', settings)
 };
