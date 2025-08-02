@@ -511,6 +511,26 @@ ipcMain.handle('generate-titles', async (_event, description: string, captions: 
   }
 });
 
+ipcMain.handle('generate-tweet-hooks', async (_event, captions: any[], customPrompt?: string) => {
+  try {
+    const aiService = AIService.getInstance();
+    return await aiService.generateTweetHooks(captions, customPrompt);
+  } catch (error) {
+    console.error('Failed to generate tweet hooks:', error);
+    throw new Error(`Failed to generate tweet hooks: ${error}`);
+  }
+});
+
+ipcMain.handle('generate-thumbnail-ideas', async (_event, captions: any[], customPrompt?: string) => {
+  try {
+    const aiService = AIService.getInstance();
+    return await aiService.generateThumbnailIdeas(captions, customPrompt);
+  } catch (error) {
+    console.error('Failed to generate thumbnail ideas:', error);
+    throw new Error(`Failed to generate thumbnail ideas: ${error}`);
+  }
+});
+
 ipcMain.handle('get-available-models', async (_event, settings: any) => {
   try {
     const aiService = AIService.getInstance();
