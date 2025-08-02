@@ -12,6 +12,8 @@ interface UnifiedTimelineProps {
   videoFile?: { path: string; name: string; duration?: number } | null;
   onReTranscribeSegment?: (startTime: number, endTime: number) => void;
   onSplitSegment?: (segmentId: string, splitTime: number) => void;
+  onPlayPause?: () => void;
+  isPlaying?: boolean;
 }
 
 const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
@@ -25,6 +27,8 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   videoFile,
   onReTranscribeSegment,
   onSplitSegment,
+  onPlayPause,
+  isPlaying = false,
 }) => {
   const timelineRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -114,6 +118,14 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts if user is typing in an input field
+      const target = e.target as HTMLElement;
+      const isInputField = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.contentEditable === 'true';
+      
+      if (isInputField) {
+        return; // Let the input field handle the keypress
+      }
+
       if (e.key === 's' && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         setSplitMode(!splitMode);
@@ -129,6 +141,11 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
               text: segment.text
             });
           }
+        }
+      } else if (e.key === ' ' || e.code === 'Space') {
+        e.preventDefault();
+        if (onPlayPause) {
+          onPlayPause();
         }
       }
     };
@@ -191,6 +208,29 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
         borderBottom: '1px solid #444'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* Play/Pause Button */}
+          {onPlayPause && (
+            <button
+              onClick={onPlayPause}
+              style={{
+                padding: '4px 8px',
+                backgroundColor: isPlaying ? '#28a745' : '#6c757d',
+                color: '#fff',
+                border: '1px solid #555',
+                borderRadius: '3px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                minWidth: '60px',
+                justifyContent: 'center'
+              }}
+              title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
+            >
+              {isPlaying ? '⏸️ Pause' : '▶️ Play'}
+            </button>
+          )}
           <span>Timeline</span>
           <span style={{ color: '#888' }}>{formatTime(currentTime)} / {formatTime(totalDuration)}</span>
         </div>
