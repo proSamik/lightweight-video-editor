@@ -1,4 +1,6 @@
 import React from 'react';
+import { useTheme } from '../contexts/ThemeContext';
+import { CelebrationIcon, ShowInFinderIcon } from './IconComponents';
 
 interface SuccessModalProps {
   isOpen: boolean;
@@ -13,6 +15,7 @@ const SuccessModal: React.FC<SuccessModalProps> = ({
   filePath,
   onShowInFinder
 }) => {
+  const { theme } = useTheme();
   if (!isOpen) return null;
 
   const fileName = filePath.split('/').pop() || 'video';
@@ -31,33 +34,33 @@ const SuccessModal: React.FC<SuccessModalProps> = ({
       zIndex: 1000
     }}>
       <div style={{
-        backgroundColor: '#2a2a2a',
+        backgroundColor: theme.colors.surface,
         borderRadius: '12px',
         padding: '32px',
         minWidth: '400px',
         maxWidth: '500px',
-        border: '1px solid #444',
+        border: `1px solid ${theme.colors.border}`,
         textAlign: 'center'
       }}>
         {/* Success Icon */}
         <div style={{
           width: '80px',
           height: '80px',
-          backgroundColor: '#28a745',
+          backgroundColor: theme.colors.success,
           borderRadius: '50%',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           margin: '0 auto 24px',
-          fontSize: '40px'
+          color: theme.colors.text
         }}>
-          ✅
+          <CelebrationIcon size={40} />
         </div>
 
         <h2 style={{ 
           margin: '0 0 16px 0', 
           fontSize: '24px',
-          color: '#fff'
+          color: theme.colors.text
         }}>
           Export Complete!
         </h2>
@@ -65,7 +68,7 @@ const SuccessModal: React.FC<SuccessModalProps> = ({
         <p style={{
           margin: '0 0 24px 0',
           fontSize: '16px',
-          color: '#ccc',
+          color: theme.colors.textSecondary,
           lineHeight: '1.5'
         }}>
           Your video with captions has been successfully exported.
@@ -73,8 +76,8 @@ const SuccessModal: React.FC<SuccessModalProps> = ({
 
         {/* File Info */}
         <div style={{
-          backgroundColor: '#1a1a1a',
-          border: '1px solid #333',
+          backgroundColor: theme.colors.background,
+          border: `1px solid ${theme.colors.border}`,
           borderRadius: '8px',
           padding: '16px',
           marginBottom: '24px',
@@ -82,14 +85,14 @@ const SuccessModal: React.FC<SuccessModalProps> = ({
         }}>
           <div style={{
             fontSize: '12px',
-            color: '#888',
+            color: theme.colors.textSecondary,
             marginBottom: '4px'
           }}>
             File saved as:
           </div>
           <div style={{
             fontSize: '14px',
-            color: '#fff',
+            color: theme.colors.text,
             fontFamily: 'monospace',
             wordBreak: 'break-all',
             lineHeight: '1.4'
@@ -98,7 +101,7 @@ const SuccessModal: React.FC<SuccessModalProps> = ({
           </div>
           <div style={{
             fontSize: '11px',
-            color: '#666',
+            color: theme.colors.textSecondary,
             marginTop: '8px',
             wordBreak: 'break-all'
           }}>
@@ -116,8 +119,8 @@ const SuccessModal: React.FC<SuccessModalProps> = ({
             onClick={onShowInFinder}
             style={{
               padding: '12px 24px',
-              backgroundColor: '#007acc',
-              color: '#fff',
+              backgroundColor: theme.colors.primary,
+              color: theme.colors.text,
               border: 'none',
               borderRadius: '6px',
               cursor: 'pointer',
@@ -128,15 +131,16 @@ const SuccessModal: React.FC<SuccessModalProps> = ({
               gap: '8px'
             }}
           >
-            📁 Show in Finder
+            <ShowInFinderIcon size={16} />
+            Show in Finder
           </button>
           <button
             onClick={onClose}
             style={{
               padding: '12px 24px',
-              backgroundColor: '#444',
-              color: '#fff',
-              border: '1px solid #555',
+              backgroundColor: theme.colors.surface,
+              color: theme.colors.text,
+              border: `1px solid ${theme.colors.border}`,
               borderRadius: '6px',
               cursor: 'pointer',
               fontSize: '14px'
@@ -152,10 +156,10 @@ const SuccessModal: React.FC<SuccessModalProps> = ({
           top: '20px',
           left: '50%',
           transform: 'translateX(-50%)',
-          fontSize: '24px',
-          animation: 'celebration 2s ease-in-out infinite'
+          animation: 'celebration 2s ease-in-out infinite',
+          color: theme.colors.text
         }}>
-          🎉
+          <CelebrationIcon size={24} />
         </div>
 
         <style>{`
