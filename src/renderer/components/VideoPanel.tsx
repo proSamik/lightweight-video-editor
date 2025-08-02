@@ -10,6 +10,8 @@ interface VideoPanelProps {
   onVideoDropped?: (filePath: string) => void;
   selectedSegmentId?: string | null;
   onCaptionUpdate?: (segmentId: string, updates: Partial<CaptionSegment>) => void;
+  onPlayPause?: () => void;
+  isPlaying?: boolean;
 }
 
 const VideoPanel: React.FC<VideoPanelProps> = ({
@@ -21,6 +23,8 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   onVideoDropped,
   selectedSegmentId,
   onCaptionUpdate,
+  onPlayPause,
+  isPlaying,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -100,11 +104,21 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     const video = videoRef.current;
     if (video) {
       const handleTimeUpdate = () => {
-        onTimeUpdate(video.currentTime * 1000);
+        const currentTimeMs = video.currentTime * 1000;
+        onTimeUpdate(currentTimeMs);
+        // Force canvas re-render will be handled by the renderCaptionsOnCanvas useEffect
       };
       
+      // More frequent updates for better synchronization
       video.addEventListener('timeupdate', handleTimeUpdate);
-      return () => video.removeEventListener('timeupdate', handleTimeUpdate);
+      video.addEventListener('seeked', handleTimeUpdate);
+      video.addEventListener('loadedmetadata', handleTimeUpdate);
+      
+      return () => {
+        video.removeEventListener('timeupdate', handleTimeUpdate);
+        video.removeEventListener('seeked', handleTimeUpdate);
+        video.removeEventListener('loadedmetadata', handleTimeUpdate);
+      };
     }
     return undefined;
   }, [onTimeUpdate]);
@@ -169,6 +183,82 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   useEffect(() => {
     renderCaptionsOnCanvas();
   }, [renderCaptionsOnCanvas]);
+
+  // Handle play/pause functionality
+  const handlePlayPause = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (video.paused) {
+      video.play().catch(console.error);
+    } else {
+      video.pause();
+    }
+  }, []);
+
+  // Track video play state and sync with parent
+  useEffect(() => {
+    const video = videoRef.current;
+    if (video) {
+      let playbackInterval: NodeJS.Timeout | null = null;
+      
+      const handlePlay = () => {
+        // Update parent's isPlaying state
+        if ((window as any).setVideoPlaying) {
+          (window as any).setVideoPlaying(true);
+        }
+        
+        // Start frequent time updates during playback
+        playbackInterval = setInterval(() => {
+          if (!video.paused && !video.ended) {
+            const currentTimeMs = video.currentTime * 1000;
+            onTimeUpdate(currentTimeMs);
+            renderCaptionsOnCanvas();
+          } else {
+            if (playbackInterval) {
+              clearInterval(playbackInterval);
+              playbackInterval = null;
+            }
+          }
+        }, 100); // Update every 100ms for smooth timeline
+      };
+      
+      const handlePause = () => {
+        // Update parent's isPlaying state
+        if ((window as any).setVideoPlaying) {
+          (window as any).setVideoPlaying(false);
+        }
+        
+        // Clear the playback interval
+        if (playbackInterval) {
+          clearInterval(playbackInterval);
+          playbackInterval = null;
+        }
+      };
+
+      video.addEventListener('play', handlePlay);
+      video.addEventListener('pause', handlePause);
+      video.addEventListener('ended', handlePause);
+
+      return () => {
+        if (playbackInterval) {
+          clearInterval(playbackInterval);
+        }
+        video.removeEventListener('play', handlePlay);
+        video.removeEventListener('pause', handlePause);
+        video.removeEventListener('ended', handlePause);
+      };
+    }
+    return undefined;
+  }, [onTimeUpdate, renderCaptionsOnCanvas]);
+
+  // Expose play/pause to parent component
+  useEffect(() => {
+    if (onPlayPause) {
+      // This is a bit of a hack, but we need to pass the video control function up
+      (window as any).videoPlayPause = handlePlayPause;
+    }
+  }, [handlePlayPause, onPlayPause]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -298,7 +388,12 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
             maxHeight: '100%',
             objectFit: 'contain'
           }}
-          controls
+          onTimeUpdate={(e) => {
+            const video = e.currentTarget;
+            const currentTimeMs = video.currentTime * 1000;
+            onTimeUpdate(currentTimeMs);
+            renderCaptionsOnCanvas();
+          }}
           onSeeking={() => {
             // Force canvas re-render on seeking
             setTimeout(() => renderCaptionsOnCanvas(), 50);
