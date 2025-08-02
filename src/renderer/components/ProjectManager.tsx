@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { useTheme } from '../contexts/ThemeContext';
+import { SaveProjectIcon } from './IconComponents';
 import { ProjectData } from '../../types';
 
 interface ProjectManagerProps {
@@ -23,6 +25,7 @@ const ProjectManagerModal: React.FC<ProjectManagerProps> = ({
   onSaveProject,
   currentProject
 }) => {
+  const { theme } = useTheme();
   const [recentProjects, setRecentProjects] = useState<ProjectListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'recent' | 'save'>('recent');
@@ -113,13 +116,13 @@ const ProjectManagerModal: React.FC<ProjectManagerProps> = ({
       zIndex: 1000
     }}>
       <div style={{
-        backgroundColor: '#2a2a2a',
+        backgroundColor: theme.colors.surface,
         borderRadius: '8px',
         padding: '24px',
         minWidth: '600px',
         maxWidth: '800px',
         maxHeight: '80vh',
-        border: '1px solid #444',
+        border: `1px solid ${theme.colors.border}`,
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column'
@@ -130,7 +133,7 @@ const ProjectManagerModal: React.FC<ProjectManagerProps> = ({
           alignItems: 'center',
           marginBottom: '20px'
         }}>
-          <h2 style={{ margin: 0, fontSize: '18px' }}>
+          <h2 style={{ margin: 0, fontSize: '18px', color: theme.colors.text }}>
             Project Manager
           </h2>
           <button
@@ -138,7 +141,7 @@ const ProjectManagerModal: React.FC<ProjectManagerProps> = ({
             style={{
               background: 'none',
               border: 'none',
-              color: '#ccc',
+              color: theme.colors.textSecondary,
               cursor: 'pointer',
               fontSize: '18px'
             }}
@@ -151,16 +154,16 @@ const ProjectManagerModal: React.FC<ProjectManagerProps> = ({
         <div style={{
           display: 'flex',
           marginBottom: '20px',
-          borderBottom: '1px solid #444'
+          borderBottom: `1px solid ${theme.colors.border}`
         }}>
           <button
             onClick={() => setActiveTab('recent')}
             style={{
               padding: '8px 16px',
-              backgroundColor: activeTab === 'recent' ? '#007acc' : 'transparent',
-              color: '#fff',
+              backgroundColor: activeTab === 'recent' ? theme.colors.primary : 'transparent',
+              color: theme.colors.text,
               border: 'none',
-              borderBottom: activeTab === 'recent' ? '2px solid #007acc' : '2px solid transparent',
+              borderBottom: activeTab === 'recent' ? `2px solid ${theme.colors.primary}` : '2px solid transparent',
               cursor: 'pointer',
               fontSize: '14px'
             }}
@@ -171,10 +174,10 @@ const ProjectManagerModal: React.FC<ProjectManagerProps> = ({
             onClick={() => setActiveTab('save')}
             style={{
               padding: '8px 16px',
-              backgroundColor: activeTab === 'save' ? '#007acc' : 'transparent',
-              color: '#fff',
+              backgroundColor: activeTab === 'save' ? theme.colors.primary : 'transparent',
+              color: theme.colors.text,
               border: 'none',
-              borderBottom: activeTab === 'save' ? '2px solid #007acc' : '2px solid transparent',
+              borderBottom: activeTab === 'save' ? `2px solid ${theme.colors.primary}` : '2px solid transparent',
               cursor: 'pointer',
               fontSize: '14px'
             }}
@@ -303,16 +306,21 @@ const ProjectManagerModal: React.FC<ProjectManagerProps> = ({
                     style={{
                       width: '100%',
                       padding: '12px 24px',
-                      backgroundColor: '#007acc',
-                      color: '#fff',
+                      backgroundColor: theme.colors.primary,
+                      color: theme.colors.text,
                       border: 'none',
                       borderRadius: '6px',
                       cursor: 'pointer',
                       fontSize: '16px',
-                      fontWeight: 'bold'
+                      fontWeight: 'bold',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px'
                     }}
                   >
-                    💾 Save Project
+                    <SaveProjectIcon size={18} />
+                    Save Project
                   </button>
                 </div>
               ) : (
