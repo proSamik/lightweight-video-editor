@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTheme } from '../contexts/ThemeContext';
 import { CaptionSegment, VideoFile, ExportSettings } from '../../types';
 import StylingPanel from './StylingPanel';
 import SubtitlePanel from './SubtitlePanel';
@@ -38,13 +39,14 @@ const TabbedRightPanel: React.FC<TabbedRightPanelProps> = ({
   onSegmentDelete,
   currentTime,
 }) => {
+  const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState<TabType>('styling');
 
   const tabStyle = (isActive: boolean) => ({
     flex: 1,
     padding: '10px 16px',
-    backgroundColor: isActive ? '#007acc' : '#444',
-    color: '#fff',
+    backgroundColor: isActive ? theme.colors.primary : theme.colors.surface,
+    color: theme.colors.text,
     border: 'none',
     cursor: 'pointer',
     fontSize: '13px',
@@ -62,13 +64,13 @@ const TabbedRightPanel: React.FC<TabbedRightPanelProps> = ({
       height: '100%',
       display: 'flex',
       flexDirection: 'column',
-      backgroundColor: '#2a2a2a'
+      backgroundColor: theme.colors.surface
     }}>
       {/* Tab Navigation */}
       <div style={{
         display: 'flex',
-        borderBottom: '1px solid #555',
-        backgroundColor: '#333'
+        borderBottom: `1px solid ${theme.colors.border}`,
+        backgroundColor: theme.colors.background
       }}>
         <button
           onClick={() => setActiveTab('styling')}
