@@ -313,7 +313,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
       flex: 1, 
       display: 'flex',
       flexDirection: 'column',
-      backgroundColor: '#000',
+              backgroundColor: theme.colors.background,
       margin: '20px'
     }}>
       {/* Modern Preview Header */}
@@ -425,10 +425,10 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
       {/* Modern Canvas Info Footer */}
       <div style={{
         padding: '12px 20px',
-        background: 'linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%)',
-        borderTop: '1px solid #444',
+        background: `linear-gradient(135deg, ${theme.colors.background} 0%, ${theme.colors.surface} 100%)`,
+                  borderTop: `1px solid ${theme.colors.border}`,
         fontSize: '12px',
-        color: '#888'
+                  color: theme.colors.textSecondary
       }}>
         <div style={{
           display: 'flex',
