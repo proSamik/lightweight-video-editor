@@ -15,7 +15,7 @@ const ThemeToggle: React.FC = () => {
       style={{
         position: 'fixed',
         top: '30px',
-        right: '20px',
+        right: '30px',
         width: '40px',
         height: '40px',
         borderRadius: '50%',
@@ -28,7 +28,7 @@ const ThemeToggle: React.FC = () => {
         justifyContent: 'center',
         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
         transition: 'all 0.2s ease',
-        zIndex: 1000,
+        zIndex: 10000,
         WebkitAppRegion: 'no-drag', // Make button clickable in Electron
       }}
       onMouseEnter={(e) => {
