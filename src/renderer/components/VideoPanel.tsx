@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { VideoFile, CaptionSegment } from '../../types';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface VideoPanelProps {
   videoFile: VideoFile | null;
@@ -26,6 +27,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   onPlayPause,
   isPlaying,
 }) => {
+  const { theme } = useTheme();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -282,10 +284,10 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: isDragOver ? '#3a3a3a' : '#2a2a2a',
+          backgroundColor: isDragOver ? theme.colors.surface : theme.colors.background,
           margin: '20px',
           borderRadius: '8px',
-          border: isDragOver ? '2px dashed #007acc' : '2px dashed #555',
+          border: isDragOver ? `2px dashed ${theme.colors.primary}` : `2px dashed ${theme.colors.border}`,
           cursor: 'pointer',
           transition: 'all 0.2s ease'
         }} 
@@ -298,7 +300,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
           <div style={{ fontSize: '18px', marginBottom: '10px' }}>
             Drop a video file here or click to select
           </div>
-          <div style={{ fontSize: '14px', color: '#888' }}>
+          <div style={{ fontSize: '14px', color: theme.colors.textSecondary }}>
             Supports MP4, MOV, AVI
           </div>
         </div>
@@ -320,8 +322,8 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
         justifyContent: 'space-between',
         alignItems: 'center',
         padding: '12px 20px',
-        background: 'linear-gradient(135deg, #2a2a2a 0%, #333 100%)',
-        borderBottom: '1px solid #444',
+        background: `linear-gradient(135deg, ${theme.colors.surface} 0%, ${theme.colors.background} 100%)`,
+        borderBottom: `1px solid ${theme.colors.border}`,
         boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
       }}>
         <div style={{ 
@@ -338,7 +340,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
           }} />
           <div style={{ 
             fontSize: '14px', 
-            color: '#fff',
+            color: theme.colors.text,
             fontWeight: '600',
             letterSpacing: '0.5px'
           }}>
@@ -346,18 +348,18 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
           </div>
           <div style={{
             fontSize: '11px',
-            color: '#888',
-            backgroundColor: '#1a1a1a',
+            color: theme.colors.textSecondary,
+            backgroundColor: theme.colors.background,
             padding: '2px 8px',
             borderRadius: '10px',
-            border: '1px solid #444'
+            border: `1px solid ${theme.colors.border}`
           }}>
             Real-time
           </div>
         </div>
         <div style={{ 
           fontSize: '12px', 
-          color: '#aaa',
+          color: theme.colors.textSecondary,
           display: 'flex',
           alignItems: 'center',
           gap: '8px'
@@ -366,7 +368,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
           <div style={{
             width: '1px',
             height: '12px',
-            backgroundColor: '#555'
+            backgroundColor: theme.colors.border
           }} />
           <span>1:1 Export Match</span>
         </div>
