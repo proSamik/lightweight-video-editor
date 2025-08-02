@@ -35,33 +35,33 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
   // Transcription status component (shown in both selected and non-selected states)
   const transcriptionStatusComponent = transcriptionStatus?.isTranscribing ? (
     <div style={{
-      backgroundColor: '#2a4a2a',
-      border: '1px solid #4a7a4a',
+      backgroundColor: theme.colors.background,
+      border: `1px solid ${theme.colors.success}`,
       borderRadius: '6px',
       padding: '12px',
       marginBottom: '20px'
     }}>
       <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span>🎤 Transcribing Audio...</span>
-        <span style={{ fontSize: '12px', color: '#4a7a4a', fontWeight: 'bold' }}>
+        <span style={{ fontSize: '12px', color: theme.colors.success, fontWeight: 'bold' }}>
           {Math.round(transcriptionStatus.progress)}%
         </span>
       </div>
       <div style={{ 
-        backgroundColor: '#333',
+        backgroundColor: theme.colors.background,
         borderRadius: '4px',
         height: '8px',
         overflow: 'hidden',
         marginBottom: '8px'
       }}>
         <div style={{
-          backgroundColor: '#4a7a4a',
+          backgroundColor: theme.colors.success,
           height: '100%',
           width: `${transcriptionStatus.progress}%`,
           transition: 'width 0.3s ease'
         }} />
       </div>
-      <div style={{ fontSize: '12px', color: '#ccc' }}>
+      <div style={{ fontSize: '12px', color: theme.colors.textSecondary }}>
         {transcriptionStatus.message}
       </div>
     </div>
@@ -72,15 +72,15 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
       <div style={{
         padding: '20px',
         height: '100%',
-        backgroundColor: '#2a2a2a'
+        backgroundColor: theme.colors.background,
       }}>
-        <h3 style={{ margin: '0 0 20px 0', fontSize: '16px' }}>Styling Controls</h3>
+        <h3 style={{ margin: '0 0 20px 0', fontSize: '16px', color: theme.colors.text }}>Styling Controls</h3>
         
         {transcriptionStatusComponent}
         
         <div style={{
           textAlign: 'center',
-          color: '#888',
+          color: theme.colors.textSecondary,
           marginTop: '100px'
         }}>
           Select a caption segment to edit its style
@@ -228,7 +228,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
     <div style={{
       padding: '20px',
       height: '100%',
-      backgroundColor: '#2a2a2a',
+      backgroundColor: theme.colors.surface,
       overflowY: 'auto'
     }}>
       <h3 style={{ margin: '0 0 20px 0', fontSize: '16px' }}>Styling Controls</h3>
@@ -237,7 +237,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
       
       {/* Text Editor Section */}
       <div style={{ marginBottom: '25px' }}>
-        <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+        <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold', color: theme.colors.text }}>
           Text Content
         </label>
         <textarea
@@ -247,9 +247,9 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
             width: '100%',
             height: '80px',
             padding: '8px',
-            backgroundColor: '#333',
-            color: '#fff',
-            border: '1px solid #555',
+            backgroundColor: theme.colors.background,
+            color: theme.colors.text,
+            border: `1px solid ${theme.colors.border}`,
             borderRadius: '4px',
             resize: 'vertical',
             fontFamily: 'monospace',
@@ -257,7 +257,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
           }}
           placeholder="Enter caption text..."
         />
-        <div style={{ marginTop: '8px', fontSize: '12px', color: '#888' }}>
+        <div style={{ marginTop: '8px', fontSize: '12px', color: theme.colors.textSecondary }}>
           {selectedSegment.words ? 
             `${selectedSegment.words.length} words with timing • Edited words get enhanced highlighting` : 
             'No word-level timing available • Edit text to add basic timing'
@@ -268,14 +268,14 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
       {/* Word-Level Editor */}
       {selectedSegment.words && selectedSegment.words.length > 0 && (
         <div style={{ marginBottom: '25px' }}>
-          <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+          <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold', color: theme.colors.text }}>
             Word-Level Editor
           </label>
           <div style={{
             maxHeight: '200px',
             overflowY: 'auto',
-            backgroundColor: '#333',
-            border: '1px solid #555',
+            backgroundColor: theme.colors.background,
+            border: `1px solid ${theme.colors.border}`,
             borderRadius: '4px',
             padding: '8px'
           }}>
@@ -292,9 +292,9 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
                     alignItems: 'center',
                     marginBottom: '4px',
                     padding: '4px',
-                    backgroundColor: isEdited ? '#4a5d23' : '#444', // Green tint for edited words
+                    backgroundColor: isEdited ? theme.colors.success : theme.colors.surface, // Green tint for edited words
                     borderRadius: '3px',
-                    border: isEdited ? '1px solid #6b8e23' : 'none'
+                    border: isEdited ? `1px solid ${theme.colors.success}` : 'none'
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
@@ -302,7 +302,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
                       <span style={{ 
                         marginRight: '6px', 
                         fontSize: '10px',
-                        color: '#90ee90',
+                        color: theme.colors.success,
                         fontWeight: 'bold'
                       }}>
                         ✎
@@ -315,9 +315,9 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
                       style={{
                         flex: 1,
                         padding: '2px 4px',
-                        backgroundColor: isEdited ? '#5a6d33' : '#555',
-                        color: '#fff',
-                        border: isEdited ? '1px solid #6b8e23' : '1px solid #666',
+                        backgroundColor: isEdited ? theme.colors.success : theme.colors.surface,
+                        color: theme.colors.text,
+                        border: isEdited ? `1px solid ${theme.colors.success}` : `1px solid ${theme.colors.border}`,
                         borderRadius: '2px',
                         fontSize: '12px'
                       }}
@@ -327,7 +327,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
                     onClick={() => handleJumpToWord(word.start)}
                     style={{ 
                       fontSize: '9px', 
-                      color: isEdited ? '#90ee90' : '#999', 
+                      color: isEdited ? theme.colors.success : theme.colors.textSecondary, 
                       marginLeft: '4px',
                       minWidth: '40px',
                       textAlign: 'center',
@@ -346,8 +346,8 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
                       style={{
                         marginLeft: '8px',
                         padding: '2px 6px',
-                        backgroundColor: '#2e7d32',
-                        color: '#fff',
+                                              backgroundColor: theme.colors.success,
+                      color: theme.colors.text,
                         border: 'none',
                         borderRadius: '2px',
                         fontSize: '10px',
@@ -363,8 +363,8 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
                     style={{
                       marginLeft: '8px',
                       padding: '2px 6px',
-                      backgroundColor: '#d32f2f',
-                      color: '#fff',
+                      backgroundColor: theme.colors.error,
+                      color: theme.colors.text,
                       border: 'none',
                       borderRadius: '2px',
                       fontSize: '10px',
@@ -377,7 +377,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
               );
             })}
           </div>
-          <div style={{ marginTop: '8px', fontSize: '11px', color: '#888' }}>
+          <div style={{ marginTop: '8px', fontSize: '11px', color: theme.colors.textSecondary }}>
             ✎ Green highlighted words have extended timing for better highlighting visibility<br/>
             ⟷ Merge button combines words while preserving audio timing<br/>
             ⚠️ Deleting words will remove corresponding audio/video segments
@@ -387,7 +387,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
       
       {/* Font Size Control */}
       <div style={{ marginBottom: '25px' }}>
-        <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+        <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold', color: theme.colors.text }}>
           Font Size: {selectedSegment.style.fontSize}px
         </label>
         <input
@@ -414,7 +414,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
 
       {/* Font Family Control */}
       <div style={{ marginBottom: '25px' }}>
-        <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+        <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold', color: theme.colors.text }}>
           Font Family
         </label>
         <select
@@ -423,9 +423,9 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
           style={{
             width: '100%',
             padding: '8px',
-            backgroundColor: '#333',
-            color: '#fff',
-            border: '1px solid #555',
+            backgroundColor: theme.colors.background,
+            color: theme.colors.text,
+            border: `1px solid ${theme.colors.border}`,
             borderRadius: '4px'
           }}
         >
@@ -440,7 +440,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
 
       {/* Text Color Control */}
       <div style={{ marginBottom: '25px' }}>
-        <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+        <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold', color: theme.colors.text }}>
           Text Color
         </label>
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
@@ -452,7 +452,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
                 width: '30px',
                 height: '30px',
                 backgroundColor: color,
-                border: selectedSegment.style.textColor === color ? '3px solid #007acc' : '1px solid #555',
+                border: selectedSegment.style.textColor === color ? `3px solid ${theme.colors.primary}` : `1px solid ${theme.colors.border}`,
                 borderRadius: '4px',
                 cursor: 'pointer'
               }}
@@ -464,7 +464,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
 
       {/* Highlighter Color Control */}
       <div style={{ marginBottom: '25px' }}>
-        <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+        <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold', color: theme.colors.text }}>
           Highlighter Color
         </label>
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
@@ -476,7 +476,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
                 width: '30px',
                 height: '30px',
                 backgroundColor: color,
-                border: selectedSegment.style.highlighterColor === color ? '3px solid #007acc' : '1px solid #555',
+                border: selectedSegment.style.highlighterColor === color ? `3px solid ${theme.colors.primary}` : `1px solid ${theme.colors.border}`,
                 borderRadius: '4px',
                 cursor: 'pointer'
               }}
@@ -819,14 +819,14 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
 
       {/* Apply to All Section */}
       {onApplyToAll && (
-        <div style={{ marginBottom: '25px', paddingTop: '20px', borderTop: '1px solid #444' }}>
+        <div style={{ marginBottom: '25px', paddingTop: '20px', borderTop: `1px solid ${theme.colors.border}` }}>
           <button
             onClick={() => onApplyToAll(selectedSegment.style)}
             style={{
               width: '100%',
               padding: '10px 20px',
-              backgroundColor: '#28a745',
-              color: '#fff',
+              backgroundColor: theme.colors.success,
+              color: theme.colors.text,
               border: 'none',
               borderRadius: '4px',
               cursor: 'pointer',
@@ -836,7 +836,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
           >
             Apply Style to All Subtitles
           </button>
-          <div style={{ marginTop: '4px', fontSize: '12px', color: '#888', textAlign: 'center' }}>
+          <div style={{ marginTop: '4px', fontSize: '12px', color: theme.colors.textSecondary, textAlign: 'center' }}>
             This will apply the current style to all subtitle segments
           </div>
         </div>
@@ -847,9 +847,9 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
         <div style={{ 
           marginTop: '30px', 
           paddingTop: '20px', 
-          borderTop: '1px solid #444' 
+          borderTop: `1px solid ${theme.colors.border}` 
         }}>
-          <h4 style={{ margin: '0 0 15px 0', fontSize: '14px', fontWeight: 'bold' }}>
+          <h4 style={{ margin: '0 0 15px 0', fontSize: '14px', fontWeight: 'bold', color: theme.colors.text }}>
             Export Options
           </h4>
           
@@ -889,7 +889,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
           <div style={{
             marginBottom: '15px',
             fontSize: '12px',
-            color: '#888',
+            color: theme.colors.textSecondary,
             textAlign: 'center'
           }}>
             Export subtitles for YouTube uploads
@@ -899,8 +899,8 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
             style={{
               width: '100%',
               padding: '12px 24px',
-              backgroundColor: '#007acc',
-              color: '#fff',
+              backgroundColor: theme.colors.primary,
+              color: theme.colors.text,
               border: 'none',
               borderRadius: '6px',
               cursor: 'pointer',
@@ -913,7 +913,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
           <div style={{
             marginTop: '10px',
             fontSize: '12px',
-            color: '#888',
+            color: theme.colors.textSecondary,
             textAlign: 'center'
           }}>
             This will render your video with burned-in captions
