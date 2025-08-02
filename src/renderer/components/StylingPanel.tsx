@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { CaptionSegment, FontOption, ColorOption, ExportSettings } from '../../types';
 import ExportSettingsModal from './ExportSettings';
+import { useTheme } from '../contexts/ThemeContext';
+import { ExportSrtIcon } from './IconComponents';
 
 interface StylingPanelProps {
   selectedSegment: CaptionSegment | null;
@@ -27,6 +29,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
   onTimeSeek,
   transcriptionStatus,
 }) => {
+  const { theme } = useTheme();
   const [showExportSettings, setShowExportSettings] = useState(false);
   
   // Transcription status component (shown in both selected and non-selected states)
@@ -866,17 +869,22 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
             style={{
               width: '100%',
               padding: '10px 20px',
-              backgroundColor: '#28a745',
-              color: '#fff',
+              backgroundColor: theme.colors.success,
+              color: theme.colors.text,
               border: 'none',
               borderRadius: '6px',
               cursor: 'pointer',
               fontSize: '14px',
               fontWeight: 'bold',
-              marginBottom: '10px'
+              marginBottom: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
             }}
           >
-            📄 Export SRT Subtitles
+            <ExportSrtIcon size={16} />
+            Export SRT Subtitles
           </button>
           <div style={{
             marginBottom: '15px',
