@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AISettings, AIModel } from '../../types';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface AISettingsModalProps {
   isOpen: boolean;
@@ -8,6 +9,7 @@ interface AISettingsModalProps {
 }
 
 const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSave }) => {
+  const { theme } = useTheme();
   const [settings, setSettings] = useState<AISettings>({
     selectedProvider: 'anthropic',
     descriptionPrompt: '',
@@ -118,14 +120,14 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
   };
 
   const contentStyle: React.CSSProperties = {
-    backgroundColor: '#2a2a2a',
+    backgroundColor: theme.colors.surface,
     borderRadius: '8px',
     padding: '30px',
     width: '600px',
     maxWidth: '90vw',
     maxHeight: '80vh',
     overflowY: 'auto',
-    color: '#fff',
+    color: theme.colors.text,
   };
 
   return (
@@ -146,9 +148,9 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
             style={{
               width: '100%',
               padding: '10px',
-              backgroundColor: '#333',
-              color: '#fff',
-              border: '1px solid #555',
+              backgroundColor: theme.colors.background,
+              color: theme.colors.text,
+              border: `1px solid ${theme.colors.border}`,
               borderRadius: '4px',
               fontSize: '14px'
             }}
@@ -188,8 +190,8 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
                 fontSize: '14px'
               }}
             />
-            <div style={{ marginTop: '4px', fontSize: '12px', color: '#888' }}>
-              Get your API key from <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer" style={{ color: '#4a9eff' }}>Anthropic Console</a>
+            <div style={{ marginTop: '4px', fontSize: '12px', color: theme.colors.textSecondary }}>
+              Get your API key from <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer" style={{ color: theme.colors.primary }}>Anthropic Console</a>
             </div>
           </div>
         )}
@@ -215,15 +217,15 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
               style={{
                 width: '100%',
                 padding: '10px',
-                backgroundColor: '#333',
-                color: '#fff',
-                border: '1px solid #555',
+                backgroundColor: theme.colors.background,
+                color: theme.colors.text,
+                border: `1px solid ${theme.colors.border}`,
                 borderRadius: '4px',
                 fontSize: '14px'
               }}
             />
-            <div style={{ marginTop: '4px', fontSize: '12px', color: '#888' }}>
-              Get your API key from <a href="https://makersuite.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style={{ color: '#4a9eff' }}>Google AI Studio</a>
+            <div style={{ marginTop: '4px', fontSize: '12px', color: theme.colors.textSecondary }}>
+              Get your API key from <a href="https://makersuite.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style={{ color: theme.colors.primary }}>Google AI Studio</a>
             </div>
           </div>
         )}
@@ -249,15 +251,15 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
               style={{
                 width: '100%',
                 padding: '10px',
-                backgroundColor: '#333',
-                color: '#fff',
-                border: '1px solid #555',
+                backgroundColor: theme.colors.background,
+                color: theme.colors.text,
+                border: `1px solid ${theme.colors.border}`,
                 borderRadius: '4px',
                 fontSize: '14px'
               }}
             />
-            <div style={{ marginTop: '4px', fontSize: '12px', color: '#888' }}>
-              Get your API key from <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" style={{ color: '#4a9eff' }}>OpenRouter Dashboard</a>
+            <div style={{ marginTop: '4px', fontSize: '12px', color: theme.colors.textSecondary }}>
+              Get your API key from <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" style={{ color: theme.colors.primary }}>OpenRouter Dashboard</a>
             </div>
           </div>
         )}
@@ -270,7 +272,7 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
                 AI Model
               </label>
               {loadingModels && (
-                <span style={{ fontSize: '12px', color: '#888' }}>Loading models...</span>
+                <span style={{ fontSize: '12px', color: theme.colors.textSecondary }}>Loading models...</span>
               )}
             </div>
             {availableModels.length > 0 ? (
@@ -280,9 +282,9 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
                 style={{
                   width: '100%',
                   padding: '10px',
-                  backgroundColor: '#333',
-                  color: '#fff',
-                  border: '1px solid #555',
+                  backgroundColor: theme.colors.background,
+                  color: theme.colors.text,
+                  border: `1px solid ${theme.colors.border}`,
                   borderRadius: '4px',
                   fontSize: '14px',
                   marginBottom: '8px'
@@ -300,18 +302,18 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
             ) : (
               <div style={{
                 padding: '10px',
-                backgroundColor: '#333',
-                border: '1px solid #555',
+                backgroundColor: theme.colors.background,
+                border: `1px solid ${theme.colors.border}`,
                 borderRadius: '4px',
                 fontSize: '12px',
-                color: '#888',
+                color: theme.colors.textSecondary,
                 textAlign: 'center'
               }}>
                 {loadingModels ? 'Loading available models...' : 'Enter API key to load models'}
               </div>
             )}
             {settings.selectedModel && availableModels.find(m => m.id === settings.selectedModel) && (
-              <div style={{ fontSize: '12px', color: '#888' }}>
+              <div style={{ fontSize: '12px', color: theme.colors.textSecondary }}>
                 {(() => {
                   const model = availableModels.find(m => m.id === settings.selectedModel);
                   return model ? (
@@ -336,8 +338,8 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
             disabled={testingConnection}
             style={{
               padding: '8px 16px',
-              backgroundColor: connectionStatus === 'success' ? '#28a745' : connectionStatus === 'error' ? '#dc3545' : '#6c757d',
-              color: '#fff',
+              backgroundColor: connectionStatus === 'success' ? theme.colors.success : connectionStatus === 'error' ? theme.colors.error : theme.colors.secondary,
+              color: theme.colors.text,
               border: 'none',
               borderRadius: '4px',
               cursor: testingConnection ? 'not-allowed' : 'pointer',
@@ -347,10 +349,10 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
             {testingConnection ? 'Testing...' : 'Test Connection'}
           </button>
           {connectionStatus === 'success' && (
-            <span style={{ marginLeft: '10px', color: '#28a745', fontSize: '12px' }}>✓ Connection successful</span>
+            <span style={{ marginLeft: '10px', color: theme.colors.success, fontSize: '12px' }}>✓ Connection successful</span>
           )}
           {connectionStatus === 'error' && (
-            <span style={{ marginLeft: '10px', color: '#dc3545', fontSize: '12px' }}>✗ Connection failed</span>
+            <span style={{ marginLeft: '10px', color: theme.colors.error, fontSize: '12px' }}>✗ Connection failed</span>
           )}
         </div>
 
@@ -367,9 +369,9 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
             style={{
               width: '100%',
               padding: '10px',
-              backgroundColor: '#333',
-              color: '#fff',
-              border: '1px solid #555',
+              backgroundColor: theme.colors.background,
+              color: theme.colors.text,
+              border: `1px solid ${theme.colors.border}`,
               borderRadius: '4px',
               fontSize: '12px',
               resize: 'vertical'
@@ -389,9 +391,9 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
             style={{
               width: '100%',
               padding: '10px',
-              backgroundColor: '#333',
-              color: '#fff',
-              border: '1px solid #555',
+              backgroundColor: theme.colors.background,
+              color: theme.colors.text,
+              border: `1px solid ${theme.colors.border}`,
               borderRadius: '4px',
               fontSize: '12px',
               resize: 'vertical'
@@ -405,8 +407,8 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
             onClick={onClose}
             style={{
               padding: '10px 20px',
-              backgroundColor: '#6c757d',
-              color: '#fff',
+              backgroundColor: theme.colors.secondary,
+              color: theme.colors.text,
               border: 'none',
               borderRadius: '4px',
               cursor: 'pointer',
@@ -419,8 +421,8 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
             onClick={handleSave}
             style={{
               padding: '10px 20px',
-              backgroundColor: '#007bff',
-              color: '#fff',
+              backgroundColor: theme.colors.primary,
+              color: theme.colors.text,
               border: 'none',
               borderRadius: '4px',
               cursor: 'pointer',
