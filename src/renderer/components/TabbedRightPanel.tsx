@@ -3,6 +3,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { CaptionSegment, VideoFile, ExportSettings } from '../../types';
 import StylingPanel from './StylingPanel';
 import SubtitlePanel from './SubtitlePanel';
+import { Palette, FileText } from 'lucide-react';
 
 interface TabbedRightPanelProps {
   selectedSegment: CaptionSegment | null;
@@ -76,13 +77,15 @@ const TabbedRightPanel: React.FC<TabbedRightPanelProps> = ({
           onClick={() => setActiveTab('styling')}
           style={tabStyle(activeTab === 'styling')}
         >
-          🎨 Styling
+          <Palette size={14} />
+          Styling
         </button>
         <button
           onClick={() => setActiveTab('subtitles')}
           style={tabStyle(activeTab === 'subtitles')}
         >
-          📝 Subtitles
+          <FileText size={14} />
+          Subtitles
         </button>
       </div>
 
