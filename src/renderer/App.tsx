@@ -916,7 +916,7 @@ const AppContent: React.FC = () => {
         position: 'absolute',
         top: '30px', // Moved down to give space for drag indicator
         left: '80px', // Leave space for traffic lights
-        right: '20px',
+        right: '140px',
         zIndex: 100,
         display: 'flex',
         justifyContent: 'space-between',
