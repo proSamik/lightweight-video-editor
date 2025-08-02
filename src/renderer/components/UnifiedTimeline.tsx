@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { CaptionSegment } from '../../types';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface UnifiedTimelineProps {
   captions: CaptionSegment[];
@@ -30,6 +31,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   onPlayPause,
   isPlaying = false,
 }) => {
+  const { theme } = useTheme();
   const timelineRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartX, setDragStartX] = useState(0);
@@ -214,9 +216,9 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
               onClick={onPlayPause}
               style={{
                 padding: '4px 8px',
-                backgroundColor: isPlaying ? '#28a745' : '#6c757d',
-                color: '#fff',
-                border: '1px solid #555',
+                backgroundColor: isPlaying ? theme.colors.success : theme.colors.secondary,
+                color: theme.colors.text,
+                border: `1px solid ${theme.colors.border}`,
                 borderRadius: '3px',
                 cursor: 'pointer',
                 fontSize: '12px',
@@ -239,9 +241,9 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
             onClick={() => setSplitMode(!splitMode)}
             style={{
               padding: '4px 8px',
-              backgroundColor: splitMode ? '#ff6b35' : '#444',
-              color: '#fff',
-              border: '1px solid #555',
+              backgroundColor: splitMode ? theme.colors.primary : theme.colors.surface,
+              color: theme.colors.text,
+              border: `1px solid ${theme.colors.border}`,
               borderRadius: '3px',
               cursor: 'pointer',
               fontSize: '10px'
@@ -254,7 +256,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
             width: '8px',
             height: '8px',
             borderRadius: '50%',
-            backgroundColor: '#00ff88'
+            backgroundColor: theme.colors.success
           }} />
           <span style={{ fontSize: '11px' }}>Live</span>
         </div>
@@ -267,7 +269,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
           height: `${TIMELINE_HEIGHT - 24}px`,
           position: 'relative',
           cursor: isDragging ? 'grabbing' : 'pointer',
-          backgroundColor: '#1a1a1a'
+          backgroundColor: theme.colors.background
         }}
         onMouseDown={handleTimelineMouseDown}
         onMouseMove={(e) => {
@@ -289,7 +291,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
           height: `${WAVEFORM_HEIGHT}px`,
           display: 'flex',
           alignItems: 'flex-end',
-          backgroundColor: '#222'
+          backgroundColor: theme.colors.background
         }}>
           {waveformData.map((amplitude, index) => (
             <div
@@ -297,7 +299,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
               style={{
                 width: `${100 / waveformData.length}%`,
                 height: `${amplitude * WAVEFORM_HEIGHT}px`,
-                backgroundColor: '#555',
+                backgroundColor: theme.colors.surface,
                 marginRight: '1px'
               }}
             />
@@ -311,7 +313,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
           left: 0,
           right: 0,
           height: `${CAPTION_TRACK_HEIGHT}px`,
-          backgroundColor: '#2a2a2a'
+          backgroundColor: theme.colors.background
         }}>
           {captions.map((segment) => {
             const startPercent = (segment.startTime / totalDuration) * 100;
@@ -327,15 +329,15 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                   left: `${startPercent}%`,
                   width: `${widthPercent}%`,
                   height: '100%',
-                  backgroundColor: isSelected ? '#007acc' : isHovered ? '#444' : '#666',
-                  border: isSelected ? '2px solid #00aaff' : '1px solid #555',
+                  backgroundColor: isSelected ? theme.colors.primary : isHovered ? theme.colors.surface : theme.colors.background,
+                  border: isSelected ? `2px solid ${theme.colors.primary}` : `1px solid ${theme.colors.border}`,
                   borderRadius: '2px',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: '10px',
-                  color: '#fff',
+                  color: theme.colors.text,
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
@@ -376,7 +378,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
           top: 0,
           bottom: 0,
           width: '2px',
-          backgroundColor: '#ff4444',
+          backgroundColor: theme.colors.error,
           zIndex: 10,
           pointerEvents: 'none',
           boxShadow: '0 0 4px rgba(255, 68, 68, 0.5)'
@@ -388,8 +390,8 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
             left: '-6px',
             width: '14px',
             height: '14px',
-            backgroundColor: '#ff4444',
-            border: '2px solid #fff',
+            backgroundColor: theme.colors.error,
+            border: `2px solid ${theme.colors.text}`,
             borderRadius: '50%',
             cursor: 'grab'
           }} />
@@ -403,7 +405,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
             top: `${WAVEFORM_HEIGHT}px`,
             height: `${CAPTION_TRACK_HEIGHT}px`,
             width: '1px',
-            backgroundColor: '#ffaa00',
+            backgroundColor: theme.colors.primary,
             zIndex: 5,
             pointerEvents: 'none'
           }} />
@@ -429,7 +431,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                   top: '50%',
                   transform: 'translateY(-50%)',
                   fontSize: '9px',
-                  color: '#888',
+                  color: theme.colors.textSecondary,
                   whiteSpace: 'nowrap'
                 }}
               >
@@ -447,8 +449,8 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
             position: 'fixed',
             left: contextMenu.x,
             top: contextMenu.y,
-            backgroundColor: '#333',
-            border: '1px solid #555',
+            backgroundColor: theme.colors.background,
+            border: `1px solid ${theme.colors.border}`,
             borderRadius: '4px',
             padding: '4px 0',
             zIndex: 1000,
@@ -462,7 +464,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
               padding: '8px 12px',
               cursor: 'pointer',
               fontSize: '12px',
-              color: '#fff',
+              color: theme.colors.text,
               display: 'flex',
               alignItems: 'center',
               gap: '8px'
@@ -474,7 +476,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
               setContextMenu(null);
             }}
             onMouseEnter={(e) => {
-              (e.target as HTMLElement).style.backgroundColor = '#444';
+              (e.target as HTMLElement).style.backgroundColor = theme.colors.surface;
             }}
             onMouseLeave={(e) => {
               (e.target as HTMLElement).style.backgroundColor = 'transparent';
@@ -487,7 +489,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
               padding: '8px 12px',
               cursor: 'pointer',
               fontSize: '12px',
-              color: '#ff6b6b',
+              color: theme.colors.error,
               display: 'flex',
               alignItems: 'center',
               gap: '8px'
@@ -503,7 +505,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
               setContextMenu(null);
             }}
             onMouseEnter={(e) => {
-              (e.target as HTMLElement).style.backgroundColor = '#444';
+              (e.target as HTMLElement).style.backgroundColor = theme.colors.surface;
             }}
             onMouseLeave={(e) => {
               (e.target as HTMLElement).style.backgroundColor = 'transparent';
@@ -522,15 +524,15 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.7)',
+          backgroundColor: theme.colors.background,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 2000
         }}>
           <div style={{
-            backgroundColor: '#333',
-            border: '1px solid #555',
+            backgroundColor: theme.colors.background,
+            border: `1px solid ${theme.colors.border}`,
             borderRadius: '8px',
             padding: '24px',
             maxWidth: '400px',
@@ -538,27 +540,27 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
           }}>
             <h3 style={{
               margin: '0 0 16px 0',
-              color: '#fff',
+              color: theme.colors.text,
               fontSize: '16px'
             }}>
               Delete Caption Segment?
             </h3>
             <p style={{
               margin: '0 0 16px 0',
-              color: '#ccc',
+              color: theme.colors.textSecondary,
               fontSize: '14px',
               lineHeight: '1.4'
             }}>
               Are you sure you want to delete this caption segment?
             </p>
             <div style={{
-              backgroundColor: '#2a2a2a',
-              border: '1px solid #444',
+              backgroundColor: theme.colors.background,
+              border: `1px solid ${theme.colors.border}`,
               borderRadius: '4px',
               padding: '12px',
               margin: '0 0 20px 0',
               fontSize: '12px',
-              color: '#aaa',
+                color: theme.colors.textSecondary,
               maxHeight: '80px',
               overflowY: 'auto'
             }}>
@@ -573,9 +575,9 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                 onClick={() => setDeleteConfirm(null)}
                 style={{
                   padding: '8px 16px',
-                  backgroundColor: '#6c757d',
-                  color: '#fff',
-                  border: '1px solid #545b62',
+                  backgroundColor: theme.colors.secondary,
+                  color: theme.colors.text,
+                  border: `1px solid ${theme.colors.border}`,
                   borderRadius: '4px',
                   cursor: 'pointer',
                   fontSize: '12px'
@@ -590,9 +592,9 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                 }}
                 style={{
                   padding: '8px 16px',
-                  backgroundColor: '#dc3545',
-                  color: '#fff',
-                  border: '1px solid #c82333',
+                  backgroundColor: theme.colors.error,
+                  color: theme.colors.text,
+                  border: `1px solid ${theme.colors.error}`,
                   borderRadius: '4px',
                   cursor: 'pointer',
                   fontSize: '12px'
