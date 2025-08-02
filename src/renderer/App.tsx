@@ -884,7 +884,7 @@ const AppContent: React.FC = () => {
           position: 'absolute',
           top: 0,
           left: 0,
-          right: 0,
+          right: '80px', // Exclude right area where ThemeToggle is positioned
           height: '80px', // Increased height for better dragging
           WebkitAppRegion: 'drag',
           zIndex: 50,
