@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CaptionSegment } from '../../types';
 import { useTheme } from '../contexts/ThemeContext';
+import { Trash2, Search } from 'lucide-react';
 
 interface SubtitlePanelProps {
   captions: CaptionSegment[];
@@ -168,7 +169,7 @@ const SubtitlePanel: React.FC<SubtitlePanelProps> = ({
   return (
     <div style={{
       height: '100%',
-      backgroundColor: '#2a2a2a',
+      backgroundColor: theme.colors.background,
       display: 'flex',
       flexDirection: 'column',
       overflow: 'hidden'
@@ -204,7 +205,8 @@ const SubtitlePanel: React.FC<SubtitlePanelProps> = ({
             }}
             title="Search & Replace (Ctrl/Cmd+F)"
           >
-            🔍 Search
+            <Search size={14} />
+            Search
           </button>
         </div>
 
@@ -427,7 +429,7 @@ const SubtitlePanel: React.FC<SubtitlePanelProps> = ({
                     }}
                     title="Delete subtitle"
                   >
-                    🗑️
+                    <Trash2 size={14} />
                   </button>
                 </div>
                 
