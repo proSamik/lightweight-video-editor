@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTheme } from '../contexts/ThemeContext';
 import { CaptionSegment, GeneratedContent } from '../../types';
 
 interface AIContentModalProps {
@@ -16,6 +17,7 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
   onSave,
   initialContent 
 }) => {
+  const { theme } = useTheme();
   const [description, setDescription] = useState('');
   const [titles, setTitles] = useState<{ title: string; characterCount: number }[]>([]);
   const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
@@ -117,27 +119,27 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
   };
 
   const contentStyle: React.CSSProperties = {
-    backgroundColor: '#2a2a2a',
+    backgroundColor: theme.colors.surface,
     borderRadius: '8px',
     padding: '30px',
     width: '800px',
     maxWidth: '90vw',
     maxHeight: '80vh',
     overflowY: 'auto',
-    color: '#fff',
+    color: theme.colors.text,
   };
 
   return (
     <div style={modalStyle} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div style={contentStyle}>
-        <h2 style={{ margin: '0 0 25px 0', fontSize: '20px', fontWeight: 'bold' }}>
+        <h2 style={{ margin: '0 0 25px 0', fontSize: '20px', fontWeight: 'bold', color: theme.colors.text }}>
           AI Content Generation for YouTube
         </h2>
 
         {error && (
           <div style={{
-            backgroundColor: '#dc3545',
-            color: '#fff',
+            backgroundColor: theme.colors.error,
+            color: theme.colors.text,
             padding: '10px',
             borderRadius: '4px',
             marginBottom: '20px',
@@ -148,17 +150,17 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
         )}
 
         {/* SRT Export Section */}
-        <div style={{ marginBottom: '30px', padding: '15px', backgroundColor: '#333', borderRadius: '6px' }}>
-          <h3 style={{ margin: '0 0 10px 0', fontSize: '16px' }}>Export Subtitles for YouTube</h3>
-          <p style={{ margin: '0 0 15px 0', fontSize: '14px', color: '#ccc' }}>
+        <div style={{ marginBottom: '30px', padding: '15px', backgroundColor: theme.colors.background, borderRadius: '6px' }}>
+          <h3 style={{ margin: '0 0 10px 0', fontSize: '16px', color: theme.colors.text }}>Export Subtitles for YouTube</h3>
+          <p style={{ margin: '0 0 15px 0', fontSize: '14px', color: theme.colors.textSecondary }}>
             Export your subtitles as an SRT file to upload to YouTube for better accessibility and SEO.
           </p>
           <button
             onClick={exportSRT}
             style={{
               padding: '8px 16px',
-              backgroundColor: '#28a745',
-              color: '#fff',
+              backgroundColor: theme.colors.success,
+              color: theme.colors.text,
               border: 'none',
               borderRadius: '4px',
               cursor: 'pointer',
@@ -173,14 +175,14 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
         {/* Description Section */}
         <div style={{ marginBottom: '30px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px' }}>
-            <h3 style={{ margin: 0, fontSize: '16px' }}>YouTube Description</h3>
+            <h3 style={{ margin: 0, fontSize: '16px', color: theme.colors.text }}>YouTube Description</h3>
             <button
               onClick={generateDescription}
               disabled={isGeneratingDescription}
               style={{
                 padding: '8px 16px',
-                backgroundColor: isGeneratingDescription ? '#6c757d' : '#007bff',
-                color: '#fff',
+                backgroundColor: isGeneratingDescription ? theme.colors.secondary : theme.colors.primary,
+                color: theme.colors.text,
                 border: 'none',
                 borderRadius: '4px',
                 cursor: isGeneratingDescription ? 'not-allowed' : 'pointer',
@@ -198,16 +200,16 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
             style={{
               width: '100%',
               padding: '12px',
-              backgroundColor: '#333',
-              color: '#fff',
-              border: '1px solid #555',
+              backgroundColor: theme.colors.background,
+              color: theme.colors.text,
+              border: `1px solid ${theme.colors.border}`,
               borderRadius: '4px',
               fontSize: '14px',
               resize: 'vertical',
               fontFamily: 'inherit'
             }}
           />
-          <div style={{ marginTop: '8px', fontSize: '12px', color: '#888' }}>
+          <div style={{ marginTop: '8px', fontSize: '12px', color: theme.colors.textSecondary }}>
             Characters: {description.length} / 5000 (YouTube limit)
           </div>
         </div>
@@ -215,14 +217,14 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
         {/* Title Generation Section */}
         <div style={{ marginBottom: '30px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px' }}>
-            <h3 style={{ margin: 0, fontSize: '16px' }}>YouTube Titles</h3>
+            <h3 style={{ margin: 0, fontSize: '16px', color: theme.colors.text }}>YouTube Titles</h3>
             <button
               onClick={generateTitles}
               disabled={isGeneratingTitles || !description.trim()}
               style={{
                 padding: '8px 16px',
-                backgroundColor: isGeneratingTitles || !description.trim() ? '#6c757d' : '#28a745',
-                color: '#fff',
+                backgroundColor: isGeneratingTitles || !description.trim() ? theme.colors.secondary : theme.colors.success,
+                color: theme.colors.text,
                 border: 'none',
                 borderRadius: '4px',
                 cursor: isGeneratingTitles || !description.trim() ? 'not-allowed' : 'pointer',
@@ -236,10 +238,10 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
           {titles.length === 0 ? (
             <div style={{
               padding: '20px',
-              backgroundColor: '#333',
+              backgroundColor: theme.colors.background,
               borderRadius: '4px',
               textAlign: 'center',
-              color: '#888',
+              color: theme.colors.textSecondary,
               fontSize: '14px'
             }}>
               Generate titles after creating a description
@@ -251,9 +253,9 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
                   key={index}
                   style={{
                     padding: '12px',
-                    backgroundColor: selectedTitleIndex === index ? '#007bff' : '#333',
+                    backgroundColor: selectedTitleIndex === index ? theme.colors.primary : theme.colors.background,
                     border: '2px solid transparent',
-                    borderColor: selectedTitleIndex === index ? '#0056b3' : 'transparent',
+                    borderColor: selectedTitleIndex === index ? theme.colors.primary : 'transparent',
                     borderRadius: '4px',
                     cursor: 'pointer',
                     transition: 'all 0.2s'
