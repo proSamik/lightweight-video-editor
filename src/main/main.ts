@@ -146,6 +146,78 @@ ipcMain.handle('export-video', async (_event, outputPath: string) => {
   return null;
 });
 
+// Audio file handlers
+ipcMain.handle('select-audio-file', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openFile'],
+    filters: [
+      {
+        name: 'Audio Files',
+        extensions: ['mp3', 'wav', 'aac', 'm4a', 'flac', 'ogg'],
+      },
+    ],
+  });
+
+  if (!result.canceled && result.filePaths.length > 0) {
+    return result.filePaths[0];
+  }
+  return null;
+});
+
+ipcMain.handle('export-audio', async (_event, videoPath: string, outputName?: string) => {
+  const result = await dialog.showSaveDialog(mainWindow, {
+    defaultPath: outputName || 'extracted_audio.mp3',
+    filters: [
+      {
+        name: 'MP3 Audio',
+        extensions: ['mp3'],
+      },
+      {
+        name: 'WAV Audio',
+        extensions: ['wav'],
+      },
+      {
+        name: 'All Audio Files',
+        extensions: ['mp3', 'wav', 'aac', 'm4a'],
+      },
+    ],
+  });
+
+  if (!result.canceled && result.filePath) {
+    try {
+      const ffmpegService = FFmpegService.getInstance();
+      await ffmpegService.extractAudioToFile(videoPath, result.filePath);
+      return result.filePath;
+    } catch (error) {
+      throw new Error(`Failed to export audio: ${error}`);
+    }
+  }
+  return null;
+});
+
+ipcMain.handle('replace-audio-track', async (_event, videoPath: string, audioPath: string, outputName?: string) => {
+  const result = await dialog.showSaveDialog(mainWindow, {
+    defaultPath: outputName || 'video_with_new_audio.mp4',
+    filters: [
+      {
+        name: 'Video Files',
+        extensions: ['mp4'],
+      },
+    ],
+  });
+
+  if (!result.canceled && result.filePath) {
+    try {
+      const ffmpegService = FFmpegService.getInstance();
+      await ffmpegService.replaceAudioTrack(videoPath, audioPath, result.filePath);
+      return result.filePath;
+    } catch (error) {
+      throw new Error(`Failed to replace audio track: ${error}`);
+    }
+  }
+  return null;
+});
+
 // Video processing handlers
 ipcMain.handle('get-video-metadata', async (_event, videoPath: string) => {
   try {
@@ -193,13 +265,40 @@ ipcMain.handle('test-whisper-installation', async () => {
   return await whisperService.testWhisperInstallation();
 });
 
-ipcMain.handle('render-video-with-captions', async (event, videoPath: string, captionsData: any[], outputPath: string, exportSettings?: any) => {
+ipcMain.handle('render-video-with-captions', async (event, videoPath: string, captionsData: any[], outputPath: string, exportSettings?: any, replacementAudioPath?: string) => {
   try {
     const ffmpegService = FFmpegService.getInstance();
-    return await ffmpegService.renderVideoWithBurnedCaptions(videoPath, captionsData, outputPath, (progress: number) => {
-      // Send progress updates to renderer
-      event.sender.send('rendering-progress', progress);
-    }, exportSettings);
+    
+    if (replacementAudioPath) {
+      // First render video with captions to a temp file
+      const tempVideoPath = outputPath.replace('.mp4', '_temp_with_captions.mp4');
+      await ffmpegService.renderVideoWithBurnedCaptions(videoPath, captionsData, tempVideoPath, (progress: number) => {
+        // Send progress updates to renderer (first 80% for caption rendering)
+        event.sender.send('rendering-progress', progress * 0.8);
+      }, exportSettings);
+      
+      // Then replace the audio track
+      await ffmpegService.replaceAudioTrack(tempVideoPath, replacementAudioPath, outputPath);
+      
+      // Send final progress
+      event.sender.send('rendering-progress', 100);
+      
+      // Clean up temp file
+      const fs = require('fs');
+      try {
+        fs.unlinkSync(tempVideoPath);
+      } catch (cleanupError) {
+        console.warn('Failed to clean up temp file:', cleanupError);
+      }
+      
+      return outputPath;
+    } else {
+      // Normal rendering without audio replacement
+      return await ffmpegService.renderVideoWithBurnedCaptions(videoPath, captionsData, outputPath, (progress: number) => {
+        // Send progress updates to renderer
+        event.sender.send('rendering-progress', progress);
+      }, exportSettings);
+    }
   } catch (error) {
     throw new Error(`Failed to render video: ${error}`);
   }
