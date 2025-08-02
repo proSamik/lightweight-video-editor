@@ -131,6 +131,8 @@ export interface AISettings {
   googleAiApiKey?: string;
   descriptionPrompt?: string;
   titlePrompt?: string;
+  tweetPrompt?: string;
+  thumbnailPrompt?: string;
   selectedProvider: 'openrouter' | 'anthropic' | 'google';
   selectedModel?: string;
   availableModels?: AIModel[];
@@ -139,4 +141,6 @@ export interface AISettings {
 export interface GeneratedContent {
   description?: string;
   titles?: { title: string; characterCount: number }[];
+  tweets?: { hook: string; lineCount: number; wordCount: number }[];
+  thumbnails?: string[];
 }
