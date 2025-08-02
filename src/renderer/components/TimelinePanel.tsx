@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CaptionSegment, SearchResult } from '../../types';
 import SearchModal from './SearchModal';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface TimelinePanelProps {
   captions: CaptionSegment[];
@@ -25,6 +26,7 @@ const TimelinePanel: React.FC<TimelinePanelProps> = ({
   videoFile,
   onReTranscribeSegment,
 }) => {
+  const { theme } = useTheme();
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [highlightedSegments, setHighlightedSegments] = useState<Set<string>>(new Set());
   const [searchHighlight, setSearchHighlight] = useState<{segmentId: string, start: number, end: number} | null>(null);
@@ -97,8 +99,8 @@ const TimelinePanel: React.FC<TimelinePanelProps> = ({
       <>
         {beforeMatch}
         <span style={{
-          backgroundColor: '#ffff00',
-          color: '#000',
+          backgroundColor: theme.colors.warning,
+          color: theme.colors.text,
           padding: '2px 4px',
           borderRadius: '2px',
           fontWeight: 'bold'
@@ -127,13 +129,13 @@ const TimelinePanel: React.FC<TimelinePanelProps> = ({
   return (
     <div style={{
       height: '200px',
-      backgroundColor: '#2a2a2a',
-      borderTop: '1px solid #333',
+      backgroundColor: theme.colors.surface,
+      borderTop: `1px solid ${theme.colors.border}`,
       padding: '20px',
       overflow: 'hidden'
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-        <h3 style={{ margin: 0, fontSize: '16px' }}>Caption Timeline</h3>
+        <h3 style={{ margin: 0, fontSize: '16px', color: theme.colors.text }}>Caption Timeline</h3>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
             onClick={() => {
@@ -142,9 +144,9 @@ const TimelinePanel: React.FC<TimelinePanelProps> = ({
             }}
             style={{
               padding: '6px 12px',
-              backgroundColor: isSelectingRange ? '#28a745' : '#6c757d',
-              color: '#fff',
-              border: '1px solid #555',
+              backgroundColor: isSelectingRange ? theme.colors.success : theme.colors.secondary,
+              color: theme.colors.text,
+              border: `1px solid ${theme.colors.border}`,
               borderRadius: '4px',
               cursor: 'pointer',
               fontSize: '12px',
@@ -165,9 +167,9 @@ const TimelinePanel: React.FC<TimelinePanelProps> = ({
               }}
               style={{
                 padding: '6px 12px',
-                backgroundColor: '#dc3545',
-                color: '#fff',
-                border: '1px solid #c82333',
+                backgroundColor: theme.colors.error,
+                color: theme.colors.text,
+                border: `1px solid ${theme.colors.error}`,
                 borderRadius: '4px',
                 cursor: 'pointer',
                 fontSize: '12px',
@@ -184,9 +186,9 @@ const TimelinePanel: React.FC<TimelinePanelProps> = ({
             onClick={() => setShowSearchModal(true)}
             style={{
               padding: '6px 12px',
-              backgroundColor: '#444',
-              color: '#fff',
-              border: '1px solid #555',
+              backgroundColor: theme.colors.surface,
+              color: theme.colors.text,
+              border: `1px solid ${theme.colors.border}`,
               borderRadius: '4px',
               cursor: 'pointer',
               fontSize: '12px',
@@ -205,7 +207,7 @@ const TimelinePanel: React.FC<TimelinePanelProps> = ({
       <div style={{
         height: '30px',
         position: 'relative',
-        backgroundColor: '#333',
+        backgroundColor: theme.colors.background,
         borderRadius: '4px',
         marginBottom: '15px',
         cursor: 'pointer'
@@ -237,8 +239,8 @@ const TimelinePanel: React.FC<TimelinePanelProps> = ({
             width: `${((selectedTimeRange.end - selectedTimeRange.start) / totalDuration) * 100}%`,
             top: 0,
             bottom: 0,
-            backgroundColor: 'rgba(40, 167, 69, 0.3)',
-            border: '1px solid #28a745',
+            backgroundColor: `${theme.colors.success}30`,
+            border: `1px solid ${theme.colors.success}`,
             borderRadius: '2px',
             zIndex: 1
           }} />
@@ -251,7 +253,7 @@ const TimelinePanel: React.FC<TimelinePanelProps> = ({
           top: 0,
           bottom: 0,
           width: '2px',
-          backgroundColor: '#ff6b6b',
+          backgroundColor: theme.colors.error,
           zIndex: 2
         }} />
         
@@ -267,7 +269,7 @@ const TimelinePanel: React.FC<TimelinePanelProps> = ({
                 top: '50%',
                 transform: 'translateY(-50%)',
                 fontSize: '10px',
-                color: '#888',
+                color: theme.colors.textSecondary,
                 whiteSpace: 'nowrap'
               }}
             >
@@ -286,7 +288,7 @@ const TimelinePanel: React.FC<TimelinePanelProps> = ({
         {captions.length === 0 ? (
           <div style={{
             textAlign: 'center',
-            color: '#888',
+            color: theme.colors.textSecondary,
             marginTop: '40px'
           }}>
             No captions loaded. Import a video to generate captions.
@@ -299,10 +301,10 @@ const TimelinePanel: React.FC<TimelinePanelProps> = ({
               style={{
                 padding: '8px 12px',
                 marginBottom: '8px',
-                backgroundColor: selectedSegmentId === caption.id ? '#444' : '#363636',
+                backgroundColor: selectedSegmentId === caption.id ? theme.colors.surface : theme.colors.background,
                 borderRadius: '4px',
                 cursor: 'pointer',
-                border: selectedSegmentId === caption.id ? '1px solid #666' : '1px solid transparent',
+                border: selectedSegmentId === caption.id ? `1px solid ${theme.colors.border}` : '1px solid transparent',
                 transition: 'all 0.2s ease'
               }}
               onClick={() => onSegmentSelect(caption.id)}
@@ -318,11 +320,11 @@ const TimelinePanel: React.FC<TimelinePanelProps> = ({
                 alignItems: 'center',
                 marginBottom: '4px'
               }}>
-                <span style={{ fontSize: '12px', color: '#888' }}>
+                <span style={{ fontSize: '12px', color: theme.colors.textSecondary }}>
                   {formatTime(caption.startTime)} - {formatTime(caption.endTime)}
                 </span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '12px', color: '#888' }}>
+                  <span style={{ fontSize: '12px', color: theme.colors.textSecondary }}>
                     {Math.round((caption.endTime - caption.startTime) / 1000)}s
                   </span>
                   <button
@@ -333,7 +335,7 @@ const TimelinePanel: React.FC<TimelinePanelProps> = ({
                     style={{
                       background: 'none',
                       border: 'none',
-                      color: '#ff6b6b',
+                      color: theme.colors.error,
                       cursor: 'pointer',
                       fontSize: '16px',
                       padding: '2px',
@@ -351,7 +353,7 @@ const TimelinePanel: React.FC<TimelinePanelProps> = ({
               <div style={{
                 fontSize: '14px',
                 lineHeight: '1.4',
-                color: selectedSegmentId === caption.id ? '#fff' : '#ccc'
+                color: selectedSegmentId === caption.id ? theme.colors.text : theme.colors.textSecondary
               }}>
                 {renderHighlightedText(caption.text, caption.id)}
               </div>
