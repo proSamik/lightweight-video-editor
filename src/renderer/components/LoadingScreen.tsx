@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface LoadingScreenProps {
   message: string;
@@ -6,11 +7,12 @@ interface LoadingScreenProps {
 }
 
 const LoadingScreen: React.FC<LoadingScreenProps> = ({ message, progress }) => {
+  const { theme } = useTheme();
   return (
     <div style={{
       height: '100vh',
-      backgroundColor: '#1a1a1a',
-      color: '#ffffff',
+      backgroundColor: theme.colors.background,
+      color: theme.colors.text,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -20,8 +22,8 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ message, progress }) => {
       <div style={{
         width: '60px',
         height: '60px',
-        border: '4px solid #333',
-        borderTop: '4px solid #007acc',
+        border: `4px solid ${theme.colors.border}`,
+        borderTop: `4px solid ${theme.colors.primary}`,
         borderRadius: '50%',
         animation: 'spin 1s linear infinite',
         marginBottom: '20px'
@@ -38,7 +40,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ message, progress }) => {
       <p style={{ 
         margin: '0 0 20px 0', 
         fontSize: '16px',
-        color: '#ccc',
+        color: theme.colors.textSecondary,
         maxWidth: '400px',
         lineHeight: '1.4'
       }}>
@@ -50,14 +52,14 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ message, progress }) => {
           <div style={{
             width: '100%',
             height: '8px',
-            backgroundColor: '#333',
+            backgroundColor: theme.colors.background,
             borderRadius: '4px',
             overflow: 'hidden'
           }}>
             <div style={{
               width: `${Math.max(0, Math.min(100, progress))}%`,
               height: '100%',
-              backgroundColor: '#007acc',
+              backgroundColor: theme.colors.primary,
               transition: 'width 0.3s ease',
               borderRadius: '4px'
             }} />
@@ -65,7 +67,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ message, progress }) => {
           <div style={{
             marginTop: '8px',
             fontSize: '14px',
-            color: '#999',
+            color: theme.colors.textSecondary,
             textAlign: 'center'
           }}>
             {Math.round(progress)}%
