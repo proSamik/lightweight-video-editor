@@ -107,6 +107,7 @@ export interface ProjectData {
   videoFile: VideoFile | null;
   captions: CaptionSegment[];
   timeline: TimelineSelection[];
+  replacementAudioPath?: string | null;
   lastModified: number;
   description?: string;
   title?: string;
