@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTheme } from '../contexts/ThemeContext';
 import { ExportSettings } from '../../types';
 
 interface ExportSettingsProps {
@@ -12,6 +13,7 @@ const ExportSettingsModal: React.FC<ExportSettingsProps> = ({
   onClose,
   onConfirm
 }) => {
+  const { theme } = useTheme();
   const [framerate, setFramerate] = useState<30 | 60>(30);
   const [quality, setQuality] = useState<'fast' | 'balanced' | 'high'>('balanced');
 
@@ -38,11 +40,11 @@ const ExportSettingsModal: React.FC<ExportSettingsProps> = ({
       zIndex: 1000
     }}>
       <div style={{
-        backgroundColor: '#2a2a2a',
+        backgroundColor: theme.colors.surface,
         borderRadius: '8px',
         padding: '24px',
         minWidth: '400px',
-        border: '1px solid #444'
+        border: `1px solid ${theme.colors.border}`
       }}>
         <div style={{
           display: 'flex',
@@ -58,7 +60,7 @@ const ExportSettingsModal: React.FC<ExportSettingsProps> = ({
             style={{
               background: 'none',
               border: 'none',
-              color: '#ccc',
+              color: theme.colors.textSecondary,
               cursor: 'pointer',
               fontSize: '18px'
             }}
@@ -78,9 +80,9 @@ const ExportSettingsModal: React.FC<ExportSettingsProps> = ({
               style={{
                 flex: 1,
                 padding: '12px 16px',
-                backgroundColor: framerate === 30 ? '#007acc' : '#444',
-                color: '#fff',
-                border: framerate === 30 ? '2px solid #0099ff' : '1px solid #555',
+                backgroundColor: framerate === 30 ? theme.colors.primary : theme.colors.surface,
+                color: theme.colors.text,
+                border: framerate === 30 ? `2px solid ${theme.colors.primary}` : `1px solid ${theme.colors.border}`,
                 borderRadius: '6px',
                 cursor: 'pointer',
                 fontSize: '14px',
@@ -88,7 +90,7 @@ const ExportSettingsModal: React.FC<ExportSettingsProps> = ({
               }}
             >
               <div style={{ marginBottom: '4px' }}>30 FPS</div>
-              <div style={{ fontSize: '11px', color: framerate === 30 ? '#cce7ff' : '#aaa' }}>
+              <div style={{ fontSize: '11px', color: framerate === 30 ? theme.colors.primary : theme.colors.textSecondary }}>
                 Standard quality, faster rendering
               </div>
             </button>
@@ -97,9 +99,9 @@ const ExportSettingsModal: React.FC<ExportSettingsProps> = ({
               style={{
                 flex: 1,
                 padding: '12px 16px',
-                backgroundColor: framerate === 60 ? '#007acc' : '#444',
-                color: '#fff',
-                border: framerate === 60 ? '2px solid #0099ff' : '1px solid #555',
+                backgroundColor: framerate === 60 ? theme.colors.primary : theme.colors.surface,
+                color: theme.colors.text,
+                border: framerate === 60 ? `2px solid ${theme.colors.primary}` : `1px solid ${theme.colors.border}`,
                 borderRadius: '6px',
                 cursor: 'pointer',
                 fontSize: '14px',
@@ -107,7 +109,7 @@ const ExportSettingsModal: React.FC<ExportSettingsProps> = ({
               }}
             >
               <div style={{ marginBottom: '4px' }}>60 FPS</div>
-              <div style={{ fontSize: '11px', color: framerate === 60 ? '#cce7ff' : '#aaa' }}>
+              <div style={{ fontSize: '11px', color: framerate === 60 ? theme.colors.primary : theme.colors.textSecondary }}>
                 Smooth motion, longer rendering
               </div>
             </button>
@@ -130,9 +132,9 @@ const ExportSettingsModal: React.FC<ExportSettingsProps> = ({
                 onClick={() => setQuality(option.value as any)}
                 style={{
                   padding: '12px 16px',
-                  backgroundColor: quality === option.value ? '#007acc' : '#444',
-                  color: '#fff',
-                  border: quality === option.value ? '2px solid #0099ff' : '1px solid #555',
+                  backgroundColor: quality === option.value ? theme.colors.primary : theme.colors.surface,
+                  color: theme.colors.text,
+                  border: quality === option.value ? `2px solid ${theme.colors.primary}` : `1px solid ${theme.colors.border}`,
                   borderRadius: '6px',
                   cursor: 'pointer',
                   fontSize: '14px',
@@ -141,7 +143,7 @@ const ExportSettingsModal: React.FC<ExportSettingsProps> = ({
                 }}
               >
                 <div style={{ marginBottom: '2px' }}>{option.label}</div>
-                <div style={{ fontSize: '11px', color: quality === option.value ? '#cce7ff' : '#aaa' }}>
+                <div style={{ fontSize: '11px', color: quality === option.value ? theme.colors.primary : theme.colors.textSecondary }}>
                   {option.description}
                 </div>
               </button>
@@ -151,16 +153,16 @@ const ExportSettingsModal: React.FC<ExportSettingsProps> = ({
 
         {/* Estimated rendering time info */}
         <div style={{
-          backgroundColor: '#1a1a1a',
+          backgroundColor: theme.colors.background,
           padding: '12px',
           borderRadius: '4px',
           marginBottom: '20px',
-          border: '1px solid #333'
+          border: `1px solid ${theme.colors.border}`
         }}>
-          <div style={{ fontSize: '12px', color: '#ccc', marginBottom: '4px' }}>
+          <div style={{ fontSize: '12px', color: theme.colors.textSecondary, marginBottom: '4px' }}>
             <strong>Estimated rendering time:</strong>
           </div>
-          <div style={{ fontSize: '11px', color: '#aaa' }}>
+          <div style={{ fontSize: '11px', color: theme.colors.textSecondary }}>
             {framerate === 30 ? (
               quality === 'fast' ? '0.5-1x video length' :
               quality === 'balanced' ? '1-2x video length' :
@@ -183,9 +185,9 @@ const ExportSettingsModal: React.FC<ExportSettingsProps> = ({
             onClick={onClose}
             style={{
               padding: '10px 20px',
-              backgroundColor: '#444',
-              color: '#fff',
-              border: '1px solid #555',
+              backgroundColor: theme.colors.surface,
+              color: theme.colors.text,
+              border: `1px solid ${theme.colors.border}`,
               borderRadius: '4px',
               cursor: 'pointer',
               fontSize: '14px'
@@ -197,9 +199,9 @@ const ExportSettingsModal: React.FC<ExportSettingsProps> = ({
             onClick={handleConfirm}
             style={{
               padding: '10px 20px',
-              backgroundColor: '#28a745',
-              color: '#fff',
-              border: '1px solid #218838',
+              backgroundColor: theme.colors.success,
+              color: theme.colors.text,
+              border: `1px solid ${theme.colors.success}`,
               borderRadius: '4px',
               cursor: 'pointer',
               fontSize: '14px',
