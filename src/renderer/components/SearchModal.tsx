@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTheme } from '../contexts/ThemeContext';
 import { CaptionSegment, SearchResult } from '../../types';
 
 interface SearchModalProps {
@@ -18,6 +19,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
   onReplaceAll,
   onReplace,
 }) => {
+  const { theme } = useTheme();
   const [searchTerm, setSearchTerm] = useState('');
   const [replaceTerm, setReplaceTerm] = useState('');
   const [caseSensitive, setCaseSensitive] = useState(false);
@@ -162,12 +164,12 @@ const SearchModal: React.FC<SearchModalProps> = ({
       zIndex: 1000
     }}>
       <div style={{
-        backgroundColor: '#2a2a2a',
+        backgroundColor: theme.colors.surface,
         borderRadius: '8px',
         padding: '24px',
         minWidth: '500px',
         maxWidth: '700px',
-        border: '1px solid #444'
+        border: `1px solid ${theme.colors.border}`
       }}>
         <div style={{
           display: 'flex',
@@ -175,7 +177,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
           alignItems: 'center',
           marginBottom: '20px'
         }}>
-          <h2 style={{ margin: 0, fontSize: '18px' }}>
+          <h2 style={{ margin: 0, fontSize: '18px', color: theme.colors.text }}>
             {showReplace ? 'Find & Replace' : 'Find in Timeline'}
           </h2>
           <button
@@ -183,7 +185,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
             style={{
               background: 'none',
               border: 'none',
-              color: '#ccc',
+              color: theme.colors.textSecondary,
               cursor: 'pointer',
               fontSize: '18px'
             }}
@@ -204,9 +206,9 @@ const SearchModal: React.FC<SearchModalProps> = ({
             style={{
               width: '100%',
               padding: '10px',
-              backgroundColor: '#333',
-              color: '#fff',
-              border: '1px solid #555',
+              backgroundColor: theme.colors.background,
+              color: theme.colors.text,
+              border: `1px solid ${theme.colors.border}`,
               borderRadius: '4px',
               fontSize: '14px'
             }}
@@ -225,9 +227,9 @@ const SearchModal: React.FC<SearchModalProps> = ({
               style={{
                 width: '100%',
                 padding: '10px',
-                backgroundColor: '#333',
-                color: '#fff',
-                border: '1px solid #555',
+                backgroundColor: theme.colors.background,
+                color: theme.colors.text,
+                border: `1px solid ${theme.colors.border}`,
                 borderRadius: '4px',
                 fontSize: '14px'
               }}
@@ -267,7 +269,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
           <div style={{
             marginBottom: '16px',
             fontSize: '12px',
-            color: '#aaa'
+            color: theme.colors.textSecondary
           }}>
             {searchResults.length === 0 ? 
               'No matches found' : 
@@ -289,9 +291,9 @@ const SearchModal: React.FC<SearchModalProps> = ({
               disabled={searchResults.length === 0}
               style={{
                 padding: '8px 16px',
-                backgroundColor: searchResults.length > 0 ? '#444' : '#2a2a2a',
-                color: searchResults.length > 0 ? '#fff' : '#666',
-                border: '1px solid #555',
+                backgroundColor: searchResults.length > 0 ? theme.colors.surface : theme.colors.background,
+                color: searchResults.length > 0 ? theme.colors.text : theme.colors.textSecondary,
+                border: `1px solid ${theme.colors.border}`,
                 borderRadius: '4px',
                 cursor: searchResults.length > 0 ? 'pointer' : 'default',
                 fontSize: '12px'
@@ -304,9 +306,9 @@ const SearchModal: React.FC<SearchModalProps> = ({
               disabled={searchResults.length === 0}
               style={{
                 padding: '8px 16px',
-                backgroundColor: searchResults.length > 0 ? '#444' : '#2a2a2a',
-                color: searchResults.length > 0 ? '#fff' : '#666',
-                border: '1px solid #555',
+                backgroundColor: searchResults.length > 0 ? theme.colors.surface : theme.colors.background,
+                color: searchResults.length > 0 ? theme.colors.text : theme.colors.textSecondary,
+                border: `1px solid ${theme.colors.border}`,
                 borderRadius: '4px',
                 cursor: searchResults.length > 0 ? 'pointer' : 'default',
                 fontSize: '12px'
@@ -321,9 +323,9 @@ const SearchModal: React.FC<SearchModalProps> = ({
               onClick={() => setShowReplace(!showReplace)}
               style={{
                 padding: '8px 16px',
-                backgroundColor: showReplace ? '#007acc' : '#444',
-                color: '#fff',
-                border: '1px solid #555',
+                backgroundColor: showReplace ? theme.colors.primary : theme.colors.surface,
+                color: theme.colors.text,
+                border: `1px solid ${theme.colors.border}`,
                 borderRadius: '4px',
                 cursor: 'pointer',
                 fontSize: '12px'
@@ -339,9 +341,9 @@ const SearchModal: React.FC<SearchModalProps> = ({
                   disabled={searchResults.length === 0}
                   style={{
                     padding: '8px 16px',
-                    backgroundColor: searchResults.length > 0 ? '#28a745' : '#2a2a2a',
-                    color: searchResults.length > 0 ? '#fff' : '#666',
-                    border: '1px solid #555',
+                    backgroundColor: searchResults.length > 0 ? theme.colors.success : theme.colors.background,
+                    color: searchResults.length > 0 ? theme.colors.text : theme.colors.textSecondary,
+                    border: `1px solid ${theme.colors.border}`,
                     borderRadius: '4px',
                     cursor: searchResults.length > 0 ? 'pointer' : 'default',
                     fontSize: '12px'
@@ -354,9 +356,9 @@ const SearchModal: React.FC<SearchModalProps> = ({
                   disabled={searchResults.length === 0}
                   style={{
                     padding: '8px 16px',
-                    backgroundColor: searchResults.length > 0 ? '#dc3545' : '#2a2a2a',
-                    color: searchResults.length > 0 ? '#fff' : '#666',
-                    border: '1px solid #555',
+                    backgroundColor: searchResults.length > 0 ? theme.colors.error : theme.colors.background,
+                    color: searchResults.length > 0 ? theme.colors.text : theme.colors.textSecondary,
+                    border: `1px solid ${theme.colors.border}`,
                     borderRadius: '4px',
                     cursor: searchResults.length > 0 ? 'pointer' : 'default',
                     fontSize: '12px'
@@ -373,8 +375,8 @@ const SearchModal: React.FC<SearchModalProps> = ({
         <div style={{
           marginTop: '16px',
           fontSize: '11px',
-          color: '#666',
-          borderTop: '1px solid #444',
+          color: theme.colors.textSecondary,
+          borderTop: `1px solid ${theme.colors.border}`,
           paddingTop: '12px'
         }}>
           <strong>Keyboard shortcuts:</strong> Enter = Next, Shift+Enter = Previous, Esc = Close
