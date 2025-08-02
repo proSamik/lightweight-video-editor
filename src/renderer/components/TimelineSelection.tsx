@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TimelineSelection } from '../../types';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface TimelineSelectionProps {
   isOpen: boolean;
@@ -14,6 +15,7 @@ const TimelineSelectionModal: React.FC<TimelineSelectionProps> = ({
   onConfirm,
   videoDuration
 }) => {
+  const { theme } = useTheme();
   const [selections, setSelections] = useState<TimelineSelection[]>([]);
   const [currentSelection, setCurrentSelection] = useState<{ start: number; end: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
