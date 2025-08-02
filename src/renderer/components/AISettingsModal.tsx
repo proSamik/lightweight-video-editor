@@ -13,7 +13,9 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
   const [settings, setSettings] = useState<AISettings>({
     selectedProvider: 'anthropic',
     descriptionPrompt: '',
-    titlePrompt: ''
+    titlePrompt: '',
+    tweetPrompt: '',
+    thumbnailPrompt: ''
   });
   const [testingConnection, setTestingConnection] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -377,6 +379,9 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
               resize: 'vertical'
             }}
           />
+          <div style={{ marginTop: '4px', fontSize: '11px', color: theme.colors.textSecondary }}>
+            🔒 System prompts include security measures to prevent override
+          </div>
         </div>
 
         <div style={{ marginBottom: '25px' }}>
@@ -399,6 +404,59 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
               resize: 'vertical'
             }}
           />
+          <div style={{ marginTop: '4px', fontSize: '11px', color: theme.colors.textSecondary }}>
+            🔒 System prompts include security measures to prevent override
+          </div>
+        </div>
+
+        <div style={{ marginBottom: '25px' }}>
+          <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+            Custom Tweet Hooks Prompt (Optional)
+          </label>
+          <textarea
+            value={settings.tweetPrompt || ''}
+            onChange={(e) => setSettings({ ...settings, tweetPrompt: e.target.value })}
+            placeholder="Custom prompt for generating Twitter video hooks... (leave empty for default)"
+            rows={4}
+            style={{
+              width: '100%',
+              padding: '10px',
+              backgroundColor: theme.colors.background,
+              color: theme.colors.text,
+              border: `1px solid ${theme.colors.border}`,
+              borderRadius: '4px',
+              fontSize: '12px',
+              resize: 'vertical'
+            }}
+          />
+          <div style={{ marginTop: '4px', fontSize: '11px', color: theme.colors.textSecondary }}>
+            Format: 4 hooks, max 4-5 lines each, 5-6 words per line for optimal Twitter engagement
+          </div>
+        </div>
+
+        <div style={{ marginBottom: '25px' }}>
+          <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+            Custom Thumbnail Ideas Prompt (Optional)
+          </label>
+          <textarea
+            value={settings.thumbnailPrompt || ''}
+            onChange={(e) => setSettings({ ...settings, thumbnailPrompt: e.target.value })}
+            placeholder="Custom prompt for generating thumbnail concept ideas... (leave empty for default)"
+            rows={4}
+            style={{
+              width: '100%',
+              padding: '10px',
+              backgroundColor: theme.colors.background,
+              color: theme.colors.text,
+              border: `1px solid ${theme.colors.border}`,
+              borderRadius: '4px',
+              fontSize: '12px',
+              resize: 'vertical'
+            }}
+          />
+          <div style={{ marginTop: '4px', fontSize: '11px', color: theme.colors.textSecondary }}>
+            Generate visual concept descriptions with colors, emotions, and CTR optimization tips
+          </div>
         </div>
 
         {/* Buttons */}
