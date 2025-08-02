@@ -11,13 +11,28 @@ import SuccessModal from './components/SuccessModal';
 import LoadingScreen from './components/LoadingScreen';
 import AISettingsModal from './components/AISettingsModal';
 import AIContentModal from './components/AIContentModal';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import ThemeToggle from './components/ThemeToggle';
+import {
+  ProjectManagerIcon,
+  NewProjectIcon,
+  SaveProjectIcon,
+  SaveProjectAsIcon,
+  SettingsIcon,
+  BotIcon,
+  MusicIcon,
+  MusicWithCheckIcon,
+  MusicExportIcon,
+  CloseIcon
+} from './components/IconComponents';
 
 interface AppState {
   captions: CaptionSegment[];
   selectedSegmentId: string | null;
 }
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
+  const { theme } = useTheme();
   const [videoFile, setVideoFile] = useState<VideoFile | null>(null);
   const [replacementAudioPath, setReplacementAudioPath] = useState<string | null>(null);
   const [captions, setCaptions] = useState<CaptionSegment[]>([]);
@@ -859,9 +874,10 @@ const App: React.FC = () => {
     <div style={{ 
       display: 'flex', 
       height: '100vh', 
-      backgroundColor: '#1a1a1a',
-      color: '#ffffff'
+      backgroundColor: theme.colors.background,
+      color: theme.colors.text
     }}>
+      <ThemeToggle />
       {/* Window Drag Region */}
       <div 
         style={{
@@ -873,8 +889,8 @@ const App: React.FC = () => {
           WebkitAppRegion: 'drag',
           zIndex: 50,
           pointerEvents: 'none', // Allow clicks to pass through to buttons
-          borderBottom: '1px solid rgba(255, 255, 255, 0.1)', // Visual indicator line
-          background: 'linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.01) 100%)', // Subtle gradient
+          borderBottom: `1px solid ${theme.colors.border}`, // Visual indicator line
+          background: `linear-gradient(180deg, ${theme.colors.surface}20 0%, ${theme.colors.surface}10 100%)`, // Subtle gradient
           cursor: 'grab'
         }}
         className="drag-region"
@@ -913,11 +929,11 @@ const App: React.FC = () => {
           alignItems: 'center',
           gap: '10px',
           fontSize: '14px',
-          color: '#ccc'
+          color: theme.colors.textSecondary
         }}>
           <span style={{ fontWeight: 'bold' }}>
             {currentProjectInfo.projectName}
-            {currentProjectInfo.isModified && <span style={{ color: '#ffc107' }}> •</span>}
+            {currentProjectInfo.isModified && <span style={{ color: theme.colors.warning }}> •</span>}
           </span>
           {currentProjectInfo.projectPath && (
             <span style={{ fontSize: '12px', opacity: 0.7 }}>
@@ -938,9 +954,9 @@ const App: React.FC = () => {
               onClick={() => setShowProjectManager(true)}
               style={{
                 padding: '6px 12px',
-                backgroundColor: '#444',
-                color: '#fff',
-                border: '1px solid #555',
+                backgroundColor: theme.colors.surface,
+                color: theme.colors.text,
+                border: `1px solid ${theme.colors.border}`,
                 borderRadius: '4px',
                 cursor: 'pointer',
                 fontSize: '11px',
@@ -950,15 +966,15 @@ const App: React.FC = () => {
               }}
               title="Project Manager (Ctrl/Cmd+O)"
             >
-              📁
+              <ProjectManagerIcon size={14} />
             </button>
             <button
               onClick={handleNewProject}
               style={{
                 padding: '6px 12px',
-                backgroundColor: '#6c757d',
-                color: '#fff',
-                border: '1px solid #545b62',
+                backgroundColor: theme.colors.secondary,
+                color: theme.colors.text,
+                border: `1px solid ${theme.colors.border}`,
                 borderRadius: '4px',
                 cursor: 'pointer',
                 fontSize: '11px',
@@ -968,15 +984,15 @@ const App: React.FC = () => {
               }}
               title="New Project (Ctrl/Cmd+N)"
             >
-              📄
+              <NewProjectIcon size={14} />
             </button>
             <button
               onClick={handleSaveProject}
               style={{
                 padding: '6px 12px',
-                backgroundColor: '#28a745',
-                color: '#fff',
-                border: '1px solid #218838',
+                backgroundColor: theme.colors.success,
+                color: theme.colors.text,
+                border: `1px solid ${theme.colors.success}`,
                 borderRadius: '4px',
                 cursor: 'pointer',
                 fontSize: '11px',
@@ -986,7 +1002,7 @@ const App: React.FC = () => {
               }}
               title="Save Project (Ctrl/Cmd+S)"
             >
-              💾
+              <SaveProjectIcon size={14} />
             </button>
           </div>
           
@@ -996,48 +1012,57 @@ const App: React.FC = () => {
               onClick={handleSaveProjectAs}
               style={{
                 padding: '6px 10px',
-                backgroundColor: '#17a2b8',
-                color: '#fff',
-                border: '1px solid #138496',
+                backgroundColor: theme.colors.info,
+                color: theme.colors.text,
+                border: `1px solid ${theme.colors.info}`,
                 borderRadius: '4px',
                 cursor: 'pointer',
-                fontSize: '11px'
+                fontSize: '11px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
               }}
               title="Save Project As (Ctrl/Cmd+Shift+S)"
             >
-              💾+
+              <SaveProjectAsIcon size={14} />
             </button>
             <button
               onClick={() => setShowAISettings(true)}
               style={{
                 padding: '6px 10px',
-                backgroundColor: '#6f42c1',
-                color: '#fff',
-                border: '1px solid #5a359e',
+                backgroundColor: theme.colors.accent,
+                color: theme.colors.text,
+                border: `1px solid ${theme.colors.accent}`,
                 borderRadius: '4px',
                 cursor: 'pointer',
-                fontSize: '11px'
+                fontSize: '11px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
               }}
               title="AI Settings (Ctrl/Cmd+,)"
             >
-              ⚙️
+              <SettingsIcon size={14} />
             </button>
             <button
               onClick={() => captions.length > 0 && setShowAIContent(true)}
               disabled={captions.length === 0}
               style={{
                 padding: '6px 10px',
-                backgroundColor: captions.length > 0 ? '#17a2b8' : '#6c757d',
-                color: '#fff',
-                border: captions.length > 0 ? '1px solid #138496' : '1px solid #545b62',
+                backgroundColor: captions.length > 0 ? theme.colors.info : theme.colors.secondary,
+                color: theme.colors.text,
+                border: captions.length > 0 ? `1px solid ${theme.colors.info}` : `1px solid ${theme.colors.border}`,
                 borderRadius: '4px',
                 cursor: captions.length > 0 ? 'pointer' : 'not-allowed',
                 fontSize: '11px',
-                opacity: captions.length > 0 ? 1 : 0.6
+                opacity: captions.length > 0 ? 1 : 0.6,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
               }}
               title="Generate AI Content (Ctrl/Cmd+G)"
             >
-              🤖
+              <BotIcon size={14} />
             </button>
           </div>
           
@@ -1048,34 +1073,40 @@ const App: React.FC = () => {
               disabled={!videoFile}
               style={{
                 padding: '6px 10px',
-                backgroundColor: videoFile ? (replacementAudioPath ? '#28a745' : '#fd7e14') : '#6c757d',
-                color: '#fff',
-                border: videoFile ? (replacementAudioPath ? '1px solid #28a745' : '1px solid #fd7e14') : '1px solid #545b62',
+                backgroundColor: videoFile ? (replacementAudioPath ? theme.colors.success : theme.colors.warning) : theme.colors.secondary,
+                color: theme.colors.text,
+                border: videoFile ? (replacementAudioPath ? `1px solid ${theme.colors.success}` : `1px solid ${theme.colors.warning}`) : `1px solid ${theme.colors.border}`,
                 borderRadius: '4px',
                 cursor: videoFile ? 'pointer' : 'not-allowed',
                 fontSize: '11px',
-                opacity: videoFile ? 1 : 0.6
+                opacity: videoFile ? 1 : 0.6,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
               }}
               title={replacementAudioPath ? `Audio Replacement Set: ${replacementAudioPath.split('/').pop()}` : "Replace Video Audio Track"}
             >
-              {replacementAudioPath ? '🎵✅' : '🎵'}
+              {replacementAudioPath ? <MusicWithCheckIcon size={14} /> : <MusicIcon size={14} />}
             </button>
             {replacementAudioPath && (
               <button
                 onClick={() => setReplacementAudioPath(null)}
                 style={{
                   padding: '4px 6px',
-                  backgroundColor: '#dc3545',
-                  color: '#fff',
-                  border: '1px solid #c82333',
+                  backgroundColor: theme.colors.error,
+                  color: theme.colors.text,
+                  border: `1px solid ${theme.colors.error}`,
                   borderRadius: '3px',
                   cursor: 'pointer',
                   fontSize: '10px',
-                  marginLeft: '2px'
+                  marginLeft: '2px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
                 }}
                 title="Clear audio replacement"
               >
-                ✕
+                <CloseIcon size={10} />
               </button>
             )}
             <button
@@ -1083,17 +1114,20 @@ const App: React.FC = () => {
               disabled={!videoFile}
               style={{
                 padding: '6px 10px',
-                backgroundColor: videoFile ? '#20c997' : '#6c757d',
-                color: '#fff',
-                border: videoFile ? '1px solid #20c997' : '1px solid #545b62',
+                backgroundColor: videoFile ? theme.colors.success : theme.colors.secondary,
+                color: theme.colors.text,
+                border: videoFile ? `1px solid ${theme.colors.success}` : `1px solid ${theme.colors.border}`,
                 borderRadius: '4px',
                 cursor: videoFile ? 'pointer' : 'not-allowed',
                 fontSize: '11px',
-                opacity: videoFile ? 1 : 0.6
+                opacity: videoFile ? 1 : 0.6,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
               }}
               title="Export Audio from Video"
             >
-              🎵↗️
+              <MusicExportIcon size={14} />
             </button>
           </div>
         </div>
@@ -1117,7 +1151,7 @@ const App: React.FC = () => {
             flex: '1 1 60%', 
             display: 'flex', 
             flexDirection: 'column',
-            borderRight: '1px solid #333',
+            borderRight: `1px solid ${theme.colors.border}`,
             minHeight: 0
           }}>
             <VideoPanel
@@ -1231,6 +1265,14 @@ const App: React.FC = () => {
         initialContent={generatedContent || undefined}
       />
     </div>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   );
 };
 
