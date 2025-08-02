@@ -192,22 +192,22 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   return (
     <div style={{
       height: `${TIMELINE_HEIGHT}px`,
-      backgroundColor: '#2a2a2a',
-      borderTop: '1px solid #444',
+              backgroundColor: theme.colors.surface,
+              borderTop: `1px solid ${theme.colors.border}`,
       position: 'relative',
       overflow: 'hidden'
     }}>
       {/* Timeline Header */}
       <div style={{
         height: '24px',
-        backgroundColor: '#333',
+        backgroundColor: theme.colors.background,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '0 12px',
         fontSize: '12px',
-        color: '#ccc',
-        borderBottom: '1px solid #444'
+                  color: theme.colors.textSecondary,
+                  borderBottom: `1px solid ${theme.colors.border}`
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           {/* Play/Pause Button */}
@@ -234,7 +234,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
             </button>
           )}
           <span>Timeline</span>
-          <span style={{ color: '#888' }}>{formatTime(currentTime)} / {formatTime(totalDuration)}</span>
+          <span style={{ color: theme.colors.textSecondary }}>{formatTime(currentTime)} / {formatTime(totalDuration)}</span>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <button
@@ -418,7 +418,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
           left: 0,
           right: 0,
           height: `${SCRUBBER_HEIGHT}px`,
-          backgroundColor: '#333'
+          backgroundColor: theme.colors.background
         }}>
           {Array.from({ length: 11 }, (_, i) => {
             const time = (i / 10) * totalDuration;
