@@ -2,7 +2,10 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 
 const electronAPI = {
   selectVideoFile: () => ipcRenderer.invoke('select-video-file'),
+  selectAudioFile: () => ipcRenderer.invoke('select-audio-file'),
   exportVideo: (outputPath: string) => ipcRenderer.invoke('export-video', outputPath),
+  exportAudio: (videoPath: string, outputName?: string) => ipcRenderer.invoke('export-audio', videoPath, outputName),
+  replaceAudioTrack: (videoPath: string, audioPath: string, outputName?: string) => ipcRenderer.invoke('replace-audio-track', videoPath, audioPath, outputName),
   getVideoMetadata: (videoPath: string) => ipcRenderer.invoke('get-video-metadata', videoPath),
   extractAudio: (videoPath: string) => ipcRenderer.invoke('extract-audio', videoPath),
   transcribeAudio: (audioPath: string) => ipcRenderer.invoke('transcribe-audio', audioPath),
@@ -10,8 +13,8 @@ const electronAPI = {
     ipcRenderer.invoke('transcribe-audio-segments', audioPath, timelineSelections),
   checkDependencies: () => ipcRenderer.invoke('check-dependencies'),
   testWhisperInstallation: () => ipcRenderer.invoke('test-whisper-installation'),
-  renderVideoWithCaptions: (videoPath: string, captionsData: any[], outputPath: string, exportSettings?: any) => 
-    ipcRenderer.invoke('render-video-with-captions', videoPath, captionsData, outputPath, exportSettings),
+  renderVideoWithCaptions: (videoPath: string, captionsData: any[], outputPath: string, exportSettings?: any, replacementAudioPath?: string) => 
+    ipcRenderer.invoke('render-video-with-captions', videoPath, captionsData, outputPath, exportSettings, replacementAudioPath),
   handleFileDrop: (filePath: string) => ipcRenderer.invoke('handle-file-drop', filePath),
   onFileDropped: (callback: (filePath: string) => void) => {
     ipcRenderer.on('file-dropped', (_event, filePath) => callback(filePath));
