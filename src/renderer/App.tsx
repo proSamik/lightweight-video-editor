@@ -4,6 +4,7 @@ import VideoPanel from './components/VideoPanel';
 import TimelinePanel from './components/TimelinePanel';
 import UnifiedTimeline from './components/UnifiedTimeline';
 import StylingPanel from './components/StylingPanel';
+import TabbedRightPanel from './components/TabbedRightPanel';
 import TranscriptionSettings from './components/TranscriptionSettings';
 import ProjectManagerModal from './components/ProjectManager';
 import SuccessModal from './components/SuccessModal';
@@ -18,10 +19,12 @@ interface AppState {
 
 const App: React.FC = () => {
   const [videoFile, setVideoFile] = useState<VideoFile | null>(null);
+  const [replacementAudioPath, setReplacementAudioPath] = useState<string | null>(null);
   const [captions, setCaptions] = useState<CaptionSegment[]>([]);
   const [originalCaptions, setOriginalCaptions] = useState<CaptionSegment[]>([]);
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [loadingProgress, setLoadingProgress] = useState<number | undefined>(undefined);
@@ -466,7 +469,8 @@ const App: React.FC = () => {
           tempVideoPath,
           captions,
           outputPath,
-          exportSettings
+          exportSettings,
+          replacementAudioPath || undefined
         );
         
         // Clean up temp file (note: this would need to be handled by the main process)
@@ -477,7 +481,8 @@ const App: React.FC = () => {
           videoFile.path,
           captions,
           outputPath,
-          exportSettings
+          exportSettings,
+          replacementAudioPath || undefined
         );
       }
 
@@ -501,6 +506,7 @@ const App: React.FC = () => {
       videoFile,
       captions,
       timeline: [], // Empty for now, could be used for timeline selections
+      replacementAudioPath,
       lastModified: Date.now(),
       description: generatedContent?.description,
       title: generatedContent?.titles?.[0]?.title,
@@ -583,6 +589,7 @@ const App: React.FC = () => {
     setVideoFile(projectData.videoFile);
     setCaptions(projectData.captions);
     setOriginalCaptions([...projectData.captions]);
+    setReplacementAudioPath(projectData.replacementAudioPath || null);
     setSelectedSegmentId(null);
     setCurrentTime(0);
 
@@ -653,6 +660,68 @@ const App: React.FC = () => {
     
     // Mark project as modified
     markProjectModified();
+  };
+
+  const handlePlayPause = () => {
+    if ((window as any).videoPlayPause) {
+      (window as any).videoPlayPause();
+    }
+    // Note: isPlaying state will be updated by the video's play/pause events
+  };
+
+  // Setup video play state listener
+  useEffect(() => {
+    (window as any).setVideoPlaying = setIsPlaying;
+    
+    return () => {
+      delete (window as any).setVideoPlaying;
+    };
+  }, []);
+
+  const handleAudioImport = async () => {
+    if (!videoFile) {
+      alert('Please load a video file first to replace its audio track.');
+      return;
+    }
+
+    try {
+      const audioPath = await window.electronAPI.selectAudioFile();
+      if (audioPath) {
+        const proceed = confirm(`Replace audio track in "${videoFile.name}" with:\n"${audioPath}"\n\nThe audio will be replaced during video rendering/export. Continue?`);
+        
+        if (proceed) {
+          setReplacementAudioPath(audioPath);
+          alert(`✅ Audio replacement set!\n\nFile: ${audioPath}\n\nThe new audio will be used when you export the video.`);
+        }
+      }
+    } catch (error) {
+      console.error('Error selecting audio file:', error);
+      alert('Failed to select audio file');
+    }
+  };
+
+  const handleAudioExport = async () => {
+    if (!videoFile) {
+      alert('No video file loaded to extract audio from.');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setLoadingMessage('Extracting audio...');
+      
+      const audioPath = await window.electronAPI.exportAudio(videoFile.path, `${videoFile.name}_audio.mp3`);
+      if (audioPath) {
+        setExportedFilePath(audioPath);
+        setShowSuccessModal(true);
+      }
+    } catch (error) {
+      console.error('Error exporting audio:', error);
+      alert(`Failed to export audio: ${error}`);
+    } finally {
+      setIsLoading(false);
+      setLoadingMessage('');
+    }
   };
 
   const handleSplitSegment = (segmentId: string, splitTime: number) => {
@@ -971,6 +1040,62 @@ const App: React.FC = () => {
               🤖
             </button>
           </div>
+          
+          {/* Audio Actions */}
+          <div style={{ display: 'flex', gap: '4px' }}>
+            <button
+              onClick={handleAudioImport}
+              disabled={!videoFile}
+              style={{
+                padding: '6px 10px',
+                backgroundColor: videoFile ? (replacementAudioPath ? '#28a745' : '#fd7e14') : '#6c757d',
+                color: '#fff',
+                border: videoFile ? (replacementAudioPath ? '1px solid #28a745' : '1px solid #fd7e14') : '1px solid #545b62',
+                borderRadius: '4px',
+                cursor: videoFile ? 'pointer' : 'not-allowed',
+                fontSize: '11px',
+                opacity: videoFile ? 1 : 0.6
+              }}
+              title={replacementAudioPath ? `Audio Replacement Set: ${replacementAudioPath.split('/').pop()}` : "Replace Video Audio Track"}
+            >
+              {replacementAudioPath ? '🎵✅' : '🎵'}
+            </button>
+            {replacementAudioPath && (
+              <button
+                onClick={() => setReplacementAudioPath(null)}
+                style={{
+                  padding: '4px 6px',
+                  backgroundColor: '#dc3545',
+                  color: '#fff',
+                  border: '1px solid #c82333',
+                  borderRadius: '3px',
+                  cursor: 'pointer',
+                  fontSize: '10px',
+                  marginLeft: '2px'
+                }}
+                title="Clear audio replacement"
+              >
+                ✕
+              </button>
+            )}
+            <button
+              onClick={handleAudioExport}
+              disabled={!videoFile}
+              style={{
+                padding: '6px 10px',
+                backgroundColor: videoFile ? '#20c997' : '#6c757d',
+                color: '#fff',
+                border: videoFile ? '1px solid #20c997' : '1px solid #545b62',
+                borderRadius: '4px',
+                cursor: videoFile ? 'pointer' : 'not-allowed',
+                fontSize: '11px',
+                opacity: videoFile ? 1 : 0.6
+              }}
+              title="Export Audio from Video"
+            >
+              🎵↗️
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1004,17 +1129,19 @@ const App: React.FC = () => {
               onVideoDropped={handleVideoDropped}
               selectedSegmentId={selectedSegmentId}
               onCaptionUpdate={handleCaptionUpdate}
+              onPlayPause={handlePlayPause}
+              isPlaying={isPlaying}
             />
           </div>
 
-          {/* Right Panel - Styling Controls */}
+          {/* Right Panel - Tabbed Controls */}
           <div style={{ 
             flex: '1 1 40%', 
             minWidth: '350px',
             maxWidth: '450px',
             minHeight: 0
           }}>
-            <StylingPanel
+            <TabbedRightPanel
               selectedSegment={captions.find(c => c.id === selectedSegmentId) || null}
               onSegmentUpdate={handleCaptionUpdate}
               videoFile={videoFile}
@@ -1023,6 +1150,10 @@ const App: React.FC = () => {
               onApplyToAll={handleApplyToAll}
               onTimeSeek={setCurrentTime}
               transcriptionStatus={transcriptionStatus}
+              selectedSegmentId={selectedSegmentId}
+              onSegmentSelect={setSelectedSegmentId}
+              onSegmentDelete={handleCaptionDelete}
+              currentTime={currentTime}
             />
           </div>
         </div>
@@ -1039,6 +1170,8 @@ const App: React.FC = () => {
           videoFile={videoFile}
           onReTranscribeSegment={handleReTranscribeSegment}
           onSplitSegment={handleSplitSegment}
+          onPlayPause={handlePlayPause}
+          isPlaying={isPlaying}
         />
       </div>
 
