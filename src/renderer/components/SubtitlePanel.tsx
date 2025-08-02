@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CaptionSegment } from '../../types';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface SubtitlePanelProps {
   captions: CaptionSegment[];
@@ -20,6 +21,7 @@ const SubtitlePanel: React.FC<SubtitlePanelProps> = ({
   onTimeSeek,
   currentTime,
 }) => {
+  const { theme } = useTheme();
   const [searchTerm, setSearchTerm] = useState('');
   const [replaceTerm, setReplaceTerm] = useState('');
   const [showSearchReplace, setShowSearchReplace] = useState(false);
@@ -144,8 +146,8 @@ const SubtitlePanel: React.FC<SubtitlePanelProps> = ({
           <span
             key={index}
             style={{
-              backgroundColor: '#ffff00',
-              color: '#000',
+              backgroundColor: theme.colors.primary,
+              color: theme.colors.text,
               padding: '1px 2px',
               borderRadius: '2px',
               fontWeight: 'bold'
@@ -174,8 +176,8 @@ const SubtitlePanel: React.FC<SubtitlePanelProps> = ({
       {/* Header */}
       <div style={{
         padding: '16px',
-        borderBottom: '1px solid #444',
-        backgroundColor: '#333'
+        borderBottom: `1px solid ${theme.colors.border}`,
+        backgroundColor: theme.colors.background
       }}>
         <div style={{
           display: 'flex',
@@ -183,16 +185,16 @@ const SubtitlePanel: React.FC<SubtitlePanelProps> = ({
           alignItems: 'center',
           marginBottom: '12px'
         }}>
-          <h3 style={{ margin: 0, fontSize: '16px', color: '#fff' }}>
+          <h3 style={{ margin: 0, fontSize: '16px', color: theme.colors.text }}>
             Subtitle Editor
           </h3>
           <button
             onClick={() => setShowSearchReplace(!showSearchReplace)}
             style={{
               padding: '6px 12px',
-              backgroundColor: showSearchReplace ? '#007acc' : '#555',
-              color: '#fff',
-              border: '1px solid #666',
+              backgroundColor: showSearchReplace ? theme.colors.primary : theme.colors.surface,
+              color: theme.colors.text,
+              border: `1px solid ${theme.colors.border}`,
               borderRadius: '4px',
               cursor: 'pointer',
               fontSize: '12px',
@@ -209,8 +211,8 @@ const SubtitlePanel: React.FC<SubtitlePanelProps> = ({
         {/* Search & Replace Panel */}
         {showSearchReplace && (
           <div style={{
-            backgroundColor: '#1a1a1a',
-            border: '1px solid #555',
+            backgroundColor: theme.colors.background,
+            border: `1px solid ${theme.colors.border}`,
             borderRadius: '6px',
             padding: '12px'
           }}>
@@ -224,10 +226,10 @@ const SubtitlePanel: React.FC<SubtitlePanelProps> = ({
                 style={{
                   flex: 1,
                   padding: '6px 8px',
-                  backgroundColor: '#2a2a2a',
-                  border: '1px solid #555',
+                  backgroundColor: theme.colors.background,
+                  border: `1px solid ${theme.colors.border}`,
                   borderRadius: '4px',
-                  color: '#fff',
+                  color: theme.colors.text,
                   fontSize: '12px'
                 }}
               />
@@ -236,9 +238,9 @@ const SubtitlePanel: React.FC<SubtitlePanelProps> = ({
                 disabled={searchResults.length === 0}
                 style={{
                   padding: '6px 8px',
-                  backgroundColor: '#555',
-                  color: '#fff',
-                  border: '1px solid #666',
+                  backgroundColor: theme.colors.surface,
+                  color: theme.colors.text,
+                  border: `1px solid ${theme.colors.border}`,
                   borderRadius: '4px',
                   cursor: searchResults.length > 0 ? 'pointer' : 'not-allowed',
                   fontSize: '12px',
@@ -252,9 +254,9 @@ const SubtitlePanel: React.FC<SubtitlePanelProps> = ({
                 disabled={searchResults.length === 0}
                 style={{
                   padding: '6px 8px',
-                  backgroundColor: '#555',
-                  color: '#fff',
-                  border: '1px solid #666',
+                  backgroundColor: theme.colors.surface,
+                  color: theme.colors.text,
+                  border: `1px solid ${theme.colors.border}`,
                   borderRadius: '4px',
                   cursor: searchResults.length > 0 ? 'pointer' : 'not-allowed',
                   fontSize: '12px',
@@ -274,10 +276,10 @@ const SubtitlePanel: React.FC<SubtitlePanelProps> = ({
                 style={{
                   flex: 1,
                   padding: '6px 8px',
-                  backgroundColor: '#2a2a2a',
-                  border: '1px solid #555',
+                  backgroundColor: theme.colors.background,
+                  border: `1px solid ${theme.colors.border}`,
                   borderRadius: '4px',
-                  color: '#fff',
+                  color: theme.colors.text,
                   fontSize: '12px'
                 }}
               />
@@ -290,9 +292,9 @@ const SubtitlePanel: React.FC<SubtitlePanelProps> = ({
                 disabled={!selectedSegmentId || !searchTerm.trim()}
                 style={{
                   padding: '6px 12px',
-                  backgroundColor: '#28a745',
-                  color: '#fff',
-                  border: '1px solid #218838',
+                  backgroundColor: theme.colors.success,
+                  color: theme.colors.text,
+                  border: `1px solid ${theme.colors.success}`,
                   borderRadius: '4px',
                   cursor: selectedSegmentId && searchTerm.trim() ? 'pointer' : 'not-allowed',
                   fontSize: '12px',
@@ -306,9 +308,9 @@ const SubtitlePanel: React.FC<SubtitlePanelProps> = ({
                 disabled={searchResults.length === 0 || !replaceTerm.trim()}
                 style={{
                   padding: '6px 12px',
-                  backgroundColor: '#dc3545',
-                  color: '#fff',
-                  border: '1px solid #c82333',
+                  backgroundColor: theme.colors.error,
+                  color: theme.colors.text,
+                  border: `1px solid ${theme.colors.error}`,
                   borderRadius: '4px',
                   cursor: searchResults.length > 0 && replaceTerm.trim() ? 'pointer' : 'not-allowed',
                   fontSize: '12px',
@@ -322,7 +324,7 @@ const SubtitlePanel: React.FC<SubtitlePanelProps> = ({
             {searchResults.length > 0 && (
               <div style={{
                 fontSize: '11px',
-                color: '#888',
+                color: theme.colors.textSecondary,
                 textAlign: 'center'
               }}>
                 {currentSearchIndex + 1} of {searchResults.length} matches
@@ -341,7 +343,7 @@ const SubtitlePanel: React.FC<SubtitlePanelProps> = ({
         {captions.length === 0 ? (
           <div style={{
             textAlign: 'center',
-            color: '#888',
+            color: theme.colors.textSecondary,
             marginTop: '40px',
             fontSize: '14px'
           }}>
@@ -362,12 +364,12 @@ const SubtitlePanel: React.FC<SubtitlePanelProps> = ({
                 style={{
                   marginBottom: '8px',
                   padding: '12px',
-                  backgroundColor: isSelected ? '#444' : isCurrent ? '#3a3a3a' : '#333',
-                  border: isSelected ? '2px solid #007acc' : isCurrent ? '2px solid #28a745' : '1px solid #555',
+                  backgroundColor: isSelected ? theme.colors.surface : isCurrent ? theme.colors.background : theme.colors.background,
+                  border: isSelected ? `2px solid ${theme.colors.primary}` : isCurrent ? `2px solid ${theme.colors.success}` : `1px solid ${theme.colors.border}`,
                   borderRadius: '6px',
                   cursor: 'pointer',
                   transition: 'all 0.2s ease',
-                  outline: hasSearchMatch ? '2px solid #ffff00' : 'none'
+                  outline: hasSearchMatch ? `2px solid ${theme.colors.primary}` : 'none'
                 }}
                 onClick={() => {
                   onSegmentSelect(caption.id);
@@ -387,21 +389,21 @@ const SubtitlePanel: React.FC<SubtitlePanelProps> = ({
                   }}>
                     <span style={{
                       fontSize: '11px',
-                      color: '#888',
+                      color: theme.colors.textSecondary,
                       fontFamily: 'monospace'
                     }}>
                       #{index + 1}
                     </span>
                     <span style={{
                       fontSize: '11px',
-                      color: '#aaa'
+                      color: theme.colors.textSecondary
                     }}>
                       {formatTime(caption.startTime)} → {formatTime(caption.endTime)}
                     </span>
                     <span style={{
                       fontSize: '10px',
-                      color: '#888',
-                      backgroundColor: '#1a1a1a',
+                      color: theme.colors.textSecondary,
+                      backgroundColor: theme.colors.background,
                       padding: '2px 6px',
                       borderRadius: '3px'
                     }}>
@@ -417,7 +419,7 @@ const SubtitlePanel: React.FC<SubtitlePanelProps> = ({
                     style={{
                       background: 'none',
                       border: 'none',
-                      color: '#ff6b6b',
+                      color: theme.colors.error,
                       cursor: 'pointer',
                       fontSize: '14px',
                       padding: '4px',
@@ -437,10 +439,10 @@ const SubtitlePanel: React.FC<SubtitlePanelProps> = ({
                     width: '100%',
                     minHeight: '60px',
                     padding: '8px',
-                    backgroundColor: '#2a2a2a',
-                    border: '1px solid #555',
+                    backgroundColor: theme.colors.background,
+                    border: `1px solid ${theme.colors.border}`,
                     borderRadius: '4px',
-                    color: '#fff',
+                    color: theme.colors.text,
                     fontSize: '13px',
                     lineHeight: '1.4',
                     resize: 'vertical',
@@ -454,7 +456,7 @@ const SubtitlePanel: React.FC<SubtitlePanelProps> = ({
                   <div style={{
                     marginTop: '8px',
                     padding: '6px',
-                    backgroundColor: '#1a1a1a',
+                    backgroundColor: theme.colors.background,
                     borderRadius: '4px',
                     fontSize: '12px',
                     lineHeight: '1.4'
