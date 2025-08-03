@@ -178,7 +178,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
   // Main panel styles
   const panelStyles: React.CSSProperties = {
     height: '100%',
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.background,
     borderRadius: borderRadius.lg,
     border: `1px solid ${theme.colors.border}`,
     overflow: 'hidden',
