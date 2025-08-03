@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { CaptionSegment, GeneratedContent } from '../../types';
+import { FiCheckCircle } from 'react-icons/fi';
 
 interface AIContentModalProps {
   isOpen: boolean;
@@ -608,7 +609,9 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
               color: theme.colors.text,
               textAlign: 'center'
             }}>
-              <div style={{ fontSize: '48px', marginBottom: '20px' }}>✅</div>
+              <div style={{ marginBottom: '20px' }}>
+                <FiCheckCircle size={48} color={theme.colors.text} />
+              </div>
               <h3 style={{ margin: '0 0 15px 0', fontSize: '18px', fontWeight: 'bold' }}>
                 SRT Export Successful!
               </h3>
