@@ -1,7 +1,17 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { CaptionSegment } from '../../types';
 import { useTheme } from '../contexts/ThemeContext';
-import { FiScissors } from 'react-icons/fi';
+import { 
+  FiPlay, 
+  FiPause, 
+  FiSkipBack, 
+  FiSkipForward, 
+  FiRotateCcw, 
+  FiRotateCw, 
+  FiTrash2,
+  FiMaximize2
+} from 'react-icons/fi';
+import WaveSurfer from 'wavesurfer.js';
 
 interface UnifiedTimelineProps {
   captions: CaptionSegment[];
@@ -13,11 +23,18 @@ interface UnifiedTimelineProps {
   onCaptionUpdate: (segmentId: string, updates: Partial<CaptionSegment>) => void;
   videoFile?: { path: string; name: string; duration?: number } | null;
   onReTranscribeSegment?: (startTime: number, endTime: number) => void;
-  onSplitSegment?: (segmentId: string, splitTime: number) => void;
   onPlayPause?: () => void;
   isPlaying?: boolean;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
 }
 
+/**
+ * UnifiedTimeline component - A comprehensive timeline interface for video editing
+ * Features: audio waveform visualization, caption segments, playback controls, and timeline scrubbing
+ */
 const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   captions,
   currentTime,
@@ -28,22 +45,25 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   onCaptionUpdate,
   videoFile,
   onReTranscribeSegment,
-  onSplitSegment,
   onPlayPause,
   isPlaying = false,
+  onUndo,
+  onRedo,
+  canUndo = false,
+  canRedo = false,
 }) => {
   const { theme } = useTheme();
   const timelineRef = useRef<HTMLDivElement>(null);
+  const waveformRef = useRef<HTMLDivElement>(null);
+  const wavesurferRef = useRef<WaveSurfer | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartX, setDragStartX] = useState(0);
   const [hoveredSegmentId, setHoveredSegmentId] = useState<string | null>(null);
-  const [splitPreviewTime, setSplitPreviewTime] = useState<number | null>(null);
-  const [waveformData, setWaveformData] = useState<number[]>([]);
   const [contextMenu, setContextMenu] = useState<{x: number, y: number, segmentId: string} | null>(null);
-  const [splitMode, setSplitMode] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{segmentId: string, text: string} | null>(null);
+  const [isWaveformLoading, setIsWaveformLoading] = useState(false);
 
-  // Calculate timeline dimensions
+  // Timeline dimensions
   const TIMELINE_HEIGHT = 120;
   const WAVEFORM_HEIGHT = 60;
   const CAPTION_TRACK_HEIGHT = 40;
@@ -56,15 +76,20 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
       ? Math.max(...captions.map(c => c.endTime))
       : 60000; // Default 1 minute
 
-  // Format time display
+  /**
+   * Format time display in MM:SS.ms format
+   */
   const formatTime = (ms: number) => {
-    const seconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+    const totalSeconds = ms / 1000;
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = Math.floor(totalSeconds % 60);
+    const milliseconds = Math.floor((ms % 1000) / 10);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(2, '0')}`;
   };
 
-  // Handle timeline click/drag
+  /**
+   * Handle timeline click/drag for seeking
+   */
   const handleTimelineMouseDown = (e: React.MouseEvent) => {
     if (!timelineRef.current) return;
     
@@ -73,23 +98,14 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
     const percentage = clickX / rect.width;
     const seekTime = percentage * totalDuration;
     
-    // If in split mode and clicked on a segment, split it
-    if (splitMode) {
-      const clickedSegment = captions.find(segment => 
-        seekTime >= segment.startTime && seekTime <= segment.endTime
-      );
-      if (clickedSegment && onSplitSegment) {
-        onSplitSegment(clickedSegment.id, seekTime);
-        setSplitMode(false);
-        return;
-      }
-    }
-    
     setIsDragging(true);
     setDragStartX(clickX);
     onTimeSeek(seekTime);
   };
 
+  /**
+   * Handle timeline mouse movement for dragging
+   */
   const handleTimelineMouseMove = useCallback((e: MouseEvent) => {
     if (!isDragging || !timelineRef.current) return;
     
@@ -101,11 +117,14 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
     onTimeSeek(seekTime);
   }, [isDragging, totalDuration, onTimeSeek]);
 
+  /**
+   * Handle timeline mouse up to stop dragging
+   */
   const handleTimelineMouseUp = useCallback(() => {
     setIsDragging(false);
   }, []);
 
-  // Set up mouse event listeners
+  // Set up mouse event listeners for dragging
   useEffect(() => {
     if (isDragging) {
       document.addEventListener('mousemove', handleTimelineMouseMove);
@@ -118,7 +137,9 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
     };
   }, [isDragging, handleTimelineMouseMove, handleTimelineMouseUp]);
 
-  // Keyboard shortcuts
+  /**
+   * Handle keyboard shortcuts
+   */
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't trigger shortcuts if user is typing in an input field
@@ -126,14 +147,10 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
       const isInputField = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.contentEditable === 'true';
       
       if (isInputField) {
-        return; // Let the input field handle the keypress
+        return;
       }
 
-      if (e.key === 's' && !e.metaKey && !e.ctrlKey) {
-        e.preventDefault();
-        setSplitMode(!splitMode);
-      } else if (e.key === 'Escape') {
-        setSplitMode(false);
+      if (e.key === 'Escape') {
         setContextMenu(null);
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedSegmentId) {
@@ -150,6 +167,16 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
         if (onPlayPause) {
           onPlayPause();
         }
+      } else if (e.key === 'z' && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
+        e.preventDefault();
+        if (onUndo && canUndo) {
+          onUndo();
+        }
+      } else if (e.key === 'z' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
+        e.preventDefault();
+        if (onRedo && canRedo) {
+          onRedo();
+        }
       }
     };
 
@@ -164,103 +191,334 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('click', handleClick);
     };
-  }, [splitMode, selectedSegmentId, onSegmentDelete]);
+  }, [selectedSegmentId, onSegmentDelete, onPlayPause, onUndo, onRedo, canUndo, canRedo]);
 
-  // Generate simple waveform (placeholder)
+  /**
+   * Initialize WaveSurfer for audio waveform generation
+   */
   useEffect(() => {
-    if (videoFile) {
-      // Generate a simple waveform simulation
-      const points = 200;
-      const data = Array.from({ length: points }, (_, i) => {
-        return Math.sin(i * 0.1) * 0.5 + Math.random() * 0.3 + 0.2;
-      });
-      setWaveformData(data);
+    // Clean up existing WaveSurfer instance if videoFile changes
+    if (wavesurferRef.current) {
+      wavesurferRef.current.destroy();
+      wavesurferRef.current = null;
     }
-  }, [videoFile]);
 
-  // Handle segment operations
+    if (videoFile && waveformRef.current) {
+      setIsWaveformLoading(true);
+      
+      // Initialize WaveSurfer
+      const wavesurfer = WaveSurfer.create({
+        container: waveformRef.current,
+        waveColor: theme.colors.primary,
+        progressColor: theme.colors.accent,
+        cursorColor: 'transparent',
+        barWidth: 2,
+        barGap: 1,
+        barRadius: 2,
+        height: WAVEFORM_HEIGHT,
+        normalize: true,
+        fillParent: true,
+        hideScrollbar: true,
+        interact: false, // Disable interaction since we handle timeline scrubbing
+      });
+
+      wavesurferRef.current = wavesurfer;
+
+      // Load audio from video file
+      wavesurfer.load(`file://${videoFile.path}`);
+
+      // Handle waveform ready event
+      wavesurfer.on('ready', () => {
+        setIsWaveformLoading(false);
+      });
+
+      // Handle errors
+      wavesurfer.on('error', (err) => {
+        setIsWaveformLoading(false);
+        // No fallback - just log the error
+      });
+
+      return () => {
+        if (wavesurferRef.current) {
+          wavesurferRef.current.destroy();
+          wavesurferRef.current = null;
+        }
+        setIsWaveformLoading(false);
+      };
+    }
+    
+    // Return empty cleanup function if conditions are not met
+    return () => {};
+  }, [videoFile?.path]); // Only depend on video file path, not theme colors
+
+  /**
+   * Update WaveSurfer colors when theme changes (without re-initializing)
+   */
+  useEffect(() => {
+    if (wavesurferRef.current) {
+      // Update colors without re-initializing
+      wavesurferRef.current.setOptions({
+        waveColor: theme.colors.primary,
+        progressColor: theme.colors.accent,
+      });
+    }
+  }, [theme.colors.primary, theme.colors.accent]);
+
+  /**
+   * Update waveform progress based on current time
+   */
+  useEffect(() => {
+    if (wavesurferRef.current && totalDuration > 0) {
+      const progress = currentTime / totalDuration;
+      wavesurferRef.current.setTime(progress * wavesurferRef.current.getDuration());
+    }
+  }, [currentTime, totalDuration]);
+
+  /**
+   * Handle segment double click to select and seek
+   */
   const handleSegmentDoubleClick = (segment: CaptionSegment) => {
     onSegmentSelect(segment.id);
     onTimeSeek(segment.startTime);
   };
 
-  const handleSegmentSplit = (segmentId: string, splitTime: number) => {
-    if (onSplitSegment) {
-      onSplitSegment(segmentId, splitTime);
-    }
-  };
+
 
   return (
     <div style={{
       height: `${TIMELINE_HEIGHT}px`,
-              backgroundColor: theme.colors.surface,
-              borderTop: `1px solid ${theme.colors.border}`,
+      backgroundColor: theme.colors.surface,
+      borderTop: `1px solid ${theme.colors.border}`,
       position: 'relative',
       overflow: 'hidden'
     }}>
-      {/* Timeline Header */}
+      <style>
+        {`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}
+      </style>
+      {/* Timeline Header with Controls */}
       <div style={{
-        height: '24px',
+        height: '32px',
         backgroundColor: theme.colors.background,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '0 12px',
         fontSize: '12px',
-                  color: theme.colors.textSecondary,
-                  borderBottom: `1px solid ${theme.colors.border}`
+        color: theme.colors.textSecondary,
+        borderBottom: `1px solid ${theme.colors.border}`
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        {/* Left side - Time Display */}
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <span style={{ color: theme.colors.textSecondary, fontFamily: 'monospace' }}>
+            {formatTime(currentTime)} / {formatTime(totalDuration)}
+          </span>
+        </div>
+
+        {/* Center - Playback Controls */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          {/* Skip Backward */}
+          <button
+            onClick={() => onTimeSeek(Math.max(0, currentTime - 5000))}
+            style={{
+              padding: '4px',
+              backgroundColor: 'transparent',
+              color: theme.colors.textSecondary,
+              border: 'none',
+              borderRadius: '3px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+              e.currentTarget.style.color = theme.colors.text;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = theme.colors.textSecondary;
+            }}
+            title="Skip Backward 5s"
+          >
+            <FiSkipBack size={14} />
+          </button>
+
           {/* Play/Pause Button */}
           {onPlayPause && (
             <button
               onClick={onPlayPause}
               style={{
-                padding: '4px 8px',
-                backgroundColor: isPlaying ? theme.colors.success : theme.colors.secondary,
-                color: theme.colors.text,
-                border: `1px solid ${theme.colors.border}`,
-                borderRadius: '3px',
+                padding: '6px',
+                backgroundColor: isPlaying ? theme.colors.success : theme.colors.primary,
+                color: theme.colors.primaryForeground,
+                border: 'none',
+                borderRadius: '4px',
                 cursor: 'pointer',
-                fontSize: '12px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px',
-                minWidth: '60px',
-                justifyContent: 'center'
+                justifyContent: 'center',
+                transition: 'all 0.2s ease',
+                minWidth: '32px',
+                minHeight: '32px'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = isPlaying ? theme.colors.successHover : theme.colors.primaryHover;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = isPlaying ? theme.colors.success : theme.colors.primary;
               }}
               title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
             >
-              {isPlaying ? '⏸️ Pause' : '▶️ Play'}
+              {isPlaying ? <FiPause size={16} /> : <FiPlay size={16} />}
             </button>
           )}
-          <span>Timeline</span>
-          <span style={{ color: theme.colors.textSecondary }}>{formatTime(currentTime)} / {formatTime(totalDuration)}</span>
-        </div>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+
+          {/* Skip Forward */}
           <button
-            onClick={() => setSplitMode(!splitMode)}
+            onClick={() => onTimeSeek(Math.min(totalDuration, currentTime + 5000))}
             style={{
-              padding: '4px 8px',
-              backgroundColor: splitMode ? theme.colors.primary : theme.colors.surface,
-              color: theme.colors.text,
-              border: `1px solid ${theme.colors.border}`,
+              padding: '4px',
+              backgroundColor: 'transparent',
+              color: theme.colors.textSecondary,
+              border: 'none',
               borderRadius: '3px',
               cursor: 'pointer',
-              fontSize: '10px'
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s ease'
             }}
-            title="Split Mode (S)"
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+              e.currentTarget.style.color = theme.colors.text;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = theme.colors.textSecondary;
+            }}
+            title="Skip Forward 5s"
           >
-            <FiScissors size={12} style={{ marginRight: '4px' }} />
-            {splitMode ? 'Split ON' : 'Split'}
+            <FiSkipForward size={14} />
           </button>
+        </div>
+
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {/* Undo/Redo Controls */}
+          <button
+            onClick={onUndo}
+            disabled={!canUndo}
+            style={{
+              padding: '4px',
+              backgroundColor: 'transparent',
+              color: canUndo ? theme.colors.textSecondary : theme.colors.textMuted,
+              border: 'none',
+              borderRadius: '3px',
+              cursor: canUndo ? 'pointer' : 'not-allowed',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              if (canUndo) {
+                e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+                e.currentTarget.style.color = theme.colors.text;
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (canUndo) {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.color = theme.colors.textSecondary;
+              }
+            }}
+            title="Undo (Ctrl+Z)"
+          >
+            <FiRotateCcw size={14} />
+          </button>
+
+          <button
+            onClick={onRedo}
+            disabled={!canRedo}
+            style={{
+              padding: '4px',
+              backgroundColor: 'transparent',
+              color: canRedo ? theme.colors.textSecondary : theme.colors.textMuted,
+              border: 'none',
+              borderRadius: '3px',
+              cursor: canRedo ? 'pointer' : 'not-allowed',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              if (canRedo) {
+                e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+                e.currentTarget.style.color = theme.colors.text;
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (canRedo) {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.color = theme.colors.textSecondary;
+              }
+            }}
+            title="Redo (Ctrl+Shift+Z)"
+          >
+            <FiRotateCw size={14} />
+          </button>
+
+          {/* Separator */}
           <div style={{
-            width: '8px',
-            height: '8px',
-            borderRadius: '50%',
-            backgroundColor: theme.colors.success
+            width: '1px',
+            height: '16px',
+            backgroundColor: theme.colors.border,
+            margin: '0 4px'
           }} />
-          <span style={{ fontSize: '11px' }}>Live</span>
+
+          {/* Fullscreen Button */}
+          <button
+            onClick={() => {
+              // Request fullscreen for the video preview container
+              const videoPreviewContainer = document.querySelector('[data-video-preview]');
+              if (videoPreviewContainer) {
+                if (document.fullscreenElement) {
+                  document.exitFullscreen();
+                } else {
+                  videoPreviewContainer.requestFullscreen();
+                }
+              }
+            }}
+            style={{
+              padding: '4px',
+              backgroundColor: 'transparent',
+              color: theme.colors.textSecondary,
+              border: 'none',
+              borderRadius: '3px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+              e.currentTarget.style.color = theme.colors.text;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = theme.colors.textSecondary;
+            }}
+            title="Toggle Fullscreen"
+          >
+            <FiMaximize2 size={14} />
+          </button>
         </div>
       </div>
 
@@ -268,45 +526,62 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
       <div 
         ref={timelineRef}
         style={{
-          height: `${TIMELINE_HEIGHT - 24}px`,
+          height: `${TIMELINE_HEIGHT - 32}px`,
           position: 'relative',
           cursor: isDragging ? 'grabbing' : 'pointer',
-          backgroundColor: theme.colors.background
+          backgroundColor: theme.colors.background,
+          overflow: 'hidden'
         }}
         onMouseDown={handleTimelineMouseDown}
-        onMouseMove={(e) => {
-          if (!timelineRef.current) return;
-          const rect = timelineRef.current.getBoundingClientRect();
-          const mouseX = e.clientX - rect.left;
-          const percentage = mouseX / rect.width;
-          const hoverTime = percentage * totalDuration;
-          setSplitPreviewTime(hoverTime);
-        }}
-        onMouseLeave={() => setSplitPreviewTime(null)}
       >
-        {/* Waveform Background */}
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: `${WAVEFORM_HEIGHT}px`,
-          display: 'flex',
-          alignItems: 'flex-end',
-          backgroundColor: theme.colors.background
-        }}>
-          {waveformData.map((amplitude, index) => (
-            <div
-              key={index}
-              style={{
-                width: `${100 / waveformData.length}%`,
-                height: `${amplitude * WAVEFORM_HEIGHT}px`,
-                backgroundColor: theme.colors.surface,
-                marginRight: '1px'
-              }}
-            />
-          ))}
-        </div>
+        {/* Waveform Background - Only show when video file is available */}
+        {videoFile && (
+          <div 
+            ref={waveformRef}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: `${WAVEFORM_HEIGHT}px`,
+              backgroundColor: theme.colors.background
+            }}
+          />
+        )}
+        
+        {/* Loading indicator overlay */}
+        {videoFile && isWaveformLoading && (
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: `${WAVEFORM_HEIGHT}px`,
+            backgroundColor: theme.colors.background,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              color: theme.colors.textSecondary,
+              fontSize: '12px'
+            }}>
+              <div style={{
+                width: '16px',
+                height: '16px',
+                border: `2px solid ${theme.colors.border}`,
+                borderTop: `2px solid ${theme.colors.primary}`,
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite'
+              }} />
+              <span>Generating waveform...</span>
+            </div>
+          </div>
+        )}
 
         {/* Caption Segments Track */}
         <div style={{
@@ -331,15 +606,15 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                   left: `${startPercent}%`,
                   width: `${widthPercent}%`,
                   height: '100%',
-                  backgroundColor: isSelected ? theme.colors.primary : isHovered ? theme.colors.surface : theme.colors.background,
+                  backgroundColor: isSelected ? theme.colors.primary : isHovered ? theme.colors.surfaceHover : theme.colors.surface,
                   border: isSelected ? `2px solid ${theme.colors.primary}` : `1px solid ${theme.colors.border}`,
-                  borderRadius: '2px',
+                  borderRadius: '3px',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: '10px',
-                  color: theme.colors.text,
+                  color: isSelected ? theme.colors.primaryForeground : theme.colors.text,
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
@@ -399,20 +674,6 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
           }} />
         </div>
 
-        {/* Split Preview Line */}
-        {splitPreviewTime !== null && (
-          <div style={{
-            position: 'absolute',
-            left: `${(splitPreviewTime / totalDuration) * 100}%`,
-            top: `${WAVEFORM_HEIGHT}px`,
-            height: `${CAPTION_TRACK_HEIGHT}px`,
-            width: '1px',
-            backgroundColor: theme.colors.primary,
-            zIndex: 5,
-            pointerEvents: 'none'
-          }} />
-        )}
-
         {/* Time markers */}
         <div style={{
           position: 'absolute',
@@ -434,7 +695,8 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                   transform: 'translateY(-50%)',
                   fontSize: '9px',
                   color: theme.colors.textSecondary,
-                  whiteSpace: 'nowrap'
+                  whiteSpace: 'nowrap',
+                  fontFamily: 'monospace'
                 }}
               >
                 {formatTime(time)}
@@ -466,32 +728,6 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
               padding: '8px 12px',
               cursor: 'pointer',
               fontSize: '12px',
-              color: theme.colors.text,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-            onClick={() => {
-              if (onSplitSegment) {
-                onSplitSegment(contextMenu.segmentId, currentTime);
-              }
-              setContextMenu(null);
-            }}
-            onMouseEnter={(e) => {
-              (e.target as HTMLElement).style.backgroundColor = theme.colors.surface;
-            }}
-            onMouseLeave={(e) => {
-              (e.target as HTMLElement).style.backgroundColor = 'transparent';
-            }}
-          >
-            <FiScissors size={14} style={{ marginRight: '6px' }} />
-            Split at Current Time
-          </div>
-          <div
-            style={{
-              padding: '8px 12px',
-              cursor: 'pointer',
-              fontSize: '12px',
               color: theme.colors.error,
               display: 'flex',
               alignItems: 'center',
@@ -508,13 +744,14 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
               setContextMenu(null);
             }}
             onMouseEnter={(e) => {
-              (e.target as HTMLElement).style.backgroundColor = theme.colors.surface;
+              (e.target as HTMLElement).style.backgroundColor = theme.colors.surfaceHover;
             }}
             onMouseLeave={(e) => {
               (e.target as HTMLElement).style.backgroundColor = 'transparent';
             }}
           >
-            🗑️ Delete Segment
+            <FiTrash2 size={14} />
+            Delete Segment
           </div>
         </div>
       )}
@@ -527,7 +764,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: theme.colors.background,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -557,13 +794,13 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
               Are you sure you want to delete this caption segment?
             </p>
             <div style={{
-              backgroundColor: theme.colors.background,
+              backgroundColor: theme.colors.surface,
               border: `1px solid ${theme.colors.border}`,
               borderRadius: '4px',
               padding: '12px',
               margin: '0 0 20px 0',
               fontSize: '12px',
-                color: theme.colors.textSecondary,
+              color: theme.colors.textSecondary,
               maxHeight: '80px',
               overflowY: 'auto'
             }}>
@@ -579,11 +816,18 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                 style={{
                   padding: '8px 16px',
                   backgroundColor: theme.colors.secondary,
-                  color: theme.colors.text,
+                  color: theme.colors.secondaryForeground,
                   border: `1px solid ${theme.colors.border}`,
                   borderRadius: '4px',
                   cursor: 'pointer',
-                  fontSize: '12px'
+                  fontSize: '12px',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = theme.colors.secondaryHover;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = theme.colors.secondary;
                 }}
               >
                 Cancel
@@ -596,11 +840,18 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                 style={{
                   padding: '8px 16px',
                   backgroundColor: theme.colors.error,
-                  color: theme.colors.text,
+                  color: theme.colors.errorForeground,
                   border: `1px solid ${theme.colors.error}`,
                   borderRadius: '4px',
                   cursor: 'pointer',
-                  fontSize: '12px'
+                  fontSize: '12px',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = theme.colors.errorHover;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = theme.colors.error;
                 }}
               >
                 Delete
