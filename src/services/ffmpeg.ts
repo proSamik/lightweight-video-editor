@@ -319,6 +319,49 @@ export class FFmpegService {
   public checkFFmpegAvailability(): boolean {
     return this.ffmpegPath !== '';
   }
+
+  /**
+   * Cancel the current rendering operation
+   */
+  public cancelRendering(): void {
+    try {
+      const { StreamingVideoRenderer } = require('./streamingRenderer');
+      const renderer = StreamingVideoRenderer.getInstance();
+      renderer.cancel();
+      console.log('[FFmpegService] Rendering cancellation requested');
+    } catch (error) {
+      console.warn('[FFmpegService] Error cancelling rendering:', error);
+    }
+  }
+
+  /**
+   * Cleanup method to ensure no orphaned FFmpeg processes
+   * This should be called when the application is shutting down
+   */
+  public cleanup(): void {
+    try {
+      // Force kill any remaining FFmpeg processes
+      const { exec } = require('child_process');
+      
+      // On macOS/Linux
+      exec('pkill -f ffmpeg', (error: any) => {
+        if (error) {
+          console.warn('[FFmpegService] No FFmpeg processes to kill or error:', error.message);
+        } else {
+          console.log('[FFmpegService] Cleaned up FFmpeg processes');
+        }
+      });
+      
+      // On Windows (if needed)
+      exec('taskkill /f /im ffmpeg.exe', (error: any) => {
+        if (error) {
+          console.warn('[FFmpegService] No FFmpeg processes to kill on Windows or error:', error.message);
+        }
+      });
+    } catch (error) {
+      console.warn('[FFmpegService] Error during cleanup:', error);
+    }
+  }
 }
 
 export default FFmpegService;
