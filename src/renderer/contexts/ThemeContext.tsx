@@ -1,58 +1,229 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
-// Theme interface
+// Enhanced theme interface with component-specific tokens
 interface Theme {
   mode: 'light' | 'dark';
   colors: {
+    // Base colors
     primary: string;
+    primaryHover: string;
+    primaryActive: string;
+    primaryForeground: string;
+    
     secondary: string;
+    secondaryHover: string;
+    secondaryActive: string;
+    secondaryForeground: string;
+    
+    // Background variants
     background: string;
+    backgroundSecondary: string;
     surface: string;
+    surfaceHover: string;
+    surfaceActive: string;
+    
+    // Text colors
     text: string;
     textSecondary: string;
+    textMuted: string;
+    textInverse: string;
+    
+    // Border colors
     border: string;
+    borderHover: string;
+    borderFocus: string;
+    
+    // State colors
     accent: string;
+    accentHover: string;
+    accentForeground: string;
+    
     success: string;
+    successHover: string;
+    successForeground: string;
+    
     warning: string;
+    warningHover: string;
+    warningForeground: string;
+    
     error: string;
+    errorHover: string;
+    errorForeground: string;
+    
     info: string;
+    infoHover: string;
+    infoForeground: string;
+    
+    // Component-specific colors
+    button: {
+      ghost: string;
+      ghostHover: string;
+      outline: string;
+      outlineHover: string;
+    };
+    
+    input: {
+      background: string;
+      backgroundFocus: string;
+      placeholder: string;
+    };
+    
+    modal: {
+      overlay: string;
+      background: string;
+      border: string;
+    };
   };
 }
 
-// Default themes
+// Monochromatic theme with only white/zinc colors
 const lightTheme: Theme = {
   mode: 'light',
   colors: {
-    primary: '#3b82f6', // Blue
-    secondary: '#6b7280', // Gray
-    background: '#ffffff',
-    surface: '#f9fafb',
-    text: '#111827',
-    textSecondary: '#6b7280',
-    border: '#d1d5db',
-    accent: '#8b5cf6', // Purple
-    success: '#10b981', // Green
-    warning: '#f59e0b', // Amber
-    error: '#ef4444', // Red
-    info: '#06b6d4', // Cyan
+    // Base colors - all using zinc scale
+    primary: '#18181b',           // zinc-900
+    primaryHover: '#27272a',      // zinc-800
+    primaryActive: '#3f3f46',     // zinc-700
+    primaryForeground: '#ffffff', // white
+    
+    secondary: '#71717a',         // zinc-500
+    secondaryHover: '#52525b',    // zinc-600
+    secondaryActive: '#3f3f46',   // zinc-700
+    secondaryForeground: '#ffffff',
+    
+    // Background variants
+    background: '#ffffff',        // white
+    backgroundSecondary: '#fafafa', // zinc-50
+    surface: '#f4f4f5',          // zinc-100
+    surfaceHover: '#e4e4e7',     // zinc-200
+    surfaceActive: '#d4d4d8',    // zinc-300
+    
+    // Text colors
+    text: '#18181b',             // zinc-900
+    textSecondary: '#71717a',    // zinc-500
+    textMuted: '#a1a1aa',        // zinc-400
+    textInverse: '#ffffff',      // white
+    
+    // Border colors
+    border: '#e4e4e7',           // zinc-200
+    borderHover: '#d4d4d8',      // zinc-300
+    borderFocus: '#18181b',      // zinc-900
+    
+    // State colors - using zinc instead of colors
+    accent: '#27272a',           // zinc-800
+    accentHover: '#18181b',      // zinc-900
+    accentForeground: '#ffffff',
+    
+    success: '#52525b',          // zinc-600
+    successHover: '#3f3f46',     // zinc-700
+    successForeground: '#ffffff',
+    
+    warning: '#71717a',          // zinc-500
+    warningHover: '#52525b',     // zinc-600
+    warningForeground: '#ffffff',
+    
+    error: '#18181b',            // zinc-900
+    errorHover: '#000000',       // black
+    errorForeground: '#ffffff',
+    
+    info: '#71717a',             // zinc-500
+    infoHover: '#52525b',        // zinc-600
+    infoForeground: '#ffffff',
+    
+    // Component-specific colors
+    button: {
+      ghost: 'transparent',
+      ghostHover: '#f4f4f5',     // zinc-100
+      outline: 'transparent',
+      outlineHover: '#fafafa',   // zinc-50
+    },
+    
+    input: {
+      background: '#ffffff',
+      backgroundFocus: '#ffffff',
+      placeholder: '#a1a1aa',    // zinc-400
+    },
+    
+    modal: {
+      overlay: 'rgba(0, 0, 0, 0.5)',
+      background: '#ffffff',
+      border: '#e4e4e7',         // zinc-200
+    },
   },
 };
 
 const darkTheme: Theme = {
   mode: 'dark',
   colors: {
-    primary: '#3b82f6', // Blue
-    secondary: '#71717a', // Zinc
-    background: '#18181b', // Zinc 900
-    surface: '#27272a', // Zinc 800
-    text: '#fafafa', // Zinc 50
-    textSecondary: '#a1a1aa', // Zinc 400
-    border: '#3f3f46', // Zinc 700
-    accent: '#8b5cf6', // Purple
-    success: '#10b981', // Green
-    warning: '#f59e0b', // Amber
-    error: '#ef4444', // Red
-    info: '#06b6d4', // Cyan
+    // Base colors - monochromatic zinc scale
+    primary: '#fafafa',           // zinc-50
+    primaryHover: '#f4f4f5',      // zinc-100
+    primaryActive: '#e4e4e7',     // zinc-200
+    primaryForeground: '#18181b', // zinc-900
+    
+    secondary: '#a1a1aa',         // zinc-400
+    secondaryHover: '#d4d4d8',    // zinc-300
+    secondaryActive: '#e4e4e7',   // zinc-200
+    secondaryForeground: '#18181b',
+    
+    // Background variants
+    background: '#09090b',        // zinc-950
+    backgroundSecondary: '#18181b', // zinc-900
+    surface: '#27272a',          // zinc-800
+    surfaceHover: '#3f3f46',     // zinc-700
+    surfaceActive: '#52525b',    // zinc-600
+    
+    // Text colors
+    text: '#fafafa',             // zinc-50
+    textSecondary: '#a1a1aa',    // zinc-400
+    textMuted: '#71717a',        // zinc-500
+    textInverse: '#18181b',      // zinc-900
+    
+    // Border colors
+    border: '#3f3f46',           // zinc-700
+    borderHover: '#52525b',      // zinc-600
+    borderFocus: '#fafafa',      // zinc-50
+    
+    // State colors - using zinc instead of colors
+    accent: '#e4e4e7',           // zinc-200
+    accentHover: '#f4f4f5',      // zinc-100
+    accentForeground: '#18181b',
+    
+    success: '#a1a1aa',          // zinc-400
+    successHover: '#d4d4d8',     // zinc-300
+    successForeground: '#18181b',
+    
+    warning: '#71717a',          // zinc-500
+    warningHover: '#a1a1aa',     // zinc-400
+    warningForeground: '#18181b',
+    
+    error: '#fafafa',            // zinc-50
+    errorHover: '#ffffff',       // white
+    errorForeground: '#18181b',
+    
+    info: '#a1a1aa',             // zinc-400
+    infoHover: '#d4d4d8',        // zinc-300
+    infoForeground: '#18181b',
+    
+    // Component-specific colors
+    button: {
+      ghost: 'transparent',
+      ghostHover: '#27272a',     // zinc-800
+      outline: 'transparent',
+      outlineHover: '#3f3f46',   // zinc-700
+    },
+    
+    input: {
+      background: '#18181b',     // zinc-900
+      backgroundFocus: '#27272a', // zinc-800
+      placeholder: '#71717a',    // zinc-500
+    },
+    
+    modal: {
+      overlay: 'rgba(0, 0, 0, 0.8)',
+      background: '#18181b',     // zinc-900
+      border: '#3f3f46',         // zinc-700
+    },
   },
 };
 
