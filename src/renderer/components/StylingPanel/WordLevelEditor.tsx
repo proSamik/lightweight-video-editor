@@ -76,10 +76,7 @@ export const WordLevelEditor: React.FC<WordLevelEditorProps> = ({
     transition: 'all 0.15s ease',
     marginBottom: spacing.sm,
     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
-    ':hover': {
-      backgroundColor: theme.colors.surfaceHover,
-      borderColor: theme.colors.borderHover,
-    },
+    cursor: 'pointer',
   });
 
   const wordIndexStyles: React.CSSProperties = {
@@ -159,7 +156,18 @@ export const WordLevelEditor: React.FC<WordLevelEditorProps> = ({
             const isEditing = editingIndex === index;
 
             return (
-              <div key={index} style={wordItemStyles(isEdited)}>
+              <div 
+                key={index} 
+                style={wordItemStyles(isEdited)}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+                  e.currentTarget.style.borderColor = theme.colors.borderHover;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = theme.colors.background;
+                  e.currentTarget.style.borderColor = theme.colors.border;
+                }}
+              >
                 <HStack align="center" gap="lg">
                   <div style={wordIndexStyles}>
                     {index + 1}
