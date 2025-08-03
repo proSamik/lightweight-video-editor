@@ -306,13 +306,21 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
             />
             
             {selectedSegment.words && selectedSegment.words.length > 0 && (
-              <WordLevelEditor
-                words={selectedSegment.words}
-                onWordUpdate={handleWordUpdate}
-                onWordDelete={handleWordDelete}
-                onWordMerge={handleWordMerge}
-                onJumpToWord={handleJumpToWord}
-              />
+              <div style={{
+                padding: `${spacing.lg}px`,
+                backgroundColor: theme.colors.surface,
+                borderRadius: borderRadius.lg,
+                border: `1px solid ${theme.colors.border}`,
+                margin: `0 -${spacing.md}px`
+              }}>
+                <WordLevelEditor
+                  words={selectedSegment.words}
+                  onWordUpdate={handleWordUpdate}
+                  onWordDelete={handleWordDelete}
+                  onWordMerge={handleWordMerge}
+                  onJumpToWord={handleJumpToWord}
+                />
+              </div>
             )}
             
             <StyleControls
