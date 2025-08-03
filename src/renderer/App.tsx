@@ -1212,6 +1212,7 @@ const AppContent: React.FC = () => {
               captions={captions}
               currentTime={currentTime}
               onTimeUpdate={setCurrentTime}
+              onTimeSeek={setCurrentTime}
               onVideoSelect={handleVideoSelect}
               onVideoDropped={handleVideoDropped}
               selectedSegmentId={selectedSegmentId}
@@ -1256,9 +1257,12 @@ const AppContent: React.FC = () => {
           onCaptionUpdate={handleCaptionUpdate}
           videoFile={videoFile}
           onReTranscribeSegment={handleReTranscribeSegment}
-          onSplitSegment={handleSplitSegment}
           onPlayPause={handlePlayPause}
           isPlaying={isPlaying}
+          onUndo={undo}
+          onRedo={redo}
+          canUndo={historyIndex > 0}
+          canRedo={historyIndex < history.length - 1}
         />
       </div>
 
