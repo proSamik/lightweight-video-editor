@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { VideoFile, CaptionSegment } from '../../types';
 import { useTheme } from '../contexts/ThemeContext';
+import { FiEye } from 'react-icons/fi';
 
 interface VideoPanelProps {
   videoFile: VideoFile | null;
@@ -440,8 +441,8 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
             alignItems: 'center',
             gap: '8px'
           }}>
-            <span style={{ fontSize: '16px' }}>✨</span>
-            <span style={{ color: '#ccc', fontWeight: '500' }}>
+            <FiEye size={16} color={theme.colors.textMuted} />
+            <span style={{ color: theme.colors.textMuted, fontWeight: '500' }}>
               WYSIWYG Preview - Exact export rendering
             </span>
           </div>
