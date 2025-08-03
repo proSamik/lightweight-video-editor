@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { CaptionSegment } from '../../types';
 import { useTheme } from '../contexts/ThemeContext';
+import { FiScissors } from 'react-icons/fi';
 
 interface UnifiedTimelineProps {
   captions: CaptionSegment[];
@@ -250,7 +251,8 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
             }}
             title="Split Mode (S)"
           >
-            ✂️ {splitMode ? 'Split ON' : 'Split'}
+            <FiScissors size={12} style={{ marginRight: '4px' }} />
+            {splitMode ? 'Split ON' : 'Split'}
           </button>
           <div style={{
             width: '8px',
@@ -482,7 +484,8 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
               (e.target as HTMLElement).style.backgroundColor = 'transparent';
             }}
           >
-            ✂️ Split at Current Time
+            <FiScissors size={14} style={{ marginRight: '6px' }} />
+            Split at Current Time
           </div>
           <div
             style={{
