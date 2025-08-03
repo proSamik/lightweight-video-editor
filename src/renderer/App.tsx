@@ -953,56 +953,77 @@ const AppContent: React.FC = () => {
             <button
               onClick={() => setShowProjectManager(true)}
               style={{
-                padding: '6px 12px',
-                backgroundColor: theme.colors.surface,
+                padding: '8px',
+                backgroundColor: 'transparent',
                 color: theme.colors.text,
                 border: `1px solid ${theme.colors.border}`,
-                borderRadius: '4px',
+                borderRadius: '6px',
                 cursor: 'pointer',
                 fontSize: '11px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px'
+                justifyContent: 'center',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
               }}
               title="Project Manager (Ctrl/Cmd+O)"
             >
-              <ProjectManagerIcon size={14} />
+              <ProjectManagerIcon size={16} />
             </button>
             <button
               onClick={handleNewProject}
               style={{
-                padding: '6px 12px',
-                backgroundColor: theme.colors.secondary,
+                padding: '8px',
+                backgroundColor: 'transparent',
                 color: theme.colors.text,
                 border: `1px solid ${theme.colors.border}`,
-                borderRadius: '4px',
+                borderRadius: '6px',
                 cursor: 'pointer',
                 fontSize: '11px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px'
+                justifyContent: 'center',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
               }}
               title="New Project (Ctrl/Cmd+N)"
             >
-              <NewProjectIcon size={14} />
+              <NewProjectIcon size={16} />
             </button>
             <button
               onClick={handleSaveProject}
               style={{
-                padding: '6px 12px',
-                backgroundColor: theme.colors.success,
+                padding: '8px',
+                backgroundColor: 'transparent',
                 color: theme.colors.text,
-                border: `1px solid ${theme.colors.success}`,
-                borderRadius: '4px',
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: '6px',
                 cursor: 'pointer',
                 fontSize: '11px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px'
+                justifyContent: 'center',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
               }}
               title="Save Project (Ctrl/Cmd+S)"
             >
-              <SaveProjectIcon size={14} />
+              <SaveProjectIcon size={16} />
             </button>
           </div>
           
@@ -1011,58 +1032,81 @@ const AppContent: React.FC = () => {
             <button
               onClick={handleSaveProjectAs}
               style={{
-                padding: '6px 10px',
-                backgroundColor: theme.colors.info,
+                padding: '8px',
+                backgroundColor: 'transparent',
                 color: theme.colors.text,
-                border: `1px solid ${theme.colors.info}`,
-                borderRadius: '4px',
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: '6px',
                 cursor: 'pointer',
                 fontSize: '11px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px'
+                justifyContent: 'center',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
               }}
               title="Save Project As (Ctrl/Cmd+Shift+S)"
             >
-              <SaveProjectAsIcon size={14} />
+              <SaveProjectAsIcon size={16} />
             </button>
             <button
               onClick={() => setShowAISettings(true)}
               style={{
-                padding: '6px 10px',
-                backgroundColor: theme.colors.accent,
+                padding: '8px',
+                backgroundColor: 'transparent',
                 color: theme.colors.text,
-                border: `1px solid ${theme.colors.accent}`,
-                borderRadius: '4px',
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: '6px',
                 cursor: 'pointer',
                 fontSize: '11px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px'
+                justifyContent: 'center',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
               }}
               title="AI Settings (Ctrl/Cmd+,)"
             >
-              <SettingsIcon size={14} />
+              <SettingsIcon size={16} />
             </button>
             <button
               onClick={() => captions.length > 0 && setShowAIContent(true)}
               disabled={captions.length === 0}
               style={{
-                padding: '6px 10px',
-                backgroundColor: captions.length > 0 ? theme.colors.info : theme.colors.secondary,
-                color: theme.colors.text,
-                border: captions.length > 0 ? `1px solid ${theme.colors.info}` : `1px solid ${theme.colors.border}`,
-                borderRadius: '4px',
+                padding: '8px',
+                backgroundColor: 'transparent',
+                color: captions.length > 0 ? theme.colors.text : theme.colors.textMuted,
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: '6px',
                 cursor: captions.length > 0 ? 'pointer' : 'not-allowed',
                 fontSize: '11px',
-                opacity: captions.length > 0 ? 1 : 0.6,
+                opacity: captions.length > 0 ? 1 : 0.5,
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px'
+                justifyContent: 'center',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                if (captions.length > 0) {
+                  e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
               }}
               title="Generate AI Content (Ctrl/Cmd+G)"
             >
-              <BotIcon size={14} />
+              <BotIcon size={16} />
             </button>
           </div>
           
@@ -1072,21 +1116,30 @@ const AppContent: React.FC = () => {
               onClick={handleAudioImport}
               disabled={!videoFile}
               style={{
-                padding: '6px 10px',
-                backgroundColor: videoFile ? (replacementAudioPath ? theme.colors.success : theme.colors.warning) : theme.colors.secondary,
-                color: theme.colors.text,
-                border: videoFile ? (replacementAudioPath ? `1px solid ${theme.colors.success}` : `1px solid ${theme.colors.warning}`) : `1px solid ${theme.colors.border}`,
-                borderRadius: '4px',
+                padding: '8px',
+                backgroundColor: 'transparent',
+                color: videoFile ? theme.colors.text : theme.colors.textMuted,
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: '6px',
                 cursor: videoFile ? 'pointer' : 'not-allowed',
                 fontSize: '11px',
-                opacity: videoFile ? 1 : 0.6,
+                opacity: videoFile ? 1 : 0.5,
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px'
+                justifyContent: 'center',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                if (videoFile) {
+                  e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
               }}
               title={replacementAudioPath ? `Audio Replacement Set: ${replacementAudioPath.split('/').pop()}` : "Replace Video Audio Track"}
             >
-              {replacementAudioPath ? <MusicWithCheckIcon size={14} /> : <MusicIcon size={14} />}
+              {replacementAudioPath ? <MusicWithCheckIcon size={16} /> : <MusicIcon size={16} />}
             </button>
             {replacementAudioPath && (
               <button
