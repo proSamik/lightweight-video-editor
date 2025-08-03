@@ -1199,9 +1199,9 @@ const AppContent: React.FC = () => {
           display: 'flex',
           minHeight: 0 // Important for proper flex sizing
         }}>
-          {/* Left Panel - Video Preview */}
+          {/* Left Panel - Video Preview with Timeline */}
           <div style={{ 
-            flex: '1 1 75%', 
+            flex: '1 1 70%', 
             display: 'flex', 
             flexDirection: 'column',
             borderRight: `1px solid ${theme.colors.border}`,
@@ -1220,14 +1220,35 @@ const AppContent: React.FC = () => {
               onPlayPause={handlePlayPause}
               isPlaying={isPlaying}
             />
+            
+            {/* Unified Timeline - Moved up inside video panel */}
+            <UnifiedTimeline
+              captions={captions}
+              currentTime={currentTime}
+              selectedSegmentId={selectedSegmentId}
+              onSegmentSelect={setSelectedSegmentId}
+              onTimeSeek={setCurrentTime}
+              onSegmentDelete={handleCaptionDelete}
+              onCaptionUpdate={handleCaptionUpdate}
+              videoFile={videoFile}
+              onReTranscribeSegment={handleReTranscribeSegment}
+              onPlayPause={handlePlayPause}
+              isPlaying={isPlaying}
+              onUndo={undo}
+              onRedo={redo}
+              canUndo={historyIndex > 0}
+              canRedo={historyIndex < history.length - 1}
+            />
           </div>
 
           {/* Right Panel - Tabbed Controls */}
           <div style={{ 
-            flex: '1 1 25%', 
+            flex: '1 1 30%', 
             minWidth: '300px',
             maxWidth: '400px',
-            minHeight: 0
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column'
           }}>
             <TabbedRightPanel
               selectedSegment={captions.find(c => c.id === selectedSegmentId) || null}
@@ -1245,25 +1266,6 @@ const AppContent: React.FC = () => {
             />
           </div>
         </div>
-        
-        {/* Bottom Unified Timeline */}
-        <UnifiedTimeline
-          captions={captions}
-          currentTime={currentTime}
-          selectedSegmentId={selectedSegmentId}
-          onSegmentSelect={setSelectedSegmentId}
-          onTimeSeek={setCurrentTime}
-          onSegmentDelete={handleCaptionDelete}
-          onCaptionUpdate={handleCaptionUpdate}
-          videoFile={videoFile}
-          onReTranscribeSegment={handleReTranscribeSegment}
-          onPlayPause={handlePlayPause}
-          isPlaying={isPlaying}
-          onUndo={undo}
-          onRedo={redo}
-          canUndo={historyIndex > 0}
-          canRedo={historyIndex < history.length - 1}
-        />
       </div>
 
       {/* Transcription Settings Dialog */}
