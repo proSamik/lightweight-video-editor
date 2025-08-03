@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CaptionSegment, SearchResult } from '../../types';
 import SearchModal from './SearchModal';
 import { useTheme } from '../contexts/ThemeContext';
+import { FiMic } from 'react-icons/fi';
 
 interface TimelinePanelProps {
   captions: CaptionSegment[];
@@ -179,7 +180,8 @@ const TimelinePanel: React.FC<TimelinePanelProps> = ({
               }}
               title="Re-transcribe selected range"
             >
-              🎤 Re-transcribe
+              <FiMic size={14} style={{ marginRight: '6px' }} />
+              Re-transcribe
             </button>
           )}
           <button
