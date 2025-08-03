@@ -65,6 +65,24 @@ const AppContent: React.FC = () => {
     progress: number;
     message: string;
   }>({ isTranscribing: false, progress: 0, message: '' });
+  const [cancelController, setCancelController] = useState<AbortController | null>(null);
+
+  // Handle cancel operation
+  const handleCancel = () => {
+    if (cancelController) {
+      cancelController.abort();
+      setCancelController(null);
+    }
+    // Also cancel the rendering operation
+    try {
+      window.electronAPI.cancelRendering();
+    } catch (error) {
+      console.warn('Error cancelling rendering:', error);
+    }
+    setIsLoading(false);
+    setLoadingProgress(undefined);
+    setLoadingMessage('');
+  };
 
   // Initialize history and load project info
   useEffect(() => {
@@ -452,6 +470,10 @@ const AppContent: React.FC = () => {
       setIsLoading(true);
       setLoadingProgress(0); // Reset progress
       setLoadingMessage('Choosing export location...');
+      
+      // Create abort controller for cancellation
+      const controller = new AbortController();
+      setCancelController(controller);
 
       const outputPath = await window.electronAPI.exportVideo(
         `${videoFile.name.replace(/\.[^/.]+$/, "")}_with_captions.mp4`
@@ -503,6 +525,7 @@ const AppContent: React.FC = () => {
 
       setIsLoading(false);
       setLoadingProgress(undefined); // Clear progress
+      setCancelController(null);
       
       // Show success modal
       setExportedFilePath(outputPath);
@@ -511,7 +534,13 @@ const AppContent: React.FC = () => {
       console.error('Export error:', error);
       setIsLoading(false);
       setLoadingProgress(undefined); // Clear progress
-      alert(`Export failed: ${error}`);
+      setCancelController(null);
+      if (error instanceof Error && error.name === 'AbortError') {
+        // Export was cancelled
+        console.log('Export cancelled by user');
+      } else {
+        alert(`Export failed: ${error}`);
+      }
     }
   };
 
@@ -867,7 +896,11 @@ const AppContent: React.FC = () => {
   };
 
   if (isLoading) {
-    return <LoadingScreen message={loadingMessage} progress={loadingProgress} />;
+    return <LoadingScreen 
+      message={loadingMessage} 
+      progress={loadingProgress} 
+      onCancel={cancelController ? handleCancel : undefined}
+    />;
   }
 
   return (
