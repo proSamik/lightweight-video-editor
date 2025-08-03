@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { SaveProjectIcon } from './IconComponents';
 import { ProjectData } from '../../types';
+import { FiX, FiPlay, FiTrash2, FiCalendar, FiVideo } from 'react-icons/fi';
 
 interface ProjectManagerProps {
   isOpen: boolean;
@@ -109,63 +110,101 @@ const ProjectManagerModal: React.FC<ProjectManagerProps> = ({
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+      backgroundColor: theme.colors.modal.overlay,
+      backdropFilter: 'blur(4px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 1000
+      zIndex: 1000,
+      padding: '20px'
     }}>
       <div style={{
-        backgroundColor: theme.colors.surface,
-        borderRadius: '8px',
-        padding: '24px',
-        minWidth: '600px',
-        maxWidth: '800px',
-        maxHeight: '80vh',
-        border: `1px solid ${theme.colors.border}`,
+        backgroundColor: theme.colors.modal.background,
+        borderRadius: '12px',
+        padding: '0',
+        minWidth: '700px',
+        maxWidth: '900px',
+        maxHeight: '85vh',
+        border: `1px solid ${theme.colors.modal.border}`,
         overflow: 'hidden',
         display: 'flex',
-        flexDirection: 'column'
+        flexDirection: 'column',
+        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
       }}>
+        {/* Header */}
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: '20px'
+          padding: '24px 32px',
+          borderBottom: `1px solid ${theme.colors.border}`,
+          backgroundColor: theme.colors.backgroundSecondary
         }}>
-          <h2 style={{ margin: 0, fontSize: '18px', color: theme.colors.text }}>
+          <h2 style={{ 
+            margin: 0, 
+            fontSize: '20px', 
+            fontWeight: '600',
+            color: theme.colors.text 
+          }}>
             Project Manager
           </h2>
           <button
             onClick={onClose}
             style={{
-              background: 'none',
-              border: 'none',
+              padding: '8px',
+              backgroundColor: 'transparent',
+              border: `1px solid ${theme.colors.border}`,
+              borderRadius: '6px',
               color: theme.colors.textSecondary,
               cursor: 'pointer',
-              fontSize: '18px'
+              fontSize: '14px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.15s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+              e.currentTarget.style.color = theme.colors.text;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = theme.colors.textSecondary;
             }}
           >
-            ✕
+            <FiX size={16} />
           </button>
         </div>
 
         {/* Tabs */}
         <div style={{
           display: 'flex',
-          marginBottom: '20px',
-          borderBottom: `1px solid ${theme.colors.border}`
+          borderBottom: `1px solid ${theme.colors.border}`,
+          backgroundColor: theme.colors.background
         }}>
           <button
             onClick={() => setActiveTab('recent')}
             style={{
-              padding: '8px 16px',
-              backgroundColor: activeTab === 'recent' ? theme.colors.primary : 'transparent',
-              color: theme.colors.text,
+              flex: 1,
+              padding: '16px 24px',
+              backgroundColor: 'transparent',
+              color: activeTab === 'recent' ? theme.colors.text : theme.colors.textSecondary,
               border: 'none',
               borderBottom: activeTab === 'recent' ? `2px solid ${theme.colors.primary}` : '2px solid transparent',
               cursor: 'pointer',
-              fontSize: '14px'
+              fontSize: '14px',
+              fontWeight: activeTab === 'recent' ? '500' : '400',
+              transition: 'all 0.15s ease'
+            }}
+            onMouseEnter={(e) => {
+              if (activeTab !== 'recent') {
+                e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (activeTab !== 'recent') {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }
             }}
           >
             Recent Projects
@@ -173,13 +212,26 @@ const ProjectManagerModal: React.FC<ProjectManagerProps> = ({
           <button
             onClick={() => setActiveTab('save')}
             style={{
-              padding: '8px 16px',
-              backgroundColor: activeTab === 'save' ? theme.colors.primary : 'transparent',
-              color: theme.colors.text,
+              flex: 1,
+              padding: '16px 24px',
+              backgroundColor: 'transparent',
+              color: activeTab === 'save' ? theme.colors.text : theme.colors.textSecondary,
               border: 'none',
               borderBottom: activeTab === 'save' ? `2px solid ${theme.colors.primary}` : '2px solid transparent',
               cursor: 'pointer',
-              fontSize: '14px'
+              fontSize: '14px',
+              fontWeight: activeTab === 'save' ? '500' : '400',
+              transition: 'all 0.15s ease'
+            }}
+            onMouseEnter={(e) => {
+              if (activeTab !== 'save') {
+                e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (activeTab !== 'save') {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }
             }}
           >
             Save Project
@@ -187,21 +239,44 @@ const ProjectManagerModal: React.FC<ProjectManagerProps> = ({
         </div>
 
         {/* Tab Content */}
-        <div style={{ flex: 1, overflow: 'auto' }}>
+        <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
           {activeTab === 'recent' && (
             <div>
               {loading ? (
-                <div style={{ textAlign: 'center', padding: '40px', color: '#ccc' }}>
-                  Loading projects...
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '60px 20px', 
+                  color: theme.colors.textMuted 
+                }}>
+                  <div style={{
+                    fontSize: '16px',
+                    marginBottom: '8px'
+                  }}>
+                    Loading projects...
+                  </div>
                 </div>
               ) : recentProjects.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
-                  No saved projects found.
-                  <br />
-                  <small>Save your current work to see it here.</small>
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '60px 20px', 
+                  color: theme.colors.textSecondary 
+                }}>
+                  <div style={{
+                    fontSize: '16px',
+                    marginBottom: '8px',
+                    fontWeight: '500'
+                  }}>
+                    No saved projects found
+                  </div>
+                  <div style={{
+                    fontSize: '14px',
+                    color: theme.colors.textMuted
+                  }}>
+                    Save your current work to see it here
+                  </div>
                 </div>
               ) : (
-                <div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {recentProjects.map((project, index) => (
                     <div
                       key={index}
@@ -209,62 +284,115 @@ const ProjectManagerModal: React.FC<ProjectManagerProps> = ({
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        padding: '12px',
-                        backgroundColor: '#333',
-                        marginBottom: '8px',
-                        borderRadius: '4px',
-                        border: '1px solid #444'
+                        padding: '20px',
+                        backgroundColor: theme.colors.background,
+                        borderRadius: '8px',
+                        border: `1px solid ${theme.colors.border}`,
+                        transition: 'all 0.15s ease',
+                        cursor: 'pointer'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+                        e.currentTarget.style.borderColor = theme.colors.borderHover;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = theme.colors.background;
+                        e.currentTarget.style.borderColor = theme.colors.border;
                       }}
                     >
                       <div style={{ flex: 1 }}>
                         <div style={{ 
-                          fontSize: '14px', 
-                          color: '#fff',
-                          marginBottom: '4px'
+                          fontSize: '16px', 
+                          color: theme.colors.text,
+                          marginBottom: '8px',
+                          fontWeight: '500'
                         }}>
                           {project.fileName}
                         </div>
                         {project.videoFileName && (
                           <div style={{ 
-                            fontSize: '12px', 
-                            color: '#aaa',
-                            marginBottom: '2px'
+                            fontSize: '14px', 
+                            color: theme.colors.textSecondary,
+                            marginBottom: '6px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
                           }}>
-                            Video: {project.videoFileName}
+                            <FiVideo size={14} />
+                            <span>{project.videoFileName}</span>
                           </div>
                         )}
-                        <div style={{ fontSize: '11px', color: '#666' }}>
-                          {formatTimeAgo(project.lastModified)}
+                        <div style={{ 
+                          fontSize: '12px', 
+                          color: theme.colors.textMuted,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}>
+                          <FiCalendar size={12} />
+                          <span>{formatTimeAgo(project.lastModified)}</span>
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <button
-                          onClick={() => handleLoadProject(project.filePath)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleLoadProject(project.filePath);
+                          }}
                           style={{
-                            padding: '6px 12px',
-                            backgroundColor: '#28a745',
-                            color: '#fff',
+                            padding: '8px 16px',
+                            backgroundColor: theme.colors.primary,
+                            color: theme.colors.primaryForeground,
                             border: 'none',
-                            borderRadius: '4px',
+                            borderRadius: '6px',
                             cursor: 'pointer',
-                            fontSize: '12px'
+                            fontSize: '14px',
+                            fontWeight: '500',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = theme.colors.primaryHover;
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = theme.colors.primary;
                           }}
                         >
+                          <FiPlay size={14} />
                           Load
                         </button>
                         <button
-                          onClick={() => handleDeleteProject(project.filePath)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteProject(project.filePath);
+                          }}
                           style={{
-                            padding: '6px 12px',
-                            backgroundColor: '#dc3545',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '4px',
+                            padding: '8px',
+                            backgroundColor: 'transparent',
+                            color: theme.colors.textMuted,
+                            border: `1px solid ${theme.colors.border}`,
+                            borderRadius: '6px',
                             cursor: 'pointer',
-                            fontSize: '12px'
+                            fontSize: '14px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = theme.colors.error;
+                            e.currentTarget.style.color = theme.colors.errorForeground;
+                            e.currentTarget.style.borderColor = theme.colors.error;
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                            e.currentTarget.style.color = theme.colors.textMuted;
+                            e.currentTarget.style.borderColor = theme.colors.border;
                           }}
                         >
-                          Delete
+                          <FiTrash2 size={14} />
                         </button>
                       </div>
                     </div>
@@ -275,28 +403,58 @@ const ProjectManagerModal: React.FC<ProjectManagerProps> = ({
           )}
 
           {activeTab === 'save' && (
-            <div style={{ padding: '20px 0' }}>
+            <div>
               {currentProject ? (
                 <div>
-                  <div style={{ marginBottom: '20px' }}>
-                    <h3 style={{ margin: '0 0 10px 0', fontSize: '16px' }}>
+                  <div style={{ marginBottom: '24px' }}>
+                    <h3 style={{ 
+                      margin: '0 0 16px 0', 
+                      fontSize: '18px',
+                      fontWeight: '600',
+                      color: theme.colors.text 
+                    }}>
                       Current Project
                     </h3>
                     <div style={{
-                      backgroundColor: '#333',
-                      padding: '16px',
-                      borderRadius: '4px',
-                      border: '1px solid #444',
+                      backgroundColor: theme.colors.background,
+                      padding: '20px',
+                      borderRadius: '8px',
+                      border: `1px solid ${theme.colors.border}`,
                       fontSize: '14px'
                     }}>
-                      <div style={{ marginBottom: '8px' }}>
-                        <strong>Video:</strong> {currentProject.videoFile?.name || 'No video loaded'}
+                      <div style={{ 
+                        marginBottom: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                      }}>
+                        <FiVideo size={16} color={theme.colors.textSecondary} />
+                        <span style={{ color: theme.colors.textSecondary }}>Video:</span>
+                        <span style={{ color: theme.colors.text, fontWeight: '500' }}>
+                          {currentProject.videoFile?.name || 'No video loaded'}
+                        </span>
                       </div>
-                      <div style={{ marginBottom: '8px' }}>
-                        <strong>Captions:</strong> {currentProject.captions.length} segments
+                      <div style={{ 
+                        marginBottom: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                      }}>
+                        <span style={{ color: theme.colors.textSecondary }}>Captions:</span>
+                        <span style={{ color: theme.colors.text, fontWeight: '500' }}>
+                          {currentProject.captions.length} segments
+                        </span>
                       </div>
-                      <div>
-                        <strong>Last Modified:</strong> {formatDate(currentProject.lastModified)}
+                      <div style={{ 
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                      }}>
+                        <FiCalendar size={16} color={theme.colors.textSecondary} />
+                        <span style={{ color: theme.colors.textSecondary }}>Last Modified:</span>
+                        <span style={{ color: theme.colors.text, fontWeight: '500' }}>
+                          {formatDate(currentProject.lastModified)}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -305,29 +463,50 @@ const ProjectManagerModal: React.FC<ProjectManagerProps> = ({
                     onClick={handleSaveProject}
                     style={{
                       width: '100%',
-                      padding: '12px 24px',
+                      padding: '16px 24px',
                       backgroundColor: theme.colors.primary,
-                      color: theme.colors.text,
+                      color: theme.colors.primaryForeground,
                       border: 'none',
-                      borderRadius: '6px',
+                      borderRadius: '8px',
                       cursor: 'pointer',
                       fontSize: '16px',
-                      fontWeight: 'bold',
+                      fontWeight: '600',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '8px'
+                      gap: '12px',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = theme.colors.primaryHover;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = theme.colors.primary;
                     }}
                   >
-                    <SaveProjectIcon size={18} />
+                    <SaveProjectIcon size={20} />
                     Save Project
                   </button>
                 </div>
               ) : (
-                <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
-                  No project data to save.
-                  <br />
-                  <small>Load a video and create captions first.</small>
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '60px 20px', 
+                  color: theme.colors.textSecondary 
+                }}>
+                  <div style={{
+                    fontSize: '16px',
+                    marginBottom: '8px',
+                    fontWeight: '500'
+                  }}>
+                    No project data to save
+                  </div>
+                  <div style={{
+                    fontSize: '14px',
+                    color: theme.colors.textMuted
+                  }}>
+                    Load a video and create captions first
+                  </div>
                 </div>
               )}
             </div>
