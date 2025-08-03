@@ -1,7 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { CaptionSegment, GeneratedContent } from '../../types';
-import { FiCheckCircle } from 'react-icons/fi';
+import { Button, IconButton } from './ui';
+import { 
+  FiCheckCircle, 
+  FiX, 
+  FiFileText, 
+  FiEdit3, 
+  FiCopy, 
+  FiLoader, 
+  FiDownload,
+  FiAlertTriangle,
+  FiYoutube,
+  FiTwitter,
+  FiImage
+} from 'react-icons/fi';
 
 interface AIContentModalProps {
   isOpen: boolean;
@@ -155,104 +168,171 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    backgroundColor: theme.colors.modal.overlay,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,
+    backdropFilter: 'blur(8px)',
   };
 
   const contentStyle: React.CSSProperties = {
-    backgroundColor: theme.colors.surface,
-    borderRadius: '8px',
-    padding: '30px',
-    width: '800px',
-    maxWidth: '90vw',
-    maxHeight: '80vh',
+    backgroundColor: theme.colors.modal.background,
+    borderRadius: '12px',
+    border: `1px solid ${theme.colors.modal.border}`,
+    padding: '0',
+    width: '900px',
+    maxWidth: '95vw',
+    maxHeight: '90vh',
     overflowY: 'auto',
     color: theme.colors.text,
+    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
   };
 
   return (
     <div style={modalStyle} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div style={contentStyle}>
-        <h2 style={{ margin: '0 0 25px 0', fontSize: '20px', fontWeight: 'bold', color: theme.colors.text }}>
-          AI Content Generation for YouTube
-        </h2>
+        {/* Modal Header */}
+        <div style={{
+          padding: '24px 32px',
+          borderBottom: `1px solid ${theme.colors.border}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <div>
+            <h2 style={{ 
+              margin: 0, 
+              fontSize: '24px', 
+              fontWeight: '600', 
+              color: theme.colors.text,
+              lineHeight: '1.2'
+            }}>
+              AI Content Generation
+            </h2>
+            <p style={{
+              margin: '4px 0 0 0',
+              fontSize: '14px',
+              color: theme.colors.textSecondary,
+              fontWeight: '400'
+            }}>
+              Generate YouTube descriptions, titles, and more with AI
+            </p>
+          </div>
+          <IconButton
+            icon={<FiX size={18} />}
+            onClick={onClose}
+            variant="ghost"
+            size="sm"
+            aria-label="Close modal"
+          />
+        </div>
+
+        {/* Modal Content */}
+        <div style={{ padding: '32px' }}>
 
         {error && (
           <div style={{
             backgroundColor: theme.colors.error,
-            color: theme.colors.text,
-            padding: '10px',
-            borderRadius: '4px',
-            marginBottom: '20px',
-            fontSize: '14px'
+            color: theme.colors.errorForeground,
+            padding: '16px',
+            borderRadius: '8px',
+            marginBottom: '24px',
+            fontSize: '14px',
+            border: `1px solid ${theme.colors.error}`,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px'
           }}>
+            <FiAlertTriangle size={16} />
             {error}
           </div>
         )}
 
         {/* SRT Export Section */}
-        <div style={{ marginBottom: '30px', padding: '15px', backgroundColor: theme.colors.background, borderRadius: '6px' }}>
-          <h3 style={{ margin: '0 0 10px 0', fontSize: '16px', color: theme.colors.text }}>Export Subtitles for YouTube</h3>
-          <p style={{ margin: '0 0 15px 0', fontSize: '14px', color: theme.colors.textSecondary }}>
+        <div style={{ 
+          marginBottom: '32px', 
+          padding: '20px', 
+          backgroundColor: theme.colors.surface, 
+          borderRadius: '12px',
+          border: `1px solid ${theme.colors.border}`
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              backgroundColor: theme.colors.primary,
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '18px'
+            }}>
+              <FiFileText size={18} color={theme.colors.primaryForeground} />
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: theme.colors.text }}>
+                Export Subtitles
+              </h3>
+              <p style={{ margin: '2px 0 0 0', fontSize: '14px', color: theme.colors.textSecondary }}>
+                Generate SRT file for YouTube upload
+              </p>
+            </div>
+          </div>
+          <p style={{ margin: '0 0 16px 0', fontSize: '14px', color: theme.colors.textMuted, lineHeight: '1.5' }}>
             Export your subtitles as an SRT file to upload to YouTube for better accessibility and SEO.
           </p>
-          <button
+          <Button
             onClick={exportSRT}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: theme.colors.success,
-              color: theme.colors.text,
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: 'bold'
-            }}
+            variant="primary"
+            size="md"
+            leftIcon={<FiDownload size={16} />}
           >
             Export SRT File
-          </button>
+          </Button>
         </div>
 
         {/* Description Section */}
-        <div style={{ marginBottom: '30px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px' }}>
-            <h3 style={{ margin: 0, fontSize: '16px', color: theme.colors.text }}>YouTube Description</h3>
+        <div style={{ marginBottom: '32px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                backgroundColor: theme.colors.accent,
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '14px'
+              }}>
+                <FiEdit3 size={16} color={theme.colors.accentForeground} />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: theme.colors.text }}>
+                YouTube Description
+              </h3>
+            </div>
             <div style={{ display: 'flex', gap: '8px' }}>
               {description.trim() && (
-                <button
+                <Button
                   onClick={() => navigator.clipboard.writeText(description)}
-                  style={{
-                    padding: '8px',
-                    backgroundColor: theme.colors.success,
-                    color: theme.colors.text,
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '14px'
-                  }}
-                  title="Copy description"
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<FiCopy size={14} />}
                 >
-                  📋
-                </button>
+                  Copy
+                </Button>
               )}
-              <button
+              <Button
                 onClick={generateDescription}
                 disabled={isGeneratingDescription}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: isGeneratingDescription ? theme.colors.secondary : theme.colors.primary,
-                  color: theme.colors.text,
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: isGeneratingDescription ? 'not-allowed' : 'pointer',
-                  fontSize: '14px'
-                }}
+                variant="primary"
+                size="sm"
+                isLoading={isGeneratingDescription}
+                leftIcon={!isGeneratingDescription && <FiEdit3 size={14} />}
               >
                 {isGeneratingDescription ? 'Generating...' : 'Generate Description'}
-              </button>
+              </Button>
             </div>
           </div>
           <textarea
@@ -262,18 +342,43 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
             rows={8}
             style={{
               width: '100%',
-              padding: '12px',
-              backgroundColor: theme.colors.background,
+              padding: '16px',
+              backgroundColor: theme.colors.input.background,
               color: theme.colors.text,
               border: `1px solid ${theme.colors.border}`,
-              borderRadius: '4px',
+              borderRadius: '8px',
               fontSize: '14px',
               resize: 'vertical',
-              fontFamily: 'inherit'
+              fontFamily: 'inherit',
+              lineHeight: '1.5',
+              transition: 'all 0.2s ease',
+              outline: 'none'
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = theme.colors.borderFocus;
+              e.currentTarget.style.backgroundColor = theme.colors.input.backgroundFocus;
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = theme.colors.border;
+              e.currentTarget.style.backgroundColor = theme.colors.input.background;
             }}
           />
-          <div style={{ marginTop: '8px', fontSize: '12px', color: theme.colors.textSecondary }}>
-            Characters: {description.length} / 5000 (YouTube limit)
+          <div style={{ 
+            marginTop: '12px', 
+            fontSize: '12px', 
+            color: theme.colors.textSecondary,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <span>Characters: {description.length} / 5000</span>
+            <span style={{ 
+              color: description.length > 5000 ? theme.colors.error : 
+                     description.length > 4500 ? theme.colors.warning : theme.colors.textSecondary
+            }}>
+              {description.length > 5000 ? 'Exceeds YouTube limit' : 
+               description.length > 4500 ? 'Approaching limit' : 'Within YouTube limit'}
+            </span>
           </div>
         </div>
 
@@ -281,21 +386,15 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
         <div style={{ marginBottom: '30px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px' }}>
             <h3 style={{ margin: 0, fontSize: '16px', color: theme.colors.text }}>YouTube Titles</h3>
-            <button
+            <Button
               onClick={generateTitles}
               disabled={isGeneratingTitles || !description.trim()}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: isGeneratingTitles || !description.trim() ? theme.colors.secondary : theme.colors.success,
-                color: theme.colors.text,
-                border: 'none',
-                borderRadius: '4px',
-                cursor: isGeneratingTitles || !description.trim() ? 'not-allowed' : 'pointer',
-                fontSize: '14px'
-              }}
+              variant="primary"
+              size="sm"
+              isLoading={isGeneratingTitles}
             >
               {isGeneratingTitles ? 'Generating...' : 'Generate Titles'}
-            </button>
+            </Button>
           </div>
           
           {titles.length === 0 ? (
@@ -331,7 +430,7 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
                   </div>
                   <div style={{ 
                     fontSize: '12px', 
-                    color: titleObj.characterCount > 60 ? '#ff6b6b' : titleObj.characterCount < 40 ? '#ffd93d' : '#51cf66'
+                    color: titleObj.characterCount > 60 ? theme.colors.error : titleObj.characterCount < 40 ? theme.colors.warning : theme.colors.success
                   }}>
                     {titleObj.characterCount} characters 
                     {titleObj.characterCount > 60 ? ' (too long)' : 
@@ -347,7 +446,7 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
                       top: '8px',
                       right: '8px',
                       padding: '4px',
-                      backgroundColor: 'rgba(0,0,0,0.1)',
+                      backgroundColor: theme.colors.surface,
                       color: theme.colors.text,
                       border: 'none',
                       borderRadius: '3px',
@@ -373,21 +472,15 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
         <div style={{ marginBottom: '30px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px' }}>
             <h3 style={{ margin: 0, fontSize: '16px', color: theme.colors.text }}>Twitter Video Hooks</h3>
-            <button
+            <Button
               onClick={generateTweets}
               disabled={isGeneratingTweets}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: isGeneratingTweets ? theme.colors.secondary : '#1DA1F2',
-                color: theme.colors.text,
-                border: 'none',
-                borderRadius: '4px',
-                cursor: isGeneratingTweets ? 'not-allowed' : 'pointer',
-                fontSize: '14px'
-              }}
+              variant="primary"
+              size="sm"
+              isLoading={isGeneratingTweets}
             >
               {isGeneratingTweets ? 'Generating...' : 'Generate Tweet Hooks'}
-            </button>
+            </Button>
           </div>
           
           {tweets.length === 0 ? (
@@ -408,9 +501,9 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
                   key={index}
                   style={{
                     padding: '15px',
-                    backgroundColor: selectedTweetIndex === index ? '#1DA1F2' : theme.colors.background,
+                    backgroundColor: selectedTweetIndex === index ? theme.colors.primary : theme.colors.background,
                     border: '2px solid transparent',
-                    borderColor: selectedTweetIndex === index ? '#1DA1F2' : 'transparent',
+                    borderColor: selectedTweetIndex === index ? theme.colors.primary : 'transparent',
                     borderRadius: '6px',
                     cursor: 'pointer',
                     transition: 'all 0.2s',
@@ -447,7 +540,7 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
                       top: '10px',
                       right: '10px',
                       padding: '4px',
-                      backgroundColor: 'rgba(0,0,0,0.1)',
+                      backgroundColor: theme.colors.surface,
                       color: theme.colors.text,
                       border: 'none',
                       borderRadius: '3px',
@@ -473,21 +566,15 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
         <div style={{ marginBottom: '30px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px' }}>
             <h3 style={{ margin: 0, fontSize: '16px', color: theme.colors.text }}>Thumbnail Ideas</h3>
-            <button
+            <Button
               onClick={generateThumbnails}
               disabled={isGeneratingThumbnails}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: isGeneratingThumbnails ? theme.colors.secondary : '#FF6B35',
-                color: theme.colors.text,
-                border: 'none',
-                borderRadius: '4px',
-                cursor: isGeneratingThumbnails ? 'not-allowed' : 'pointer',
-                fontSize: '14px'
-              }}
+              variant="primary"
+              size="sm"
+              isLoading={isGeneratingThumbnails}
             >
               {isGeneratingThumbnails ? 'Generating...' : 'Generate Thumbnail Ideas'}
-            </button>
+            </Button>
           </div>
           
           {thumbnails.length === 0 ? (
@@ -555,38 +642,24 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
 
         {/* Action Buttons */}
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-          <button
+          <Button
             onClick={onClose}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: theme.colors.secondary,
-              color: theme.colors.text,
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '14px'
-            }}
+            variant="secondary"
+            size="md"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleSave}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: theme.colors.success,
-              color: theme.colors.text,
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: 'bold'
-            }}
+            variant="success"
+            size="md"
           >
             Save to Project
-          </button>
+          </Button>
         </div>
+      </div>
 
-        {/* SRT Export Success Modal */}
+      {/* SRT Export Success Modal */}
         {showSrtSuccess && (
           <div style={{
             position: 'fixed',
@@ -630,35 +703,20 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
                 {exportedSrtPath}
               </div>
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-                <button
+                <Button
                   onClick={() => setShowSrtSuccess(false)}
-                  style={{
-                    padding: '10px 20px',
-                    backgroundColor: theme.colors.secondary,
-                    color: theme.colors.text,
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '14px'
-                  }}
+                  variant="secondary"
+                  size="md"
                 >
                   Close
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={handleShowSrtInFinder}
-                  style={{
-                    padding: '10px 20px',
-                    backgroundColor: theme.colors.primary,
-                    color: theme.colors.text,
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: 'bold'
-                  }}
+                  variant="primary"
+                  size="md"
                 >
                   Show in Finder
-                </button>
+                </Button>
               </div>
             </div>
           </div>
