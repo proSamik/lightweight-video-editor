@@ -99,10 +99,74 @@ function createWindow(): void {
 
 app.whenReady().then(createWindow);
 
+// Handle app lifecycle events for proper cleanup
 app.on('window-all-closed', () => {
+  // Cleanup FFmpeg processes before quitting
+  try {
+    const ffmpegService = FFmpegService.getInstance();
+    ffmpegService.cleanup();
+    
+    const { StreamingVideoRenderer } = require('../services/streamingRenderer');
+    const renderer = StreamingVideoRenderer.getInstance();
+    renderer.cleanup();
+  } catch (error) {
+    console.warn('Error during cleanup:', error);
+  }
+  
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('activate', () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow();
+  }
+});
+
+app.on('before-quit', () => {
+  // Ensure cleanup happens before app quits
+  try {
+    const ffmpegService = FFmpegService.getInstance();
+    ffmpegService.cleanup();
+    
+    const { StreamingVideoRenderer } = require('../services/streamingRenderer');
+    const renderer = StreamingVideoRenderer.getInstance();
+    renderer.cleanup();
+  } catch (error) {
+    console.warn('Error during cleanup:', error);
+  }
+});
+
+// Handle process termination signals
+process.on('SIGINT', () => {
+  console.log('Received SIGINT, cleaning up...');
+  try {
+    const ffmpegService = FFmpegService.getInstance();
+    ffmpegService.cleanup();
+    
+    const { StreamingVideoRenderer } = require('../services/streamingRenderer');
+    const renderer = StreamingVideoRenderer.getInstance();
+    renderer.cleanup();
+  } catch (error) {
+    console.warn('Error during cleanup:', error);
+  }
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  console.log('Received SIGTERM, cleaning up...');
+  try {
+    const ffmpegService = FFmpegService.getInstance();
+    ffmpegService.cleanup();
+    
+    const { StreamingVideoRenderer } = require('../services/streamingRenderer');
+    const renderer = StreamingVideoRenderer.getInstance();
+    renderer.cleanup();
+  } catch (error) {
+    console.warn('Error during cleanup:', error);
+  }
+  process.exit(0);
 });
 
 app.on('activate', () => {
@@ -298,7 +362,7 @@ ipcMain.handle('render-video-with-captions', async (event, videoPath: string, ca
         // Send progress updates to renderer
         event.sender.send('rendering-progress', progress);
       }, exportSettings);
-    }
+    } 
   } catch (error) {
     throw new Error(`Failed to render video: ${error}`);
   }
@@ -548,5 +612,16 @@ ipcMain.handle('get-available-models', async (_event, settings: any) => {
   } catch (error) {
     console.error('Failed to get available models:', error);
     throw new Error(`Failed to get available models: ${error}`);
+  }
+});
+
+ipcMain.handle('cancel-rendering', async () => {
+  try {
+    const ffmpegService = FFmpegService.getInstance();
+    ffmpegService.cancelRendering();
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to cancel rendering:', error);
+    throw new Error(`Failed to cancel rendering: ${error}`);
   }
 });
