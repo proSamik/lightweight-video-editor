@@ -45,19 +45,20 @@ const TabbedRightPanel: React.FC<TabbedRightPanelProps> = ({
 
   const tabStyle = (isActive: boolean) => ({
     flex: 1,
-    padding: '10px 16px',
-    backgroundColor: isActive ? theme.colors.primary : theme.colors.surface,
-    color: theme.colors.text,
+    padding: '12px 16px',
+    backgroundColor: 'transparent',
+    color: isActive ? theme.colors.text : theme.colors.textSecondary,
     border: 'none',
+    borderBottom: isActive ? `2px solid ${theme.colors.primary}` : `2px solid transparent`,
     cursor: 'pointer',
-    fontSize: '13px',
-    fontWeight: '500',
-    transition: 'all 0.2s ease',
+    fontSize: '14px',
+    fontWeight: isActive ? '500' : '400',
+    transition: 'all 0.15s ease',
     borderRadius: '0',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '6px'
+    gap: '8px'
   });
 
   return (
