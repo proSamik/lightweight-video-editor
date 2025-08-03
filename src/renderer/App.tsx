@@ -1201,7 +1201,7 @@ const AppContent: React.FC = () => {
         }}>
           {/* Left Panel - Video Preview */}
           <div style={{ 
-            flex: '1 1 60%', 
+            flex: '1 1 75%', 
             display: 'flex', 
             flexDirection: 'column',
             borderRight: `1px solid ${theme.colors.border}`,
@@ -1224,9 +1224,9 @@ const AppContent: React.FC = () => {
 
           {/* Right Panel - Tabbed Controls */}
           <div style={{ 
-            flex: '1 1 40%', 
-            minWidth: '350px',
-            maxWidth: '450px',
+            flex: '1 1 25%', 
+            minWidth: '300px',
+            maxWidth: '400px',
             minHeight: 0
           }}>
             <TabbedRightPanel
