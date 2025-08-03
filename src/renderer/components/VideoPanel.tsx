@@ -364,7 +364,9 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
         display: 'flex',
         flexDirection: 'column',
         backgroundColor: theme.colors.background,
-        margin: '20px'
+        padding: '1px',
+        border: `1px solid ${theme.colors.border}`,
+        borderRadius: '2px'
       }}
     >
 
@@ -375,7 +377,8 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
         position: 'relative',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center'
+        justifyContent: 'center',
+        minHeight: 0
       }}>
         <video
           ref={videoRef}
