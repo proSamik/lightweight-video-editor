@@ -4,9 +4,10 @@ import { useTheme } from '../contexts/ThemeContext';
 interface LoadingScreenProps {
   message: string;
   progress?: number; // Progress percentage (0-100)
+  onCancel?: () => void; // Optional cancel callback
 }
 
-const LoadingScreen: React.FC<LoadingScreenProps> = ({ message, progress }) => {
+const LoadingScreen: React.FC<LoadingScreenProps> = ({ message, progress, onCancel }) => {
   const { theme } = useTheme();
   return (
     <div style={{
@@ -73,6 +74,34 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ message, progress }) => {
             {Math.round(progress)}%
           </div>
         </div>
+      )}
+      
+      {onCancel && (
+        <button
+          onClick={onCancel}
+          style={{
+            marginTop: '20px',
+            padding: '12px 24px',
+            backgroundColor: 'transparent',
+            border: `2px solid ${theme.colors.border}`,
+            borderRadius: '8px',
+            color: theme.colors.text,
+            fontSize: '14px',
+            fontWeight: '500',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = theme.colors.border;
+            e.currentTarget.style.borderColor = theme.colors.text;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent';
+            e.currentTarget.style.borderColor = theme.colors.border;
+          }}
+        >
+          Cancel
+        </button>
       )}
       
       <style>{`
