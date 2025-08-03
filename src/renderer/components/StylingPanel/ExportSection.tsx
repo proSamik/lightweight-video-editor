@@ -152,7 +152,6 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
             variant="primary"
             size="lg"
             leftIcon={<VideoIcon />}
-            rightIcon={<SettingsIcon />}
             onClick={onShowExportSettings}
             disabled={!canExport}
             fullWidth
