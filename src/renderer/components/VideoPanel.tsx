@@ -8,6 +8,7 @@ interface VideoPanelProps {
   captions: CaptionSegment[];
   currentTime: number;
   onTimeUpdate: (time: number) => void;
+  onTimeSeek?: (time: number) => void;
   onVideoSelect: () => void;
   onVideoDropped?: (filePath: string) => void;
   selectedSegmentId?: string | null;
@@ -21,6 +22,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   captions,
   currentTime,
   onTimeUpdate,
+  onTimeSeek,
   onVideoSelect,
   onVideoDropped,
   selectedSegmentId,
@@ -36,6 +38,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [isResizing, setIsResizing] = useState(false);
+  const [isTimelineDragging, setIsTimelineDragging] = useState(false);
 
   // Mouse interaction handlers for text box manipulation
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -102,6 +105,50 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   const handleCanvasMouseUp = () => {
     setIsDragging(false);
   };
+
+  // Mini timeline handlers for fullscreen mode
+  const handleTimelineMouseDown = (e: React.MouseEvent) => {
+    if (!onTimeSeek || !videoFile?.duration) return;
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const percentage = clickX / rect.width;
+    const seekTime = percentage * (videoFile.duration * 1000);
+    
+    setIsTimelineDragging(true);
+    onTimeSeek(seekTime);
+  };
+
+  const handleTimelineMouseMove = useCallback((e: MouseEvent) => {
+    if (!isTimelineDragging || !onTimeSeek || !videoFile?.duration) return;
+    
+    const target = e.target as HTMLElement;
+    if (!target.classList.contains('mini-timeline')) return;
+    
+    const rect = target.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const percentage = Math.max(0, Math.min(1, mouseX / rect.width));
+    const seekTime = percentage * (videoFile.duration * 1000);
+    
+    onTimeSeek(seekTime);
+  }, [isTimelineDragging, onTimeSeek, videoFile?.duration]);
+
+  const handleTimelineMouseUp = useCallback(() => {
+    setIsTimelineDragging(false);
+  }, []);
+
+  // Set up timeline mouse event listeners
+  useEffect(() => {
+    if (isTimelineDragging) {
+      document.addEventListener('mousemove', handleTimelineMouseMove);
+      document.addEventListener('mouseup', handleTimelineMouseUp);
+    }
+    
+    return () => {
+      document.removeEventListener('mousemove', handleTimelineMouseMove);
+      document.removeEventListener('mouseup', handleTimelineMouseUp);
+    };
+  }, [isTimelineDragging, handleTimelineMouseMove, handleTimelineMouseUp]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -310,13 +357,16 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   }
 
   return (
-    <div style={{ 
-      flex: 1, 
-      display: 'flex',
-      flexDirection: 'column',
-              backgroundColor: theme.colors.background,
-      margin: '20px'
-    }}>
+    <div 
+      data-video-preview
+      style={{ 
+        flex: 1, 
+        display: 'flex',
+        flexDirection: 'column',
+        backgroundColor: theme.colors.background,
+        margin: '20px'
+      }}
+    >
       {/* Modern Preview Header */}
       <div style={{
         display: 'flex',
@@ -421,6 +471,63 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
             pointerEvents: 'none'
           }}
         />
+
+        {/* Mini Timeline for Fullscreen Mode */}
+        {document.fullscreenElement && videoFile && videoFile.duration && onTimeSeek && (
+          <div style={{
+            position: 'absolute',
+            bottom: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: '300px',
+            height: '40px',
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            borderRadius: '20px',
+            padding: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            zIndex: 1000
+          }}>
+            <div
+              className="mini-timeline"
+              style={{
+                width: '100%',
+                height: '24px',
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                borderRadius: '12px',
+                position: 'relative',
+                cursor: 'pointer'
+              }}
+              onMouseDown={handleTimelineMouseDown}
+            >
+              {/* Progress bar */}
+              <div style={{
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                height: '100%',
+                width: `${(currentTime / (videoFile.duration * 1000)) * 100}%`,
+                backgroundColor: theme.colors.primary,
+                borderRadius: '12px',
+                transition: 'width 0.1s ease'
+              }} />
+              
+              {/* Playhead */}
+              <div style={{
+                position: 'absolute',
+                left: `${(currentTime / (videoFile.duration * 1000)) * 100}%`,
+                top: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: '8px',
+                height: '8px',
+                backgroundColor: theme.colors.primary,
+                borderRadius: '50%',
+                border: '2px solid white',
+                boxShadow: '0 0 4px rgba(0,0,0,0.5)'
+              }} />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Modern Canvas Info Footer */}
