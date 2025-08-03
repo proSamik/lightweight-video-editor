@@ -225,6 +225,35 @@ export class ProjectManager {
     }
   }
 
+  /**
+   * Rename a project file
+   */
+  public async renameProject(filePath: string, newName: string): Promise<void> {
+    try {
+      // Always add .lvep extension, remove any existing extension first
+      const baseName = newName.replace(/\.[^/.]+$/, ''); // Remove any extension
+      const newFileName = `${baseName}.lvep`;
+      const newFilePath = path.join(this.projectsDir, newFileName);
+      
+      // Check if the new file name already exists
+      if (fs.existsSync(newFilePath) && newFilePath !== filePath) {
+        throw new Error('A project with this name already exists');
+      }
+      
+      // Rename the file
+      await fs.promises.rename(filePath, newFilePath);
+      
+      // Update current project path if this was the current project
+      if (this.currentProjectPath === filePath) {
+        this.currentProjectPath = newFilePath;
+      }
+      
+      console.log(`Project renamed: ${filePath} -> ${newFilePath}`);
+    } catch (error) {
+      throw new Error(`Failed to rename project: ${error}`);
+    }
+  }
+
   public async autoSaveProject(projectData: ProjectData): Promise<string> {
     try {
       const autoSaveFileName = 'autosave.lvep';
