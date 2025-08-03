@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { SaveProjectIcon } from './IconComponents';
 import { ProjectData } from '../../types';
-import { FiX, FiPlay, FiTrash2, FiCalendar, FiVideo } from 'react-icons/fi';
+import { FiX, FiPlay, FiTrash2, FiCalendar, FiVideo, FiEdit3, FiCheck, FiX as FiXIcon } from 'react-icons/fi';
 
 interface ProjectManagerProps {
   isOpen: boolean;
@@ -30,6 +30,8 @@ const ProjectManagerModal: React.FC<ProjectManagerProps> = ({
   const [recentProjects, setRecentProjects] = useState<ProjectListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'recent' | 'save'>('recent');
+  const [editingProject, setEditingProject] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
 
   useEffect(() => {
     if (isOpen) {
@@ -80,6 +82,34 @@ const ProjectManagerModal: React.FC<ProjectManagerProps> = ({
         console.error('Failed to delete project:', error);
         alert('Failed to delete project.');
       }
+    }
+  };
+
+  const handleStartRename = (project: ProjectListItem) => {
+    setEditingProject(project.filePath);
+    // Remove the .lvep extension for editing
+    const baseName = project.fileName.replace(/\.lvep$/, '');
+    setEditName(baseName);
+  };
+
+  const handleCancelRename = () => {
+    setEditingProject(null);
+    setEditName('');
+  };
+
+  const handleConfirmRename = async () => {
+    if (!editingProject || !editName.trim()) {
+      handleCancelRename();
+      return;
+    }
+
+    try {
+      await window.electronAPI.renameProject(editingProject, editName.trim());
+      loadRecentProjects(); // Refresh the list
+      handleCancelRename();
+    } catch (error) {
+      console.error('Failed to rename project:', error);
+      alert('Failed to rename project. Please try again.');
     }
   };
 
@@ -301,14 +331,80 @@ const ProjectManagerModal: React.FC<ProjectManagerProps> = ({
                       }}
                     >
                       <div style={{ flex: 1 }}>
-                        <div style={{ 
-                          fontSize: '16px', 
-                          color: theme.colors.text,
-                          marginBottom: '8px',
-                          fontWeight: '500'
-                        }}>
-                          {project.fileName}
-                        </div>
+                        {editingProject === project.filePath ? (
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            marginBottom: '8px'
+                          }}>
+                            <input
+                              type="text"
+                              value={editName}
+                              onChange={(e) => setEditName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleConfirmRename();
+                                } else if (e.key === 'Escape') {
+                                  handleCancelRename();
+                                }
+                              }}
+                              style={{
+                                flex: 1,
+                                padding: '6px 12px',
+                                fontSize: '16px',
+                                fontWeight: '500',
+                                color: theme.colors.text,
+                                backgroundColor: theme.colors.input.background,
+                                border: `1px solid ${theme.colors.border}`,
+                                borderRadius: '4px',
+                                outline: 'none'
+                              }}
+                              autoFocus
+                            />
+                            <button
+                              onClick={handleConfirmRename}
+                              style={{
+                                padding: '6px',
+                                backgroundColor: theme.colors.success,
+                                color: theme.colors.successForeground,
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                            >
+                              <FiCheck size={14} />
+                            </button>
+                            <button
+                              onClick={handleCancelRename}
+                              style={{
+                                padding: '6px',
+                                backgroundColor: theme.colors.secondary,
+                                color: theme.colors.secondaryForeground,
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                            >
+                              <FiXIcon size={14} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div style={{ 
+                            fontSize: '16px', 
+                            color: theme.colors.text,
+                            marginBottom: '8px',
+                            fontWeight: '500'
+                          }}>
+                            {project.fileName}
+                          </div>
+                        )}
                         {project.videoFileName && (
                           <div style={{ 
                             fontSize: '14px', 
@@ -362,6 +458,37 @@ const ProjectManagerModal: React.FC<ProjectManagerProps> = ({
                         >
                           <FiPlay size={14} />
                           Load
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleStartRename(project);
+                          }}
+                          style={{
+                            padding: '8px',
+                            backgroundColor: 'transparent',
+                            color: theme.colors.textMuted,
+                            border: `1px solid ${theme.colors.border}`,
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = theme.colors.accent;
+                            e.currentTarget.style.color = theme.colors.accentForeground;
+                            e.currentTarget.style.borderColor = theme.colors.accent;
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                            e.currentTarget.style.color = theme.colors.textMuted;
+                            e.currentTarget.style.borderColor = theme.colors.border;
+                          }}
+                        >
+                          <FiEdit3 size={14} />
                         </button>
                         <button
                           onClick={(e) => {
