@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { AISettings, AIModel } from '../../types';
 import { useTheme } from '../contexts/ThemeContext';
+import { Button, IconButton } from './ui';
+import { 
+  FiX, 
+  FiSettings
+} from 'react-icons/fi';
 
 interface AISettingsModalProps {
   isOpen: boolean;
@@ -114,47 +119,119 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    backgroundColor: theme.colors.modal.overlay,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,
+    backdropFilter: 'blur(8px)',
   };
 
   const contentStyle: React.CSSProperties = {
-    backgroundColor: theme.colors.surface,
-    borderRadius: '8px',
-    padding: '30px',
-    width: '600px',
-    maxWidth: '90vw',
-    maxHeight: '80vh',
+    backgroundColor: theme.colors.modal.background,
+    borderRadius: '12px',
+    border: `1px solid ${theme.colors.modal.border}`,
+    padding: '0',
+    width: '700px',
+    maxWidth: '95vw',
+    maxHeight: '90vh',
     overflowY: 'auto',
     color: theme.colors.text,
+    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
   };
 
   return (
     <div style={modalStyle} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div style={contentStyle}>
-        <h2 style={{ margin: '0 0 25px 0', fontSize: '20px', fontWeight: 'bold' }}>
-          AI Settings
-        </h2>
+        {/* Modal Header */}
+        <div style={{
+          padding: '24px 32px',
+          borderBottom: `1px solid ${theme.colors.border}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              backgroundColor: theme.colors.primary,
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <FiSettings size={20} color={theme.colors.primaryForeground} />
+            </div>
+            <div>
+              <h2 style={{ 
+                margin: 0, 
+                fontSize: '24px', 
+                fontWeight: '600', 
+                lineHeight: '1.2'
+              }}>
+                AI Settings
+              </h2>
+              <p style={{
+                margin: '2px 0 0 0',
+                fontSize: '14px',
+                color: theme.colors.textSecondary
+              }}>
+                Configure AI providers and custom prompts
+              </p>
+            </div>
+          </div>
+          <IconButton
+            icon={<FiX size={18} />}
+            onClick={onClose}
+            variant="ghost"
+            size="sm"
+            aria-label="Close modal"
+          />
+        </div>
+
+        {/* Modal Content */}
+        <div style={{ padding: '32px' }}>
 
         {/* Provider Selection */}
-        <div style={{ marginBottom: '25px' }}>
-          <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
-            AI Provider
-          </label>
+        <div style={{ marginBottom: '32px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              backgroundColor: theme.colors.accent,
+              borderRadius: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <FiSettings size={16} color={theme.colors.accentForeground} />
+            </div>
+            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: theme.colors.text }}>
+              AI Provider
+            </h3>
+          </div>
           <select
             value={settings.selectedProvider}
             onChange={(e) => handleProviderChange(e.target.value as any)}
             style={{
               width: '100%',
-              padding: '10px',
-              backgroundColor: theme.colors.background,
+              padding: '12px 16px',
+              backgroundColor: theme.colors.input.background,
               color: theme.colors.text,
               border: `1px solid ${theme.colors.border}`,
-              borderRadius: '4px',
-              fontSize: '14px'
+              borderRadius: '8px',
+              fontSize: '14px',
+              transition: 'all 0.2s ease',
+              outline: 'none'
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = theme.colors.borderFocus;
+              e.currentTarget.style.backgroundColor = theme.colors.input.backgroundFocus;
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = theme.colors.border;
+              e.currentTarget.style.backgroundColor = theme.colors.input.background;
             }}
           >
             <option value="anthropic">Anthropic (Claude)</option>
@@ -185,9 +262,9 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
               style={{
                 width: '100%',
                 padding: '10px',
-                backgroundColor: '#333',
-                color: '#fff',
-                border: '1px solid #555',
+                backgroundColor: theme.colors.background,
+                color: theme.colors.text,
+                border: `1px solid ${theme.colors.border}`,
                 borderRadius: '4px',
                 fontSize: '14px'
               }}
@@ -335,21 +412,15 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
 
         {/* Connection Test */}
         <div style={{ marginBottom: '25px' }}>
-          <button
+          <Button
             onClick={testConnection}
             disabled={testingConnection}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: connectionStatus === 'success' ? theme.colors.success : connectionStatus === 'error' ? theme.colors.error : theme.colors.secondary,
-              color: theme.colors.text,
-              border: 'none',
-              borderRadius: '4px',
-              cursor: testingConnection ? 'not-allowed' : 'pointer',
-              fontSize: '12px'
-            }}
+            variant={connectionStatus === 'success' ? 'success' : connectionStatus === 'error' ? 'destructive' : 'secondary'}
+            size="sm"
+            isLoading={testingConnection}
           >
             {testingConnection ? 'Testing...' : 'Test Connection'}
-          </button>
+          </Button>
           {connectionStatus === 'success' && (
             <span style={{ marginLeft: '10px', color: theme.colors.success, fontSize: '12px' }}>✓ Connection successful</span>
           )}
@@ -458,38 +529,24 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
             Generate visual concept descriptions with colors, emotions, and CTR optimization tips
           </div>
         </div>
+        </div>
 
         {/* Buttons */}
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-          <button
+          <Button
             onClick={onClose}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: theme.colors.secondary,
-              color: theme.colors.text,
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '14px'
-            }}
+            variant="secondary"
+            size="md"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleSave}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: theme.colors.primary,
-              color: theme.colors.text,
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: 'bold'
-            }}
+            variant="primary"
+            size="md"
           >
             Save Settings
-          </button>
+          </Button>
         </div>
       </div>
     </div>
