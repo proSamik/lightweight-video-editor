@@ -474,7 +474,7 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
             <h3 style={{ margin: 0, fontSize: '16px', color: theme.colors.text }}>Twitter Video Hooks</h3>
             <Button
               onClick={generateTweets}
-              disabled={isGeneratingTweets}
+              disabled={isGeneratingTweets || !description.trim()}
               variant="primary"
               size="sm"
               isLoading={isGeneratingTweets}
@@ -568,7 +568,7 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
             <h3 style={{ margin: 0, fontSize: '16px', color: theme.colors.text }}>Thumbnail Ideas</h3>
             <Button
               onClick={generateThumbnails}
-              disabled={isGeneratingThumbnails}
+              disabled={isGeneratingThumbnails || !description.trim()}
               variant="primary"
               size="sm"
               isLoading={isGeneratingThumbnails}
