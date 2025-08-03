@@ -287,10 +287,10 @@ const WAVEFORM_HEIGHT = 100;
   return (
     <div style={{
       height: `${TIMELINE_HEIGHT}px`,
-      backgroundColor: theme.colors.surface,
+      backgroundColor: theme.colors.background,
       borderTop: `1px solid ${theme.colors.border}`,
       position: 'relative',
-      overflow: 'hidden'
+      overflow: 'hidden',
     }}>
       <style>
         {`
@@ -408,7 +408,7 @@ const WAVEFORM_HEIGHT = 100;
           </button>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', paddingRight: '8px' }}>
           {/* Undo/Redo Controls */}
           <button
             onClick={onUndo}
@@ -531,7 +531,8 @@ const WAVEFORM_HEIGHT = 100;
           cursor: isDragging ? 'grabbing' : 'pointer',
           backgroundColor: theme.colors.background,
           overflow: 'hidden',
-          paddingBottom: '8px'
+          paddingBottom: '8px',
+          marginLeft: '10px',
         }}
         onMouseDown={handleTimelineMouseDown}
       >
@@ -584,8 +585,6 @@ const WAVEFORM_HEIGHT = 100;
           </div>
         )}
 
-
-
         {/* Scrubber/Playhead */}
         <div style={{
           position: 'absolute',
@@ -610,37 +609,6 @@ const WAVEFORM_HEIGHT = 100;
             borderRadius: '50%',
             cursor: 'grab'
           }} />
-        </div>
-
-        {/* Time markers */}
-        <div style={{
-          position: 'absolute',
-          top: `${WAVEFORM_HEIGHT}px`,
-          left: 0,
-          right: 0,
-          height: `${SCRUBBER_HEIGHT}px`,
-          backgroundColor: theme.colors.background
-        }}>
-          {Array.from({ length: 11 }, (_, i) => {
-            const time = (i / 10) * totalDuration;
-            return (
-              <div
-                key={i}
-                style={{
-                  position: 'absolute',
-                  left: `${i * 10}%`,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  fontSize: '9px',
-                  color: theme.colors.textSecondary,
-                  whiteSpace: 'nowrap',
-                  fontFamily: 'monospace'
-                }}
-              >
-                {formatTime(time)}
-              </div>
-            );
-          })}
         </div>
       </div>
 
@@ -690,111 +658,6 @@ const WAVEFORM_HEIGHT = 100;
           >
             <FiTrash2 size={14} />
             Delete Segment
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {deleteConfirm && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 2000
-        }}>
-          <div style={{
-            backgroundColor: theme.colors.background,
-            border: `1px solid ${theme.colors.border}`,
-            borderRadius: '8px',
-            padding: '24px',
-            maxWidth: '400px',
-            width: '90%'
-          }}>
-            <h3 style={{
-              margin: '0 0 16px 0',
-              color: theme.colors.text,
-              fontSize: '16px'
-            }}>
-              Delete Caption Segment?
-            </h3>
-            <p style={{
-              margin: '0 0 16px 0',
-              color: theme.colors.textSecondary,
-              fontSize: '14px',
-              lineHeight: '1.4'
-            }}>
-              Are you sure you want to delete this caption segment?
-            </p>
-            <div style={{
-              backgroundColor: theme.colors.surface,
-              border: `1px solid ${theme.colors.border}`,
-              borderRadius: '4px',
-              padding: '12px',
-              margin: '0 0 20px 0',
-              fontSize: '12px',
-              color: theme.colors.textSecondary,
-              maxHeight: '80px',
-              overflowY: 'auto'
-            }}>
-              "{deleteConfirm.text}"
-            </div>
-            <div style={{
-              display: 'flex',
-              gap: '12px',
-              justifyContent: 'flex-end'
-            }}>
-              <button
-                onClick={() => setDeleteConfirm(null)}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: theme.colors.secondary,
-                  color: theme.colors.secondaryForeground,
-                  border: `1px solid ${theme.colors.border}`,
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = theme.colors.secondaryHover;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = theme.colors.secondary;
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  onSegmentDelete(deleteConfirm.segmentId);
-                  setDeleteConfirm(null);
-                }}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: theme.colors.error,
-                  color: theme.colors.errorForeground,
-                  border: `1px solid ${theme.colors.error}`,
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = theme.colors.errorHover;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = theme.colors.error;
-                }}
-              >
-                Delete
-              </button>
-            </div>
           </div>
         </div>
       )}
