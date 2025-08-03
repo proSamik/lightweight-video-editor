@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTheme } from '../contexts/ThemeContext';
-import { CelebrationIcon, ShowInFinderIcon } from './IconComponents';
+import { Button, IconButton } from './ui';
+import { FiCheckCircle, FiFolder, FiX } from 'react-icons/fi';
 
 interface SuccessModalProps {
   isOpen: boolean;
@@ -27,148 +28,188 @@ const SuccessModal: React.FC<SuccessModalProps> = ({
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+      backgroundColor: theme.colors.modal.overlay,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 1000
+      zIndex: 1000,
+      backdropFilter: 'blur(8px)'
     }}>
       <div style={{
-        backgroundColor: theme.colors.surface,
-        borderRadius: '12px',
-        padding: '32px',
-        minWidth: '400px',
-        maxWidth: '500px',
-        border: `1px solid ${theme.colors.border}`,
-        textAlign: 'center'
+        backgroundColor: theme.colors.modal.background,
+        borderRadius: '16px',
+        border: `1px solid ${theme.colors.modal.border}`,
+        padding: '0',
+        minWidth: '500px',
+        maxWidth: '600px',
+        textAlign: 'center',
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+        position: 'relative',
+        overflow: 'hidden'
       }}>
-        {/* Success Icon */}
+        {/* Modal Header */}
         <div style={{
-          width: '80px',
-          height: '80px',
-          backgroundColor: theme.colors.success,
-          borderRadius: '50%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          margin: '0 auto 24px',
-          color: theme.colors.text
+          padding: '32px 32px 24px',
+          position: 'relative'
         }}>
-          <CelebrationIcon size={40} />
-        </div>
-
-        <h2 style={{ 
-          margin: '0 0 16px 0', 
-          fontSize: '24px',
-          color: theme.colors.text
-        }}>
-          Export Complete!
-        </h2>
-
-        <p style={{
-          margin: '0 0 24px 0',
-          fontSize: '16px',
-          color: theme.colors.textSecondary,
-          lineHeight: '1.5'
-        }}>
-          Your video with captions has been successfully exported.
-        </p>
-
-        {/* File Info */}
-        <div style={{
-          backgroundColor: theme.colors.background,
-          border: `1px solid ${theme.colors.border}`,
-          borderRadius: '8px',
-          padding: '16px',
-          marginBottom: '24px',
-          textAlign: 'left'
-        }}>
+          {/* Close Button */}
           <div style={{
-            fontSize: '12px',
-            color: theme.colors.textSecondary,
-            marginBottom: '4px'
+            position: 'absolute',
+            top: '20px',
+            right: '20px'
           }}>
-            File saved as:
+            <IconButton
+              icon={<FiX size={18} />}
+              onClick={onClose}
+              variant="ghost"
+              size="sm"
+              aria-label="Close modal"
+            />
           </div>
+
+          {/* Success Icon */}
           <div style={{
-            fontSize: '14px',
+            width: '80px',
+            height: '80px',
+            backgroundColor: theme.colors.success,
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 24px',
+            position: 'relative',
+            boxShadow: `0 0 0 8px ${theme.colors.success}20`
+          }}>
+            <FiCheckCircle size={40} color={theme.colors.successForeground} />
+          </div>
+
+          <h2 style={{ 
+            margin: '0 0 12px 0', 
+            fontSize: '28px',
+            fontWeight: '700',
             color: theme.colors.text,
-            fontFamily: 'monospace',
-            wordBreak: 'break-all',
-            lineHeight: '1.4'
+            lineHeight: '1.2'
           }}>
-            {fileName}
-          </div>
-          <div style={{
-            fontSize: '11px',
+            Export Complete!
+          </h2>
+
+          <p style={{
+            margin: '0 0 0 0',
+            fontSize: '16px',
             color: theme.colors.textSecondary,
-            marginTop: '8px',
-            wordBreak: 'break-all'
+            lineHeight: '1.5',
+            fontWeight: '400'
           }}>
-            {filePath}
+            Your video with captions has been successfully exported.
+          </p>
+        </div>
+
+        {/* File Info Section */}
+        <div style={{ padding: '0 32px 32px' }}>
+          <div style={{
+            backgroundColor: theme.colors.surface,
+            border: `1px solid ${theme.colors.border}`,
+            borderRadius: '12px',
+            padding: '20px',
+            marginBottom: '24px',
+            textAlign: 'left'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                backgroundColor: theme.colors.primary,
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <FiFolder size={16} color={theme.colors.primaryForeground} />
+              </div>
+              <h3 style={{
+                margin: 0,
+                fontSize: '16px',
+                fontWeight: '600',
+                color: theme.colors.text
+              }}>
+                Export Details
+              </h3>
+            </div>
+            
+            <div style={{
+              backgroundColor: theme.colors.background,
+              border: `1px solid ${theme.colors.border}`,
+              borderRadius: '8px',
+              padding: '16px'
+            }}>
+              <div style={{
+                fontSize: '12px',
+                color: theme.colors.textSecondary,
+                marginBottom: '8px',
+                fontWeight: '500',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}>
+                File Name
+              </div>
+              <div style={{
+                fontSize: '14px',
+                color: theme.colors.text,
+                fontFamily: 'monospace',
+                wordBreak: 'break-all',
+                lineHeight: '1.4',
+                marginBottom: '12px',
+                fontWeight: '500'
+              }}>
+                {fileName}
+              </div>
+              
+              <div style={{
+                fontSize: '12px',
+                color: theme.colors.textSecondary,
+                marginBottom: '8px',
+                fontWeight: '500',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}>
+                Location
+              </div>
+              <div style={{
+                fontSize: '12px',
+                color: theme.colors.textMuted,
+                wordBreak: 'break-all',
+                lineHeight: '1.4',
+                fontFamily: 'monospace'
+              }}>
+                {filePath}
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div style={{
+            display: 'flex',
+            gap: '12px',
+            justifyContent: 'center'
+          }}>
+            <Button
+              onClick={onShowInFinder}
+              variant="primary"
+              size="lg"
+              leftIcon={<FiFolder size={16} />}
+            >
+              Show in Finder
+            </Button>
+            <Button
+              onClick={onClose}
+              variant="outline"
+              size="lg"
+            >
+              Close
+            </Button>
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div style={{
-          display: 'flex',
-          gap: '12px',
-          justifyContent: 'center'
-        }}>
-          <button
-            onClick={onShowInFinder}
-            style={{
-              padding: '12px 24px',
-              backgroundColor: theme.colors.primary,
-              color: theme.colors.text,
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: 'bold',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-          >
-            <ShowInFinderIcon size={16} />
-            Show in Finder
-          </button>
-          <button
-            onClick={onClose}
-            style={{
-              padding: '12px 24px',
-              backgroundColor: theme.colors.surface,
-              color: theme.colors.text,
-              border: `1px solid ${theme.colors.border}`,
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '14px'
-            }}
-          >
-            Close
-          </button>
-        </div>
-
-        {/* Celebration animation */}
-        <div style={{
-          position: 'absolute',
-          top: '20px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          animation: 'celebration 2s ease-in-out infinite',
-          color: theme.colors.text
-        }}>
-          <CelebrationIcon size={24} />
-        </div>
-
-        <style>{`
-          @keyframes celebration {
-            0%, 100% { transform: translateX(-50%) translateY(0px) rotate(0deg); }
-            25% { transform: translateX(-50%) translateY(-10px) rotate(-15deg); }
-            75% { transform: translateX(-50%) translateY(-5px) rotate(15deg); }
-          }
-        `}</style>
       </div>
     </div>
   );
