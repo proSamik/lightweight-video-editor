@@ -75,7 +75,9 @@ const electronAPI = {
   generateThumbnailIdeas: (captions: any[], customPrompt?: string) =>
     ipcRenderer.invoke('generate-thumbnail-ideas', captions, customPrompt),
   getAvailableModels: (settings: any) =>
-    ipcRenderer.invoke('get-available-models', settings)
+    ipcRenderer.invoke('get-available-models', settings),
+  cancelRendering: () =>
+    ipcRenderer.invoke('cancel-rendering')
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);
