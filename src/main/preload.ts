@@ -45,6 +45,8 @@ const electronAPI = {
     ipcRenderer.invoke('list-recent-projects'),
   deleteProject: (filePath: string) => 
     ipcRenderer.invoke('delete-project', filePath),
+  renameProject: (filePath: string, newName: string) => 
+    ipcRenderer.invoke('rename-project', filePath, newName),
   // Enhanced project management
   saveProjectAs: (projectData: any, fileName?: string) =>
     ipcRenderer.invoke('save-project-as', projectData, fileName),
