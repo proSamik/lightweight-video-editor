@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CaptionSegment, SearchResult } from '../../types';
 import SearchModal from './SearchModal';
 import { useTheme } from '../contexts/ThemeContext';
-import { FiMic } from 'react-icons/fi';
+import { FiMic, FiTrash2, FiScissors } from 'react-icons/fi';
 
 interface TimelinePanelProps {
   captions: CaptionSegment[];
@@ -348,7 +348,7 @@ const TimelinePanel: React.FC<TimelinePanelProps> = ({
                     }}
                     title="Delete this caption segment"
                   >
-                    🗑️
+                    <FiTrash2 size={14} />
                   </button>
                 </div>
               </div>
