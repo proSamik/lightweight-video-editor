@@ -369,6 +369,15 @@ ipcMain.handle('delete-project', async (_event, filePath: string) => {
   }
 });
 
+ipcMain.handle('rename-project', async (_event, filePath: string, newName: string) => {
+  try {
+    const projectManager = ProjectManager.getInstance();
+    return await projectManager.renameProject(filePath, newName);
+  } catch (error) {
+    throw new Error(`Failed to rename project: ${error}`);
+  }
+});
+
 // Enhanced project management handlers
 ipcMain.handle('save-project-as', async (_event, projectData: any, fileName?: string) => {
   try {
