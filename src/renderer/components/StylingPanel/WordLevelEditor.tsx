@@ -60,16 +60,18 @@ export const WordLevelEditor: React.FC<WordLevelEditorProps> = ({
   };
 
   const containerStyles: React.CSSProperties = {
-    maxHeight: 300,
+    maxHeight: 400,
     overflowY: 'auto',
+    overflowX: 'hidden',
     backgroundColor: theme.colors.background,
     border: `1px solid ${theme.colors.border}`,
     borderRadius: borderRadius.lg,
-    padding: spacing.md,
+    padding: spacing.sm,
+    width: '100%',
   };
 
   const wordItemStyles = (isEdited: boolean): React.CSSProperties => ({
-    padding: spacing.lg,
+    padding: spacing.md,
     backgroundColor: theme.colors.background,
     borderRadius: borderRadius.md,
     border: `1px solid ${theme.colors.border}`,
@@ -77,10 +79,14 @@ export const WordLevelEditor: React.FC<WordLevelEditorProps> = ({
     marginBottom: spacing.sm,
     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
     cursor: 'pointer',
+    width: '100%',
+    minWidth: 0,
+    overflow: 'hidden',
   });
 
   const wordIndexStyles: React.CSSProperties = {
-    minWidth: 32,
+    minWidth: 40,
+    width: 40,
     height: 32,
     backgroundColor: theme.colors.surface,
     color: theme.colors.text,
@@ -91,6 +97,7 @@ export const WordLevelEditor: React.FC<WordLevelEditorProps> = ({
     alignItems: 'center',
     justifyContent: 'center',
     border: `1px solid ${theme.colors.border}`,
+    flexShrink: 0,
   };
 
   const timingStyles: React.CSSProperties = {
@@ -168,26 +175,27 @@ export const WordLevelEditor: React.FC<WordLevelEditorProps> = ({
                   e.currentTarget.style.borderColor = theme.colors.border;
                 }}
               >
-                <HStack align="center" gap="lg">
+                <HStack align="center" gap="md" style={{ width: '100%', minWidth: 0 }}>
                   <div style={wordIndexStyles}>
                     {index + 1}
                   </div>
 
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
                     {isEditing ? (
-                      <HStack gap="xs">
+                      <HStack gap="xs" style={{ width: '100%', minWidth: 0 }}>
                         <Input
                           value={editingValue}
                           onChange={(e) => setEditingValue(e.target.value)}
                           onKeyDown={handleKeyPress}
                           size="sm"
-                          style={{ flex: 1 }}
+                          style={{ flex: 1, minWidth: 0 }}
                           autoFocus
                         />
                         <Button
                           variant="primary"
                           size="sm"
                           onClick={saveEdit}
+                          style={{ flexShrink: 0 }}
                         >
                           Save
                         </Button>
@@ -195,12 +203,13 @@ export const WordLevelEditor: React.FC<WordLevelEditorProps> = ({
                           variant="ghost"
                           size="sm"
                           onClick={cancelEdit}
+                          style={{ flexShrink: 0 }}
                         >
                           Cancel
                         </Button>
                       </HStack>
                     ) : (
-                      <HStack justify="between" align="center">
+                      <HStack justify="between" align="center" style={{ width: '100%', minWidth: 0 }}>
                         <span
                           style={{
                             fontSize: typography.fontSize.base,
@@ -211,6 +220,11 @@ export const WordLevelEditor: React.FC<WordLevelEditorProps> = ({
                             borderRadius: borderRadius.sm,
                             backgroundColor: 'transparent',
                             transition: 'background-color 0.2s ease',
+                            flex: 1,
+                            minWidth: 0,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
                           }}
                           onDoubleClick={() => startEditing(index, word.word)}
                           onMouseEnter={(e) => {
@@ -219,11 +233,12 @@ export const WordLevelEditor: React.FC<WordLevelEditorProps> = ({
                           onMouseLeave={(e) => {
                             e.currentTarget.style.backgroundColor = 'transparent';
                           }}
+                          title={word.word}
                         >
                           {word.word}
                         </span>
 
-                        <HStack gap="xs">
+                        <HStack gap="xs" style={{ flexShrink: 0 }}>
                           <Button
                             variant="ghost"
                             size="sm"
