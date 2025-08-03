@@ -367,63 +367,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
         margin: '20px'
       }}
     >
-      {/* Modern Preview Header */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '12px 20px',
-        background: `linear-gradient(135deg, ${theme.colors.surface} 0%, ${theme.colors.background} 100%)`,
-        borderBottom: `1px solid ${theme.colors.border}`,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
-      }}>
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '12px' 
-        }}>
-          <div style={{
-            width: '8px',
-            height: '8px',
-            borderRadius: '50%',
-            backgroundColor: '#00ff88',
-            boxShadow: '0 0 8px rgba(0,255,136,0.4)'
-          }} />
-          <div style={{ 
-            fontSize: '14px', 
-            color: theme.colors.text,
-            fontWeight: '600',
-            letterSpacing: '0.5px'
-          }}>
-            Live Preview
-          </div>
-          <div style={{
-            fontSize: '11px',
-            color: theme.colors.textSecondary,
-            backgroundColor: theme.colors.background,
-            padding: '2px 8px',
-            borderRadius: '10px',
-            border: `1px solid ${theme.colors.border}`
-          }}>
-            Real-time
-          </div>
-        </div>
-        <div style={{ 
-          fontSize: '12px', 
-          color: theme.colors.textSecondary,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
-          <span>Canvas: {canvasSize.width}×{canvasSize.height}</span>
-          <div style={{
-            width: '1px',
-            height: '12px',
-            backgroundColor: theme.colors.border
-          }} />
-          <span>1:1 Export Match</span>
-        </div>
-      </div>
+
 
       {/* Video Container with Canvas Overlay */}
       <div style={{ 
@@ -530,76 +474,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
         )}
       </div>
 
-      {/* Modern Canvas Info Footer */}
-      <div style={{
-        padding: '12px 20px',
-        background: `linear-gradient(135deg, ${theme.colors.background} 0%, ${theme.colors.surface} 100%)`,
-                  borderTop: `1px solid ${theme.colors.border}`,
-        fontSize: '12px',
-                  color: theme.colors.textSecondary
-      }}>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
-            <FiEye size={16} color={theme.colors.textMuted} />
-            <span style={{ color: theme.colors.textMuted, fontWeight: '500' }}>
-              WYSIWYG Preview - Exact export rendering
-            </span>
-          </div>
-          <div style={{
-            display: 'flex',
-            gap: '12px',
-            fontSize: '11px'
-          }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px'
-            }}>
-              <div style={{
-                width: '4px',
-                height: '4px',
-                borderRadius: '50%',
-                backgroundColor: '#00ff88'
-              }} />
-              <span>Real-time</span>
-            </div>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px'
-            }}>
-              <div style={{
-                width: '4px',
-                height: '4px',
-                borderRadius: '50%',
-                backgroundColor: '#007acc'
-              }} />
-              <span>Pixel-perfect</span>
-            </div>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px'
-            }}>
-              <div style={{
-                width: '4px',
-                height: '4px',
-                borderRadius: '50%',
-                backgroundColor: '#ff6b35'
-              }} />
-              <span>Canvas-based</span>
-            </div>
-          </div>
-        </div>
-      </div>
+
     </div>
   );
 };
