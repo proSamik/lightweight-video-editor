@@ -64,8 +64,8 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   const [isWaveformLoading, setIsWaveformLoading] = useState(false);
 
   // Timeline dimensions
-  const TIMELINE_HEIGHT = 120;
-  const WAVEFORM_HEIGHT = 60;
+  const TIMELINE_HEIGHT = 180;
+const WAVEFORM_HEIGHT = 100;
   const CAPTION_TRACK_HEIGHT = 40;
   const SCRUBBER_HEIGHT = 20;
 
@@ -530,7 +530,8 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
           position: 'relative',
           cursor: isDragging ? 'grabbing' : 'pointer',
           backgroundColor: theme.colors.background,
-          overflow: 'hidden'
+          overflow: 'hidden',
+          paddingBottom: '8px'
         }}
         onMouseDown={handleTimelineMouseDown}
       >
@@ -583,70 +584,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
           </div>
         )}
 
-        {/* Caption Segments Track */}
-        <div style={{
-          position: 'absolute',
-          top: `${WAVEFORM_HEIGHT}px`,
-          left: 0,
-          right: 0,
-          height: `${CAPTION_TRACK_HEIGHT}px`,
-          backgroundColor: theme.colors.background
-        }}>
-          {captions.map((segment) => {
-            const startPercent = (segment.startTime / totalDuration) * 100;
-            const widthPercent = ((segment.endTime - segment.startTime) / totalDuration) * 100;
-            const isSelected = selectedSegmentId === segment.id;
-            const isHovered = hoveredSegmentId === segment.id;
 
-            return (
-              <div
-                key={segment.id}
-                style={{
-                  position: 'absolute',
-                  left: `${startPercent}%`,
-                  width: `${widthPercent}%`,
-                  height: '100%',
-                  backgroundColor: isSelected ? theme.colors.primary : isHovered ? theme.colors.surfaceHover : theme.colors.surface,
-                  border: isSelected ? `2px solid ${theme.colors.primary}` : `1px solid ${theme.colors.border}`,
-                  borderRadius: '3px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '10px',
-                  color: isSelected ? theme.colors.primaryForeground : theme.colors.text,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  padding: '0 4px',
-                  transition: 'all 0.2s ease'
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSegmentSelect(segment.id);
-                }}
-                onDoubleClick={(e) => {
-                  e.stopPropagation();
-                  handleSegmentDoubleClick(segment);
-                }}
-                onMouseEnter={() => setHoveredSegmentId(segment.id)}
-                onMouseLeave={() => setHoveredSegmentId(null)}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setContextMenu({
-                    x: e.clientX,
-                    y: e.clientY,
-                    segmentId: segment.id
-                  });
-                }}
-                title={`${segment.text.substring(0, 50)}${segment.text.length > 50 ? '...' : ''}`}
-              >
-                {segment.text.length > 20 ? segment.text.substring(0, 20) + '...' : segment.text}
-              </div>
-            );
-          })}
-        </div>
 
         {/* Scrubber/Playhead */}
         <div style={{
@@ -677,7 +615,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
         {/* Time markers */}
         <div style={{
           position: 'absolute',
-          bottom: 0,
+          top: `${WAVEFORM_HEIGHT}px`,
           left: 0,
           right: 0,
           height: `${SCRUBBER_HEIGHT}px`,
