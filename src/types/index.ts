@@ -63,6 +63,12 @@ export enum FontOption {
   SF_PRO_DISPLAY = 'SF Pro Display',
   SEGOE_UI = 'Segoe UI',
   UBUNTU = 'Ubuntu',
+  MONTSERRAT = 'Montserrat',
+  POPPINS = 'Poppins',
+  RALEWAY = 'Raleway',
+  LATO = 'Lato',
+  NUNITO = 'Nunito',
+  QUICKSAND = 'Quicksand',
   ARIAL = 'Arial',
   HELVETICA = 'Helvetica'
 }
