@@ -4,17 +4,15 @@ import {
   FormGroup, 
   FormSection,
   FormGrid,
-  FormRow,
   Stack, 
   HStack,
-  Button,
   Select,
   Checkbox,
   spacing, 
   typography, 
   borderRadius 
 } from '../ui';
-import { FontOption, ColorOption, CaptionStyle } from '../../../types';
+import { CaptionStyle } from '../../../types';
 
 interface StyleControlsProps {
   style: CaptionStyle;
@@ -115,54 +113,54 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
     );
   };
 
-  // Color picker component
+  // Color picker component using HTML color input (like VideoPanel context menu)
   const ColorPicker: React.FC<{
     label: string;
     value: string;
     onChange: (color: string) => void;
     includeTransparent?: boolean;
   }> = ({ label, value, onChange, includeTransparent = false }) => {
-    const colorButtonStyles = (color: string, isSelected: boolean): React.CSSProperties => ({
-      width: 32,
-      height: 32,
-      borderRadius: borderRadius.sm,
-      border: isSelected 
-        ? `3px solid ${theme.colors.primary}` 
-        : `1px solid ${theme.colors.border}`,
+    const colorInputStyles: React.CSSProperties = {
+      width: '100%',
+      height: 40,
+      border: `1px solid ${theme.colors.border}`,
+      borderRadius: borderRadius.md,
+      backgroundColor: theme.colors.surface,
       cursor: 'pointer',
-      backgroundColor: color === 'transparent' ? 'transparent' : color,
-      backgroundImage: color === 'transparent' 
-        ? `linear-gradient(45deg, ${theme.colors.border} 25%, transparent 25%), linear-gradient(-45deg, ${theme.colors.border} 25%, transparent 25%), linear-gradient(45deg, transparent 75%, ${theme.colors.border} 75%), linear-gradient(-45deg, transparent 75%, ${theme.colors.border} 75%)`
-        : undefined,
-      backgroundSize: color === 'transparent' ? '8px 8px' : undefined,
-      backgroundPosition: color === 'transparent' ? '0 0, 0 4px, 4px -4px, -4px 0px' : undefined,
-      transition: 'all 0.2s ease',
-      position: 'relative',
-    });
+    };
 
-    const colors = includeTransparent 
-      ? ['transparent', ...Object.values(ColorOption).filter(c => c !== 'transparent')]
-      : Object.values(ColorOption).filter(c => c !== 'transparent');
+    const transparentButtonStyles: React.CSSProperties = {
+      padding: `${spacing.sm}px ${spacing.md}px`,
+      backgroundColor: value === 'transparent' ? theme.colors.primary : theme.colors.surface,
+      color: value === 'transparent' ? theme.colors.primaryForeground : theme.colors.text,
+      border: `1px solid ${value === 'transparent' ? theme.colors.primary : theme.colors.border}`,
+      borderRadius: borderRadius.md,
+      cursor: 'pointer',
+      fontSize: typography.fontSize.sm,
+      fontWeight: typography.fontWeight.medium,
+      transition: 'all 0.2s ease',
+      minWidth: 90,
+    };
 
     return (
       <FormGroup label={label}>
-        <div style={{ 
-          display: 'flex', 
-          gap: spacing.sm, 
-          flexWrap: 'wrap',
-          padding: spacing.sm,
-          backgroundColor: theme.colors.backgroundSecondary,
-          borderRadius: borderRadius.md,
-        }}>
-          {colors.map(color => (
+        <div style={{ display: 'flex', gap: spacing.sm, alignItems: 'center' }}>
+          <input
+            type="color"
+            value={value === 'transparent' ? '#000000' : value}
+            onChange={(e) => onChange(e.target.value)}
+            style={colorInputStyles}
+            disabled={value === 'transparent'}
+          />
+          {includeTransparent && (
             <button
-              key={color}
-              onClick={() => onChange(color)}
-              style={colorButtonStyles(color, value === color)}
-              title={color}
-              aria-label={`Select ${color} color`}
-            />
-          ))}
+              type="button"
+              onClick={() => onChange('transparent')}
+              style={transparentButtonStyles}
+            >
+              Transparent
+            </button>
+          )}
         </div>
       </FormGroup>
     );
