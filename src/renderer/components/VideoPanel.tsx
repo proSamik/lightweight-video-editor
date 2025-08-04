@@ -44,6 +44,51 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
   const [contextMenuSegmentId, setContextMenuSegmentId] = useState<string | null>(null);
+  const [scaleFactor, setScaleFactor] = useState(1);
+  const lastUpdateTimeRef = useRef<number>(0);
+  const [isHoveringCaption, setIsHoveringCaption] = useState(false);
+
+  // Helper function to check if mouse click is on rendered caption text
+  const isClickOnCaption = (mouseX: number, mouseY: number, caption: CaptionSegment): boolean => {
+    const canvas = canvasRef.current;
+    if (!canvas) return false;
+
+    // Get the rendered position and size of the caption
+    const x = (canvas.width * (caption.style.position?.x || 50)) / 100;
+    const y = (canvas.height * (caption.style.position?.y || 50)) / 100;
+    
+    // Calculate font size with scale
+    const baseFontSize = caption.style?.fontSize || 85;
+    const scale = caption.style?.scale || 1;
+    const fontSize = baseFontSize * scale;
+    
+    // Create a temporary canvas context to measure text
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return false;
+    
+    ctx.font = `bold ${fontSize}px ${caption.style?.font || 'Inter'}, Arial, sans-serif`;
+    
+    // Get text to measure
+    let textToMeasure = caption.text;
+    if (caption.words && caption.words.length > 0) {
+      textToMeasure = caption.words.map(w => w.word).join(' ');
+    }
+    
+    const textMetrics = ctx.measureText(textToMeasure);
+    const textWidth = textMetrics.width;
+    const textHeight = fontSize;
+    
+    // Define hit box (with some padding for easier clicking)
+    const padding = 20;
+    const hitBoxLeft = x - (textWidth / 2) - padding;
+    const hitBoxRight = x + (textWidth / 2) + padding;
+    const hitBoxTop = y - (textHeight / 2) - padding;
+    const hitBoxBottom = y + (textHeight / 2) + padding;
+    
+    // Check if mouse is within hit box
+    return mouseX >= hitBoxLeft && mouseX <= hitBoxRight && 
+           mouseY >= hitBoxTop && mouseY <= hitBoxBottom;
+  };
 
   // Mouse interaction handlers for text box manipulation
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -60,34 +105,62 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     const mouseX = (e.clientX - rect.left) * scaleX;
     const mouseY = (e.clientY - rect.top) * scaleY;
     
-    // Find any caption that's currently visible (not just selected)
+    // Find captions that's currently visible
     const currentCaptions = captions.filter(
       caption => currentTime >= caption.startTime && currentTime <= caption.endTime
     );
     
-    if (currentCaptions.length > 0) {
-      // If no segment is selected, select the first visible one
-      let targetCaption = selectedSegmentId 
-        ? currentCaptions.find(c => c.id === selectedSegmentId)
-        : currentCaptions[0];
-      
-      // If selected segment is not visible, use the first visible one
-      if (!targetCaption && currentCaptions.length > 0) {
-        targetCaption = currentCaptions[0];
-      }
-      
-      if (targetCaption) {
-        // Select the caption if not already selected
-        if (selectedSegmentId !== targetCaption.id && onSegmentSelect) {
-          onSegmentSelect(targetCaption.id);
-        }
-        
-        setIsDragging(true);
-        setDragStart({ x: mouseX, y: mouseY });
-        e.preventDefault();
-        e.stopPropagation();
+    // Check if click is on any visible caption text
+    let clickedCaption = null;
+    for (const caption of currentCaptions) {
+      if (isClickOnCaption(mouseX, mouseY, caption)) {
+        clickedCaption = caption;
+        break;
       }
     }
+    
+    if (clickedCaption) {
+      // Select the caption if not already selected
+      if (selectedSegmentId !== clickedCaption.id && onSegmentSelect) {
+        onSegmentSelect(clickedCaption.id);
+      }
+      
+      setIsDragging(true);
+      setDragStart({ x: mouseX, y: mouseY });
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  };
+
+  // Mouse move handler to track hover state
+  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (isDragging) return; // Don't change cursor while dragging
+    
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    const mouseX = (e.clientX - rect.left) * scaleX;
+    const mouseY = (e.clientY - rect.top) * scaleY;
+    
+    // Find captions that's currently visible
+    const currentCaptions = captions.filter(
+      caption => currentTime >= caption.startTime && currentTime <= caption.endTime
+    );
+    
+    // Check if hovering over any caption
+    let hoveringCaption = false;
+    for (const caption of currentCaptions) {
+      if (isClickOnCaption(mouseX, mouseY, caption)) {
+        hoveringCaption = true;
+        break;
+      }
+    }
+    
+    setIsHoveringCaption(hoveringCaption);
   };
 
   // Right-click context menu handler
@@ -111,9 +184,14 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     setIsDragging(false);
   };
 
-  // Global mouse move handler for dragging
+  // Global mouse move handler for dragging with throttling
   const handleGlobalMouseMove = useCallback((e: MouseEvent) => {
     if (!isDragging || !selectedSegmentId || !onCaptionUpdate) return;
+    
+    // Throttle updates to reduce lag (max 60fps)
+    const now = Date.now();
+    if (now - lastUpdateTimeRef.current < 16) return; // ~60fps
+    lastUpdateTimeRef.current = now;
     
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -130,16 +208,22 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     
     const currentCaption = captions.find(c => c.id === selectedSegmentId);
     if (currentCaption) {
-      onCaptionUpdate(selectedSegmentId, {
-        style: {
-          ...currentCaption.style,
-          position: {
-            ...currentCaption.style.position,
-            x: newXPercent,
-            y: newYPercent
+      // Only update if position changed significantly (avoid micro-movements)
+      const currentX = currentCaption.style.position?.x || 50;
+      const currentY = currentCaption.style.position?.y || 50;
+      
+      if (Math.abs(currentX - newXPercent) > 0.5 || Math.abs(currentY - newYPercent) > 0.5) {
+        onCaptionUpdate(selectedSegmentId, {
+          style: {
+            ...currentCaption.style,
+            position: {
+              ...currentCaption.style.position,
+              x: newXPercent,
+              y: newYPercent
+            }
           }
-        }
-      });
+        });
+      }
     }
   }, [isDragging, selectedSegmentId, onCaptionUpdate, captions]);
 
@@ -260,7 +344,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     }
   }, [currentTime]);
 
-  // Update canvas size when video loads
+  // Update canvas size when video loads and calculate scale factor
   useEffect(() => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -271,6 +355,13 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         setCanvasSize({ width: video.videoWidth, height: video.videoHeight });
+        
+        // Calculate and cache scale factor
+        const canvasRect = canvas.getBoundingClientRect();
+        const scaleX = canvasRect.width / canvas.width;
+        const scaleY = canvasRect.height / canvas.height;
+        const newScaleFactor = Math.min(scaleX, scaleY);
+        setScaleFactor(newScaleFactor);
       };
       
       video.addEventListener('loadedmetadata', handleLoadedMetadata);
@@ -278,6 +369,18 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     }
     return undefined;
   }, [videoFile]);
+
+  // Update scale factor when canvas size changes
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (canvas && canvasSize.width > 0 && canvasSize.height > 0) {
+      const canvasRect = canvas.getBoundingClientRect();
+      const scaleX = canvasRect.width / canvas.width;
+      const scaleY = canvasRect.height / canvas.height;
+      const newScaleFactor = Math.min(scaleX, scaleY);
+      setScaleFactor(newScaleFactor);
+    }
+  }, [canvasSize]);
 
   // Render captions on canvas (same logic as export)
   const renderCaptionsOnCanvas = useCallback(() => {
@@ -296,18 +399,11 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
 
     if (currentCaptions.length === 0) return;
 
-    // Calculate scale factor for font size
-    // The canvas is scaled down by CSS, so we need to scale the font size accordingly
-    const canvasRect = canvas.getBoundingClientRect();
-    const scaleX = canvasRect.width / canvas.width;
-    const scaleY = canvasRect.height / canvas.height;
-    const scaleFactor = Math.min(scaleX, scaleY); // Use the smaller scale to maintain aspect ratio
-
-    // Render all captions
+    // Render all captions using cached scale factor
     currentCaptions.forEach(caption => {
       renderCaptionOnCanvas(ctx, caption, canvas.width, canvas.height, currentTime, scaleFactor);
     });
-  }, [captions, currentTime, selectedSegmentId]);
+  }, [captions, currentTime, selectedSegmentId, scaleFactor]);
 
   // Force re-render when caption styles change
   useEffect(() => {
@@ -518,10 +614,11 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
             maxHeight: '100%',
             objectFit: 'contain',
             pointerEvents: captions.some(c => currentTime >= c.startTime && currentTime <= c.endTime) ? 'auto' : 'none',
-            cursor: isDragging ? 'grabbing' : (captions.some(c => currentTime >= c.startTime && currentTime <= c.endTime) ? 'grab' : 'default'),
+            cursor: isDragging ? 'grabbing' : (isHoveringCaption ? 'grab' : 'default'),
             zIndex: 10
           }}
           onMouseDown={handleCanvasMouseDown}
+          onMouseMove={handleCanvasMouseMove}
           onContextMenu={handleCanvasRightClick}
         />
 
@@ -1020,9 +1117,16 @@ function renderSimpleTextOnCanvas(
         break;
     }
   }
-  const baseFontSize = caption.style?.fontSize || 32;
+  const baseFontSize = caption.style?.fontSize || 85;
   const scale = caption.style?.scale || 1;
   const fontSize = baseFontSize * scale;
+  console.log('VideoPanel simple text font debug:', {
+    baseFontSize,
+    scale,
+    fontSize,
+    scaleFactor,
+    captionText: text.substring(0, 20)
+  });
   const textColor = parseColor(caption.style?.textColor || '#ffffff');
   const backgroundColor = parseColor(caption.style?.backgroundColor || '#80000000');
   const strokeColor = parseColor(caption.style?.strokeColor || '#000000');
@@ -1128,7 +1232,7 @@ function renderKaraokeTextOnCanvas(
   centerY: number,
   scaleFactor: number
 ) {
-  const baseFontSize = caption.style?.fontSize || 32;
+  const baseFontSize = caption.style?.fontSize || 85;
   const scale = caption.style?.scale || 1;
   const fontSize = baseFontSize * scale;
   const textColor = parseColor(caption.style?.textColor || '#ffffff');
@@ -1303,7 +1407,7 @@ function renderProgressiveTextOnCanvas(
   centerY: number,
   scaleFactor: number
 ) {
-  const baseFontSize = caption.style?.fontSize || 32;
+  const baseFontSize = caption.style?.fontSize || 85;
   const scale = caption.style?.scale || 1;
   const fontSize = baseFontSize * scale;
   const textColor = parseColor(caption.style?.textColor || '#ffffff');
