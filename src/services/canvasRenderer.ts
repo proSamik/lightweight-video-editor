@@ -1057,13 +1057,15 @@ export class CanvasVideoRenderer {
         const displayLine = lines[displayLineIndex];
         const lineHeight = fontSize + 8; // Add some padding between lines
         
-        // Calculate vertical position for the line
-        const lineY = centerY - ((displayLine.length - 1) * lineHeight) / 2;
+        // FIXED: First word stays at centerY, subsequent words appear below
+        // Don't center the entire line - keep first word fixed at centerY
+        const firstWordY = centerY;
         
         // Draw each word in the line vertically
         for (let wordIndex = 0; wordIndex < displayLine.length; wordIndex++) {
           const word = displayLine[wordIndex];
-          const wordY = lineY + (wordIndex * lineHeight);
+          // First word (index 0) stays at centerY, others appear below
+          const wordY = firstWordY + (wordIndex * lineHeight);
           const isHighlighted = frameTime >= word.start && frameTime <= word.end;
           
           // Apply text transformation
