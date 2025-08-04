@@ -97,7 +97,28 @@ function createWindow(): void {
   });
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(async () => {
+  createWindow();
+  
+  // Initialize AI service with saved settings
+  try {
+    const settingsManager = SettingsManager.getInstance();
+    const savedSettings = settingsManager.loadDecryptedSettings();
+    
+    // Check if we have at least one API key configured
+    const hasApiKey = savedSettings.openrouterApiKey || 
+                     savedSettings.anthropicApiKey || 
+                     savedSettings.googleAiApiKey;
+    
+    if (hasApiKey) {
+      const aiService = AIService.getInstance();
+      aiService.setSettings(savedSettings);
+      console.log('AI settings loaded successfully on startup');
+    }
+  } catch (error) {
+    console.error('Failed to load AI settings on startup:', error);
+  }
+});
 
 // Handle app lifecycle events for proper cleanup
 app.on('window-all-closed', () => {
