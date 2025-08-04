@@ -99,7 +99,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
         <input
           type="range"
           min="0.5"
-          max="2"
+          max="2.0"
           step="0.1"
           value={scaleValue}
           onChange={(e) => onStyleUpdate({ scale: parseFloat(e.target.value) })}
@@ -109,6 +109,114 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
           <span style={{ fontSize: typography.fontSize.xs, color: theme.colors.textMuted }}>50%</span>
           <span style={{ fontSize: typography.fontSize.xs, color: theme.colors.textMuted }}>200%</span>
         </HStack>
+      </FormGroup>
+    );
+  };
+
+  // Stroke width slider component
+  const StrokeWidthSlider: React.FC = () => {
+    const strokeWidth = style.strokeWidth || 0;
+
+    const sliderStyles: React.CSSProperties = {
+      width: '100%',
+      height: 6,
+      borderRadius: borderRadius.sm,
+      background: theme.colors.surfaceActive,
+      outline: 'none',
+      appearance: 'none',
+      cursor: 'pointer',
+    };
+
+    return (
+      <FormGroup label="Stroke Width" hint={`Current: ${strokeWidth}px`}>
+        <input
+          type="range"
+          min="0"
+          max="10"
+          step="0.5"
+          value={strokeWidth}
+          onChange={(e) => onStyleUpdate({ strokeWidth: parseFloat(e.target.value) })}
+          style={sliderStyles}
+        />
+        <HStack justify="between" style={{ marginTop: spacing.xs }}>
+          <span style={{ fontSize: typography.fontSize.xs, color: theme.colors.textMuted }}>0px</span>
+          <span style={{ fontSize: typography.fontSize.xs, color: theme.colors.textMuted }}>10px</span>
+        </HStack>
+      </FormGroup>
+    );
+  };
+
+  // Position controls component
+  const PositionControls: React.FC = () => {
+    const position = style.position || { x: 50, y: 80, z: 0 };
+
+    const sliderStyles: React.CSSProperties = {
+      width: '100%',
+      height: 6,
+      borderRadius: borderRadius.sm,
+      background: theme.colors.surfaceActive,
+      outline: 'none',
+      appearance: 'none',
+      cursor: 'pointer',
+    };
+
+    return (
+      <FormGroup label="Position" hint="X: percentage from left, Y: percentage from top">
+        <Stack gap="md">
+          {/* X Position */}
+          <div>
+            <HStack justify="between" style={{ marginBottom: spacing.xs }}>
+              <span style={{ fontSize: typography.fontSize.sm, color: theme.colors.text }}>X Position</span>
+              <span style={{ fontSize: typography.fontSize.xs, color: theme.colors.textMuted }}>{Math.round(position.x)}%</span>
+            </HStack>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={position.x}
+              onChange={(e) => onStyleUpdate({ 
+                position: { ...position, x: parseFloat(e.target.value) }
+              })}
+              style={sliderStyles}
+            />
+          </div>
+
+          {/* Y Position */}
+          <div>
+            <HStack justify="between" style={{ marginBottom: spacing.xs }}>
+              <span style={{ fontSize: typography.fontSize.sm, color: theme.colors.text }}>Y Position</span>
+              <span style={{ fontSize: typography.fontSize.xs, color: theme.colors.textMuted }}>{Math.round(position.y)}%</span>
+            </HStack>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={position.y}
+              onChange={(e) => onStyleUpdate({ 
+                position: { ...position, y: parseFloat(e.target.value) }
+              })}
+              style={sliderStyles}
+            />
+          </div>
+
+          {/* Z Rotation */}
+          <div>
+            <HStack justify="between" style={{ marginBottom: spacing.xs }}>
+              <span style={{ fontSize: typography.fontSize.sm, color: theme.colors.text }}>Z Rotation</span>
+              <span style={{ fontSize: typography.fontSize.xs, color: theme.colors.textMuted }}>{position.z || 0}°</span>
+            </HStack>
+            <input
+              type="range"
+              min="0"
+              max="360"
+              value={position.z || 0}
+              onChange={(e) => onStyleUpdate({ 
+                position: { ...position, z: parseFloat(e.target.value) }
+              })}
+              style={sliderStyles}
+            />
+          </div>
+        </Stack>
       </FormGroup>
     );
   };
@@ -150,7 +258,6 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
             value={value === 'transparent' ? '#000000' : value}
             onChange={(e) => onChange(e.target.value)}
             style={colorInputStyles}
-            disabled={value === 'transparent'}
           />
           {includeTransparent && (
             <button
@@ -301,6 +408,8 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
         <FormGrid columns={1}>
           <FontSizeSlider />
           <ScaleSlider />
+          <StrokeWidthSlider />
+          <PositionControls />
           
           <FormGroup label="Font Family">
             <Select
@@ -313,6 +422,18 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
               <option value="Times New Roman">Times New Roman</option>
               <option value="Georgia">Georgia</option>
               <option value="Montserrat">Montserrat</option>
+            </Select>
+          </FormGroup>
+          
+          <FormGroup label="Text Transform">
+            <Select
+              value={style.textTransform || 'none'}
+              onChange={(e) => onStyleUpdate({ textTransform: e.target.value as 'none' | 'capitalize' | 'uppercase' | 'lowercase' })}
+            >
+              <option value="none">None</option>
+              <option value="capitalize">Capitalize</option>
+              <option value="uppercase">Uppercase</option>
+              <option value="lowercase">Lowercase</option>
             </Select>
           </FormGroup>
         </FormGrid>
@@ -335,6 +456,13 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
             label="Background Color"
             value={style.backgroundColor}
             onChange={(color) => onStyleUpdate({ backgroundColor: color })}
+            includeTransparent={true}
+          />
+          
+          <ColorPicker
+            label="Stroke Color"
+            value={style.strokeColor || '#000000'}
+            onChange={(color) => onStyleUpdate({ strokeColor: color })}
             includeTransparent={true}
           />
         </Stack>
