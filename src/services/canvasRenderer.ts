@@ -258,7 +258,14 @@ export class CanvasVideoRenderer {
         
         if (activeCaptions.length > 0) {
           try {
-            await this.renderCaptionsOnFrameWithCanvas(framePath, activeCaptions, metadata, frameTime);
+            // Sort captions by z-index (lower z-index renders first, higher renders on top)
+            const sortedCaptions = activeCaptions.sort((a, b) => {
+              const aZIndex = a.style?.position?.zIndex || 50;
+              const bZIndex = b.style?.position?.zIndex || 50;
+              return aZIndex - bZIndex;
+            });
+            
+            await this.renderCaptionsOnFrameWithCanvas(framePath, sortedCaptions, metadata, frameTime);
           } catch (error) {
             console.error(`Failed to render captions on frame ${frameNumber}:`, error);
             // Continue processing other frames even if one fails
@@ -1031,8 +1038,9 @@ export class CanvasVideoRenderer {
       const backgroundColor = this.parseColor(caption.style?.backgroundColor || '#80000000');
       
       // Set font with precise sizing
+      const textAlign = caption.style?.textAlign || 'center';
       ctx.font = `bold ${fontSize}px ${fontFamily}, Arial, sans-serif`;
-      ctx.textAlign = 'center';
+      ctx.textAlign = textAlign;
       ctx.textBaseline = 'bottom';
       
       // Find words that should be visible up to current time
