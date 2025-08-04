@@ -455,7 +455,7 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
                     }}
                     title="Copy title"
                   >
-                    📋
+                    <FiCopy size={12} />
                   </button>
                 </div>
               ))}
@@ -549,7 +549,7 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
                     }}
                     title="Copy tweet hook"
                   >
-                    📋
+                    <FiCopy size={12} />
                   </button>
                 </div>
               ))}
@@ -627,7 +627,7 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
                     }}
                     title="Copy thumbnail concept"
                   >
-                    📋
+                    <FiCopy size={12} />
                   </button>
                 </div>
               ))}
