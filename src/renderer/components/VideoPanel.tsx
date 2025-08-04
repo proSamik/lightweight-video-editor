@@ -309,6 +309,28 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     });
   }, [captions, currentTime, selectedSegmentId]);
 
+  // Force re-render when caption styles change
+  useEffect(() => {
+    // Check if fonts are loaded and force a re-render
+    const checkFontsAndRender = async () => {
+      // Wait for fonts to be available
+      if ('fonts' in document) {
+        try {
+          await document.fonts.ready;
+        } catch (e) {
+          console.log('Font loading check failed, continuing anyway');
+        }
+      }
+      
+      // Add a small delay to ensure font changes are applied
+      setTimeout(() => {
+        renderCaptionsOnCanvas();
+      }, 100);
+    };
+    
+    checkFontsAndRender();
+  }, [captions.map(c => JSON.stringify(c.style)).join('|')]); // Trigger when any style property changes
+
   // Re-render when captions or time changes
   useEffect(() => {
     renderCaptionsOnCanvas();
@@ -724,12 +746,16 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
                     fontSize: '11px'
                   }}
                 >
-                  <option value="SF Pro Display Semibold">SF Pro Display Semibold</option>
-                  <option value="Arial">Arial</option>
-                  <option value="Helvetica">Helvetica</option>
-                  <option value="Times New Roman">Times New Roman</option>
-                  <option value="Georgia">Georgia</option>
-                  <option value="Montserrat">Montserrat</option>
+                  <option value="Segoe UI">Segoe UI (Microsoft System)</option>
+                  <option value="Inter">Inter (Modern & Readable)</option>
+                  <option value="Roboto">Roboto (Google System)</option>
+                  <option value="Open Sans">Open Sans (Clean & Friendly)</option>
+                  <option value="Source Sans Pro">Source Sans Pro (Adobe)</option>
+                  <option value="Noto Sans">Noto Sans (Universal)</option>
+                  <option value="SF Pro Display">SF Pro Display (Apple)</option>
+                  <option value="Ubuntu">Ubuntu (Modern)</option>
+                  <option value="Arial">Arial (Classic)</option>
+                  <option value="Helvetica">Helvetica (Classic)</option>
                 </select>
               </div>
 
@@ -997,7 +1023,7 @@ function renderSimpleTextOnCanvas(
   const strokeWidth = caption.style?.strokeWidth || 0;
   
   // Set font with actual font from caption style (matching VideoPanel exactly)
-  const fontFamily = mapFontName(caption.style?.font || 'SF Pro Display Semibold');
+  const fontFamily = mapFontName(caption.style?.font || 'Segoe UI');
   ctx.font = `bold ${fontSize}px ${fontFamily}, Arial, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
@@ -1106,7 +1132,7 @@ function renderKaraokeTextOnCanvas(
   const strokeWidth = caption.style?.strokeWidth || 0;
   
   // Set font with actual font from caption style (matching VideoPanel exactly)
-  const fontFamily = mapFontName(caption.style?.font || 'SF Pro Display Semibold');
+  const fontFamily = mapFontName(caption.style?.font || 'Segoe UI');
   ctx.font = `bold ${fontSize}px ${fontFamily}, Arial, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle'; // Changed to middle for better centering
@@ -1223,23 +1249,29 @@ function renderKaraokeTextOnCanvas(
 
 // Font mapping function (matching CanvasVideoRenderer)
 function mapFontName(fontName: string): string {
-  // Use the actual font name from the caption style
-  // For Canvas rendering, we'll use system fonts that are available
   switch (fontName) {
-    case 'SF Pro Display Semibold':
+    case 'Inter':
+      return 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    case 'Roboto':
+      return 'Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    case 'Open Sans':
+      return '"Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    case 'Source Sans Pro':
+      return '"Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    case 'Noto Sans':
+      return '"Noto Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
     case 'SF Pro Display':
-      return 'Arial'; // Fallback to Arial for consistency
+      return '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif';
+    case 'Segoe UI':
+      return '"Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif';
+    case 'Ubuntu':
+      return 'Ubuntu, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
     case 'Arial':
+      return 'Arial, sans-serif';
     case 'Helvetica':
-      return 'Arial';
-    case 'Times New Roman':
-      return 'Times New Roman';
-    case 'Georgia':
-      return 'Georgia';
-    case 'Montserrat':
-      return 'Montserrat, Arial';
+      return 'Helvetica, Arial, sans-serif';
     default:
-      return 'Arial'; // Default fallback
+      return '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'; // Default to system fonts
   }
 }
 
@@ -1263,7 +1295,7 @@ function renderProgressiveTextOnCanvas(
   const strokeWidth = caption.style?.strokeWidth || 0;
   
   // Set font with actual font from caption style
-  const fontFamily = mapFontName(caption.style?.font || 'SF Pro Display Semibold');
+  const fontFamily = mapFontName(caption.style?.font || 'Segoe UI');
   const textAlign = caption.style?.textAlign || 'center';
   ctx.font = `bold ${fontSize}px ${fontFamily}, Arial, sans-serif`;
   ctx.textAlign = textAlign;
