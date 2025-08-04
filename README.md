@@ -198,14 +198,20 @@ npm run dist:all
 ## Styling Options
 
 ### Fonts
+- **Segoe UI** - Microsoft's modern system font (Default)
 - **Inter** - Modern, highly readable, designed for screens
 - **Roboto** - Google's system font, excellent readability
 - **Open Sans** - Clean, friendly, great for accessibility
 - **Source Sans Pro** - Adobe's open-source font, excellent legibility
 - **Noto Sans** - Google's universal font, supports all languages
 - **SF Pro Display** - Apple's modern system font
-- **Segoe UI** - Microsoft's modern system font
 - **Ubuntu** - Clean, modern, excellent for digital content
+- **Montserrat** - Stylish & modern geometric font
+- **Poppins** - Clean & geometric, excellent for headings
+- **Raleway** - Elegant & light, perfect for modern designs
+- **Lato** - Friendly & readable, great for body text
+- **Nunito** - Rounded & friendly, warm appearance
+- **Quicksand** - Modern & rounded, contemporary feel
 - **Arial** - Classic, widely supported
 - **Helvetica** - Classic, clean design
 
