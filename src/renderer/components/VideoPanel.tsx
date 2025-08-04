@@ -161,18 +161,26 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     };
   }, [isDragging, handleGlobalMouseMove, handleGlobalMouseUp]);
 
-  // Close context menu when clicking elsewhere
+  // Close context menu when clicking elsewhere or pressing ESC
   useEffect(() => {
     const handleClickOutside = () => {
       setShowContextMenu(false);
     };
 
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowContextMenu(false);
+      }
+    };
+
     if (showContextMenu) {
       document.addEventListener('click', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
     }
 
     return () => {
       document.removeEventListener('click', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
     };
   }, [showContextMenu]);
 
@@ -288,13 +296,6 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
 
     if (currentCaptions.length === 0) return;
 
-    // Sort captions by z-index (lower z-index renders first, higher renders on top)
-    const sortedCaptions = currentCaptions.sort((a, b) => {
-      const aZIndex = a.style.position.zIndex || 50;
-      const bZIndex = b.style.position.zIndex || 50;
-      return aZIndex - bZIndex;
-    });
-
     // Calculate scale factor for font size
     // The canvas is scaled down by CSS, so we need to scale the font size accordingly
     const canvasRect = canvas.getBoundingClientRect();
@@ -302,8 +303,8 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     const scaleY = canvasRect.height / canvas.height;
     const scaleFactor = Math.min(scaleX, scaleY); // Use the smaller scale to maintain aspect ratio
 
-    // Render all captions in z-index order
-    sortedCaptions.forEach(caption => {
+    // Render all captions
+    currentCaptions.forEach(caption => {
       renderCaptionOnCanvas(ctx, caption, canvas.width, canvas.height, currentTime, scaleFactor);
     });
   }, [captions, currentTime, selectedSegmentId]);
@@ -573,12 +574,41 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
             }
           };
 
+          // Smart positioning to avoid overflow
+          const menuWidth = 320;
+          const menuHeight = 500; // Approximate height
+          const windowWidth = window.innerWidth;
+          const windowHeight = window.innerHeight;
+          
+          let left = contextMenuPosition.x;
+          let top = contextMenuPosition.y;
+          
+          // Adjust horizontal position if menu would overflow right edge
+          if (left + menuWidth > windowWidth) {
+            left = contextMenuPosition.x - menuWidth;
+          }
+          
+          // Adjust vertical position if menu would overflow bottom edge
+          if (top + menuHeight > windowHeight) {
+            top = contextMenuPosition.y - menuHeight;
+          }
+          
+          // Ensure menu doesn't go above top edge
+          if (top < 10) {
+            top = 10;
+          }
+          
+          // Ensure menu doesn't go beyond left edge
+          if (left < 10) {
+            left = 10;
+          }
+
           return (
             <div
               style={{
                 position: 'fixed',
-                left: `${contextMenuPosition.x}px`,
-                top: `${contextMenuPosition.y}px`,
+                left: `${left}px`,
+                top: `${top}px`,
                 backgroundColor: '#2a2a2a',
                 border: '1px solid #444',
                 borderRadius: '6px',
@@ -598,20 +628,20 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
                 Caption Settings
               </div>
 
-              {/* Z-Index Slider */}
+              {/* Z-Axis Rotation Slider */}
               <div style={{ marginBottom: '16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <label style={{ color: '#fff', fontSize: '12px' }}>Z-Index</label>
-                  <span style={{ color: '#aaa', fontSize: '11px' }}>{currentCaption.style.position.zIndex || 50}</span>
+                  <label style={{ color: '#fff', fontSize: '12px' }}>Z-Axis Rotation</label>
+                  <span style={{ color: '#aaa', fontSize: '11px' }}>{currentCaption.style.position.z || 0}°</span>
                 </div>
                 <input
                   type="range"
                   min="0"
-                  max="100"
-                  value={currentCaption.style.position.zIndex || 50}
+                  max="360"
+                  value={currentCaption.style.position.z || 0}
                   onChange={(e) => {
                     updateCaptionStyle({
-                      position: { ...currentCaption.style.position, zIndex: parseInt(e.target.value) }
+                      position: { ...currentCaption.style.position, z: parseInt(e.target.value) }
                     });
                   }}
                   style={{
@@ -814,7 +844,7 @@ function renderCaptionOnCanvas(
   const x = (canvasWidth * caption.style.position.x) / 100;
   const y = (canvasHeight * caption.style.position.y) / 100;
   
-  // Apply rotation if z rotation is specified
+  // Apply z-axis rotation if specified
   if (caption.style.position.z && caption.style.position.z !== 0) {
     ctx.save();
     ctx.translate(x, y);
