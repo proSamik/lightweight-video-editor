@@ -781,6 +781,81 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
                 </div>
               </div>
 
+              {/* Stroke Controls */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                <div>
+                  <label style={{ color: '#fff', fontSize: '12px', display: 'block', marginBottom: '6px' }}>Stroke Color</label>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <input
+                      type="color"
+                      value={currentCaption.style.strokeColor || '#000000'}
+                      onChange={(e) => updateCaptionStyle({ strokeColor: e.target.value })}
+                      style={{ flex: 1, height: '32px', border: 'none', borderRadius: '4px' }}
+                    />
+                    <button
+                      onClick={() => updateCaptionStyle({ strokeColor: 'transparent' })}
+                      style={{
+                        padding: '6px 10px',
+                        backgroundColor: (currentCaption.style.strokeColor || '#000000') === 'transparent' ? '#0066cc' : '#404040',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '10px'
+                      }}
+                    >
+                      Transparent
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label style={{ color: '#fff', fontSize: '12px', display: 'block', marginBottom: '6px' }}>Stroke Width</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <input
+                      type="range"
+                      min="0"
+                      max="10"
+                      step="0.5"
+                      value={currentCaption.style.strokeWidth || 0}
+                      onChange={(e) => updateCaptionStyle({ strokeWidth: parseFloat(e.target.value) })}
+                      style={{
+                        flex: 1,
+                        height: '4px',
+                        background: '#444',
+                        outline: 'none',
+                        borderRadius: '2px'
+                      }}
+                    />
+                    <span style={{ color: '#aaa', fontSize: '11px', minWidth: '30px' }}>
+                      {currentCaption.style.strokeWidth || 0}px
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Text Transform */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ color: '#fff', fontSize: '12px', display: 'block', marginBottom: '8px' }}>Text Transform</label>
+                <select
+                  value={currentCaption.style.textTransform || 'none'}
+                  onChange={(e) => updateCaptionStyle({ textTransform: e.target.value as 'none' | 'capitalize' | 'uppercase' | 'lowercase' })}
+                  style={{
+                    width: '100%',
+                    padding: '6px 8px',
+                    backgroundColor: '#404040',
+                    color: '#fff',
+                    border: '1px solid #555',
+                    borderRadius: '4px',
+                    fontSize: '11px'
+                  }}
+                >
+                  <option value="none">None</option>
+                  <option value="capitalize">Capitalize</option>
+                  <option value="uppercase">Uppercase</option>
+                  <option value="lowercase">Lowercase</option>
+                </select>
+              </div>
+
               {/* Close Button */}
               <div style={{ marginTop: '16px', textAlign: 'right' }}>
                 <button
