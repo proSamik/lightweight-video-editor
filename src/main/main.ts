@@ -646,3 +646,25 @@ ipcMain.handle('cancel-rendering', async () => {
     throw new Error(`Failed to cancel rendering: ${error}`);
   }
 });
+
+ipcMain.handle('rename-project-file', async (_event, filePath: string, newName: string) => {
+  try {
+    const projectManager = ProjectManager.getInstance();
+    await projectManager.renameProject(filePath, newName);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to rename project file:', error);
+    throw new Error(`Failed to rename project file: ${error}`);
+  }
+});
+
+ipcMain.handle('rename-current-project', async (_event, newName: string) => {
+  try {
+    const projectManager = ProjectManager.getInstance();
+    await projectManager.renameCurrentProject(newName);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to rename current project:', error);
+    throw new Error(`Failed to rename current project: ${error}`);
+  }
+});
