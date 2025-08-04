@@ -79,7 +79,13 @@ const electronAPI = {
   getAvailableModels: (settings: any) =>
     ipcRenderer.invoke('get-available-models', settings),
   cancelRendering: () =>
-    ipcRenderer.invoke('cancel-rendering')
+    ipcRenderer.invoke('cancel-rendering'),
+  // File access for WaveSurfer and other components
+  getFileUrl: (filePath: string) => 
+    ipcRenderer.invoke('get-file-url', filePath),
+  // Get audio buffer for WaveSurfer
+  getAudioBuffer: (filePath: string) => 
+    ipcRenderer.invoke('get-audio-buffer', filePath)
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

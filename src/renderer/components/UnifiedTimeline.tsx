@@ -224,8 +224,40 @@ const WAVEFORM_HEIGHT = 100;
 
       wavesurferRef.current = wavesurfer;
 
-      // Load audio from video file
-      wavesurfer.load(`file://${videoFile.path}`);
+      // Load audio from video file using Electron API
+      const loadWaveform = async () => {
+        try {
+          // First try loading via file URL
+          const fileUrl = await window.electronAPI.getFileUrl(videoFile.path);
+          if (fileUrl) {
+            console.log('Loading waveform from URL:', fileUrl);
+            wavesurfer.load(fileUrl);
+          } else {
+            console.error('Failed to get file URL for waveform');
+            setIsWaveformLoading(false);
+          }
+        } catch (error) {
+          console.error('Error loading waveform:', error);
+          // Try fallback with audio buffer
+          try {
+            console.log('Trying audio buffer fallback...');
+            const audioBuffer = await window.electronAPI.getAudioBuffer(videoFile.path);
+            if (audioBuffer) {
+              // Convert buffer to blob for WaveSurfer
+              const blob = new Blob([audioBuffer]);
+              wavesurfer.loadBlob(blob);
+            } else {
+              console.error('Failed to get audio buffer');
+              setIsWaveformLoading(false);
+            }
+          } catch (bufferError) {
+            console.error('Audio buffer fallback failed:', bufferError);
+            setIsWaveformLoading(false);
+          }
+        }
+      };
+      
+      loadWaveform();
 
       // Handle waveform ready event
       wavesurfer.on('ready', () => {
@@ -234,8 +266,10 @@ const WAVEFORM_HEIGHT = 100;
 
       // Handle errors
       wavesurfer.on('error', (err) => {
+        console.error('WaveSurfer error:', err);
+        console.error('Video file path:', videoFile.path);
+        console.error('Failed to load waveform - this could be due to file format, permissions, or codec issues');
         setIsWaveformLoading(false);
-        // No fallback - just log the error
       });
 
       return () => {

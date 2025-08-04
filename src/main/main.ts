@@ -214,6 +214,34 @@ ipcMain.handle('select-video-file', async () => {
   return null;
 });
 
+// Handle file URL conversion for WaveSurfer and other components
+ipcMain.handle('get-file-url', async (_event, filePath: string) => {
+  try {
+    // Convert to file:// URL for use in renderer process
+    return `file://${filePath}`;
+  } catch (error) {
+    console.error('Error creating file URL:', error);
+    return null;
+  }
+});
+
+// Get audio buffer for WaveSurfer
+ipcMain.handle('get-audio-buffer', async (_event, filePath: string) => {
+  try {
+    if (!fs.existsSync(filePath)) {
+      console.error('File does not exist:', filePath);
+      return null;
+    }
+    
+    // Read file as buffer
+    const buffer = fs.readFileSync(filePath);
+    return buffer;
+  } catch (error) {
+    console.error('Error reading audio buffer:', error);
+    return null;
+  }
+});
+
 ipcMain.handle('export-video', async (_event, outputPath: string) => {
   const result = await dialog.showSaveDialog(mainWindow, {
     defaultPath: outputPath,
