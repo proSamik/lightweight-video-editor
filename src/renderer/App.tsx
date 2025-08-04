@@ -302,7 +302,7 @@ const AppContent: React.FC = () => {
           end: word.end // Already in milliseconds from Whisper service
         })) : [],
         style: {
-          font: FontOption.SF_PRO_DISPLAY_SEMIBOLD,
+          font: 'Segoe UI',
           fontSize: 85,
           textColor: ColorOption.WHITE,
           highlighterColor: ColorOption.YELLOW,
@@ -931,7 +931,7 @@ const AppContent: React.FC = () => {
             end: word.end // Already in milliseconds from Whisper service
           })) : [],
           style: {
-            font: FontOption.SF_PRO_DISPLAY_SEMIBOLD,
+            font: 'Segoe UI',
             fontSize: 85,
             textColor: ColorOption.WHITE,
             highlighterColor: ColorOption.YELLOW,
