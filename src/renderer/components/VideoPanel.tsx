@@ -15,6 +15,7 @@ interface VideoPanelProps {
   onCaptionUpdate?: (segmentId: string, updates: Partial<CaptionSegment>) => void;
   onPlayPause?: () => void;
   isPlaying?: boolean;
+  onSegmentSelect?: (segmentId: string) => void;
 }
 
 const VideoPanel: React.FC<VideoPanelProps> = ({
@@ -29,6 +30,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   onCaptionUpdate,
   onPlayPause,
   isPlaying,
+  onSegmentSelect,
 }) => {
   const { theme } = useTheme();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -39,10 +41,14 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [isResizing, setIsResizing] = useState(false);
   const [isTimelineDragging, setIsTimelineDragging] = useState(false);
+  const [showContextMenu, setShowContextMenu] = useState(false);
+  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
+  const [contextMenuSegmentId, setContextMenuSegmentId] = useState<string | null>(null);
 
   // Mouse interaction handlers for text box manipulation
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!selectedSegmentId || !onCaptionUpdate) return;
+    if (e.button !== 0) return; // Only handle left click for dragging
+    if (!onCaptionUpdate) return;
     
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -54,57 +60,121 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     const mouseX = (e.clientX - rect.left) * scaleX;
     const mouseY = (e.clientY - rect.top) * scaleY;
     
-    // Check if click is on the current caption
-    const currentCaption = captions.find(c => c.id === selectedSegmentId);
-    if (currentCaption && currentTime >= currentCaption.startTime && currentTime <= currentCaption.endTime) {
-      setIsDragging(true);
-      setDragStart({ x: mouseX, y: mouseY });
+    // Find any caption that's currently visible (not just selected)
+    const currentCaptions = captions.filter(
+      caption => currentTime >= caption.startTime && currentTime <= caption.endTime
+    );
+    
+    if (currentCaptions.length > 0) {
+      // If no segment is selected, select the first visible one
+      let targetCaption = selectedSegmentId 
+        ? currentCaptions.find(c => c.id === selectedSegmentId)
+        : currentCaptions[0];
+      
+      // If selected segment is not visible, use the first visible one
+      if (!targetCaption && currentCaptions.length > 0) {
+        targetCaption = currentCaptions[0];
+      }
+      
+      if (targetCaption) {
+        // Select the caption if not already selected
+        if (selectedSegmentId !== targetCaption.id && onSegmentSelect) {
+          onSegmentSelect(targetCaption.id);
+        }
+        
+        setIsDragging(true);
+        setDragStart({ x: mouseX, y: mouseY });
+        e.preventDefault();
+        e.stopPropagation();
+      }
     }
   };
 
-  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  // Right-click context menu handler
+  const handleCanvasRightClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    
+    // Find caption at current time
+    const currentCaption = captions.find(
+      caption => currentTime >= caption.startTime && currentTime <= caption.endTime
+    );
+    
+    if (currentCaption) {
+      setContextMenuPosition({ x: e.clientX, y: e.clientY });
+      setContextMenuSegmentId(currentCaption.id);
+      setShowContextMenu(true);
+    }
+  };
+
+
+  const handleCanvasMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  // Global mouse move handler for dragging
+  const handleGlobalMouseMove = useCallback((e: MouseEvent) => {
     if (!isDragging || !selectedSegmentId || !onCaptionUpdate) return;
     
     const canvas = canvasRef.current;
     if (!canvas) return;
     
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
     
-    const mouseX = (e.clientX - rect.left) * scaleX;
-    const mouseY = (e.clientY - rect.top) * scaleY;
+    // Calculate mouse position relative to canvas
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
     
-    const deltaX = mouseX - dragStart.x;
-    const deltaY = mouseY - dragStart.y;
-    
-    // Convert to percentage
-    const deltaXPercent = (deltaX / canvas.width) * 100;
-    const deltaYPercent = (deltaY / canvas.height) * 100;
+    // Convert to percentage of canvas dimensions
+    const newXPercent = Math.max(0, Math.min(100, (mouseX / rect.width) * 100));
+    const newYPercent = Math.max(0, Math.min(100, (mouseY / rect.height) * 100));
     
     const currentCaption = captions.find(c => c.id === selectedSegmentId);
     if (currentCaption) {
-      const newX = Math.max(0, Math.min(100, currentCaption.style.position.x + deltaXPercent));
-      const newY = Math.max(0, Math.min(100, currentCaption.style.position.y + deltaYPercent));
-      
       onCaptionUpdate(selectedSegmentId, {
         style: {
           ...currentCaption.style,
           position: {
             ...currentCaption.style.position,
-            x: newX,
-            y: newY
+            x: newXPercent,
+            y: newYPercent
           }
         }
       });
-      
-      setDragStart({ x: mouseX, y: mouseY });
     }
-  };
+  }, [isDragging, selectedSegmentId, onCaptionUpdate, captions]);
 
-  const handleCanvasMouseUp = () => {
+  // Global mouse up handler
+  const handleGlobalMouseUp = useCallback(() => {
     setIsDragging(false);
-  };
+  }, []);
+
+  // Set up global mouse event listeners for dragging
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleGlobalMouseMove);
+      document.addEventListener('mouseup', handleGlobalMouseUp);
+    }
+    
+    return () => {
+      document.removeEventListener('mousemove', handleGlobalMouseMove);
+      document.removeEventListener('mouseup', handleGlobalMouseUp);
+    };
+  }, [isDragging, handleGlobalMouseMove, handleGlobalMouseUp]);
+
+  // Close context menu when clicking elsewhere
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setShowContextMenu(false);
+    };
+
+    if (showContextMenu) {
+      document.addEventListener('click', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [showContextMenu]);
 
   // Mini timeline handlers for fullscreen mode
   const handleTimelineMouseDown = (e: React.MouseEvent) => {
@@ -211,12 +281,19 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Get current caption
-    const currentCaption = captions.find(
+    // Get all current captions (for potential overlapping)
+    const currentCaptions = captions.filter(
       caption => currentTime >= caption.startTime && currentTime <= caption.endTime
     );
 
-    if (!currentCaption) return;
+    if (currentCaptions.length === 0) return;
+
+    // Sort captions by z-index (lower z-index renders first, higher renders on top)
+    const sortedCaptions = currentCaptions.sort((a, b) => {
+      const aZIndex = a.style.position.zIndex || 50;
+      const bZIndex = b.style.position.zIndex || 50;
+      return aZIndex - bZIndex;
+    });
 
     // Calculate scale factor for font size
     // The canvas is scaled down by CSS, so we need to scale the font size accordingly
@@ -225,9 +302,11 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     const scaleY = canvasRect.height / canvas.height;
     const scaleFactor = Math.min(scaleX, scaleY); // Use the smaller scale to maintain aspect ratio
 
-    // Render caption using the same logic as CanvasVideoRenderer
-    renderCaptionOnCanvas(ctx, currentCaption, canvas.width, canvas.height, currentTime, scaleFactor);
-  }, [captions, currentTime]);
+    // Render all captions in z-index order
+    sortedCaptions.forEach(caption => {
+      renderCaptionOnCanvas(ctx, caption, canvas.width, canvas.height, currentTime, scaleFactor);
+    });
+  }, [captions, currentTime, selectedSegmentId]);
 
   // Re-render when captions or time changes
   useEffect(() => {
@@ -415,8 +494,12 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
             maxWidth: '100%',
             maxHeight: '100%',
             objectFit: 'contain',
-            pointerEvents: 'none'
+            pointerEvents: captions.some(c => currentTime >= c.startTime && currentTime <= c.endTime) ? 'auto' : 'none',
+            cursor: isDragging ? 'grabbing' : (captions.some(c => currentTime >= c.startTime && currentTime <= c.endTime) ? 'grab' : 'default'),
+            zIndex: 10
           }}
+          onMouseDown={handleCanvasMouseDown}
+          onContextMenu={handleCanvasRightClick}
         />
 
         {/* Mini Timeline for Fullscreen Mode */}
@@ -475,6 +558,219 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
             </div>
           </div>
         )}
+
+
+        {/* Enhanced Context Menu for Caption Styling */}
+        {showContextMenu && contextMenuSegmentId && (() => {
+          const currentCaption = captions.find(c => c.id === contextMenuSegmentId);
+          if (!currentCaption) return null;
+
+          const updateCaptionStyle = (updates: Partial<typeof currentCaption.style>) => {
+            if (onCaptionUpdate && contextMenuSegmentId) {
+              onCaptionUpdate(contextMenuSegmentId, {
+                style: { ...currentCaption.style, ...updates }
+              });
+            }
+          };
+
+          return (
+            <div
+              style={{
+                position: 'fixed',
+                left: `${contextMenuPosition.x}px`,
+                top: `${contextMenuPosition.y}px`,
+                backgroundColor: '#2a2a2a',
+                border: '1px solid #444',
+                borderRadius: '6px',
+                padding: '12px',
+                minWidth: '280px',
+                maxWidth: '320px',
+                maxHeight: '80vh',
+                overflowY: 'auto',
+                zIndex: 10000,
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)',
+                fontSize: '13px'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div style={{ marginBottom: '12px', color: '#ccc', fontSize: '14px', fontWeight: 'bold' }}>
+                Caption Settings
+              </div>
+
+              {/* Z-Index Slider */}
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <label style={{ color: '#fff', fontSize: '12px' }}>Z-Index</label>
+                  <span style={{ color: '#aaa', fontSize: '11px' }}>{currentCaption.style.position.zIndex || 50}</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={currentCaption.style.position.zIndex || 50}
+                  onChange={(e) => {
+                    updateCaptionStyle({
+                      position: { ...currentCaption.style.position, zIndex: parseInt(e.target.value) }
+                    });
+                  }}
+                  style={{
+                    width: '100%',
+                    height: '4px',
+                    background: '#444',
+                    outline: 'none',
+                    borderRadius: '2px'
+                  }}
+                />
+              </div>
+
+              {/* Render Mode */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ color: '#fff', fontSize: '12px', display: 'block', marginBottom: '8px' }}>Render Mode</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {['horizontal', 'progressive'].map(mode => (
+                    <button
+                      key={mode}
+                      onClick={() => updateCaptionStyle({ renderMode: mode as 'horizontal' | 'progressive' })}
+                      style={{
+                        flex: 1,
+                        padding: '6px 12px',
+                        backgroundColor: currentCaption.style.renderMode === mode ? '#0066cc' : '#404040',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '11px',
+                        textTransform: 'capitalize'
+                      }}
+                    >
+                      {mode}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Text Alignment (only for progressive mode) */}
+              {currentCaption.style.renderMode === 'progressive' && (
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ color: '#fff', fontSize: '12px', display: 'block', marginBottom: '8px' }}>Text Alignment</label>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    {['left', 'center', 'right'].map(align => (
+                      <button
+                        key={align}
+                        onClick={() => updateCaptionStyle({ textAlign: align as 'left' | 'center' | 'right' })}
+                        style={{
+                          flex: 1,
+                          padding: '6px 8px',
+                          backgroundColor: currentCaption.style.textAlign === align ? '#0066cc' : '#404040',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '11px',
+                          textTransform: 'capitalize'
+                        }}
+                      >
+                        {align}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Font Family */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ color: '#fff', fontSize: '12px', display: 'block', marginBottom: '8px' }}>Font Family</label>
+                <select
+                  value={currentCaption.style.font}
+                  onChange={(e) => updateCaptionStyle({ font: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '6px 8px',
+                    backgroundColor: '#404040',
+                    color: '#fff',
+                    border: '1px solid #555',
+                    borderRadius: '4px',
+                    fontSize: '11px'
+                  }}
+                >
+                  <option value="SF Pro Display Semibold">SF Pro Display Semibold</option>
+                  <option value="Arial">Arial</option>
+                  <option value="Helvetica">Helvetica</option>
+                  <option value="Times New Roman">Times New Roman</option>
+                  <option value="Georgia">Georgia</option>
+                  <option value="Montserrat">Montserrat</option>
+                </select>
+              </div>
+
+              {/* Color Pickers */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                <div>
+                  <label style={{ color: '#fff', fontSize: '12px', display: 'block', marginBottom: '6px' }}>Text Color</label>
+                  <input
+                    type="color"
+                    value={currentCaption.style.textColor}
+                    onChange={(e) => updateCaptionStyle({ textColor: e.target.value })}
+                    style={{ width: '100%', height: '32px', border: 'none', borderRadius: '4px' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ color: '#fff', fontSize: '12px', display: 'block', marginBottom: '6px' }}>Highlight Color</label>
+                  <input
+                    type="color"
+                    value={currentCaption.style.highlighterColor}
+                    onChange={(e) => updateCaptionStyle({ highlighterColor: e.target.value })}
+                    style={{ width: '100%', height: '32px', border: 'none', borderRadius: '4px' }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ color: '#fff', fontSize: '12px', display: 'block', marginBottom: '6px' }}>Background Color</label>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input
+                    type="color"
+                    value={currentCaption.style.backgroundColor === 'transparent' ? '#000000' : currentCaption.style.backgroundColor}
+                    onChange={(e) => updateCaptionStyle({ backgroundColor: e.target.value })}
+                    style={{ flex: 1, height: '32px', border: 'none', borderRadius: '4px' }}
+                  />
+                  <button
+                    onClick={() => updateCaptionStyle({ backgroundColor: 'transparent' })}
+                    style={{
+                      padding: '6px 10px',
+                      backgroundColor: currentCaption.style.backgroundColor === 'transparent' ? '#0066cc' : '#404040',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '10px'
+                    }}
+                  >
+                    Transparent
+                  </button>
+                </div>
+              </div>
+
+              {/* Close Button */}
+              <div style={{ marginTop: '16px', textAlign: 'right' }}>
+                <button
+                  onClick={() => setShowContextMenu(false)}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: '#666',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '12px'
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
 
@@ -869,8 +1165,9 @@ function renderProgressiveTextOnCanvas(
   
   // Set font with actual font from caption style
   const fontFamily = mapFontName(caption.style?.font || 'SF Pro Display Semibold');
+  const textAlign = caption.style?.textAlign || 'center';
   ctx.font = `bold ${fontSize}px ${fontFamily}, Arial, sans-serif`;
-  ctx.textAlign = 'center';
+  ctx.textAlign = textAlign;
   ctx.textBaseline = 'bottom';
   
   // Find words that should be visible up to current time
