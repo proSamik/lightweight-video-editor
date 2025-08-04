@@ -258,14 +258,7 @@ export class CanvasVideoRenderer {
         
         if (activeCaptions.length > 0) {
           try {
-            // Sort captions by z-index (lower z-index renders first, higher renders on top)
-            const sortedCaptions = activeCaptions.sort((a, b) => {
-              const aZIndex = a.style?.position?.zIndex || 50;
-              const bZIndex = b.style?.position?.zIndex || 50;
-              return aZIndex - bZIndex;
-            });
-            
-            await this.renderCaptionsOnFrameWithCanvas(framePath, sortedCaptions, metadata, frameTime);
+            await this.renderCaptionsOnFrameWithCanvas(framePath, activeCaptions, metadata, frameTime);
           } catch (error) {
             console.error(`Failed to render captions on frame ${frameNumber}:`, error);
             // Continue processing other frames even if one fails
@@ -341,7 +334,7 @@ export class CanvasVideoRenderer {
       const x = (metadata.width * caption.style.position.x) / 100;
       const y = (metadata.height * caption.style.position.y) / 100;
       
-      // Apply rotation if z rotation is specified
+      // Apply z-axis rotation if specified
       if (caption.style.position.z && caption.style.position.z !== 0) {
         ctx.save();
         ctx.translate(x, y);
