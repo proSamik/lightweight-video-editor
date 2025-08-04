@@ -198,11 +198,16 @@ npm run dist:all
 ## Styling Options
 
 ### Fonts
-- Arial Bold
-- Helvetica Neue Medium
-- SF Pro Display Semibold (macOS native)
-- Futura Bold
-- Impact
+- **Inter** - Modern, highly readable, designed for screens
+- **Roboto** - Google's system font, excellent readability
+- **Open Sans** - Clean, friendly, great for accessibility
+- **Source Sans Pro** - Adobe's open-source font, excellent legibility
+- **Noto Sans** - Google's universal font, supports all languages
+- **SF Pro Display** - Apple's modern system font
+- **Segoe UI** - Microsoft's modern system font
+- **Ubuntu** - Clean, modern, excellent for digital content
+- **Arial** - Classic, widely supported
+- **Helvetica** - Classic, clean design
 
 ### Colors
 **Text Colors**: White, Black, Yellow, Red, Blue
