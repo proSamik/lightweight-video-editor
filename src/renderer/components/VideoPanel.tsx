@@ -1102,14 +1102,8 @@ function renderKaraokeTextOnCanvas(
           ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
         }
       } else {
-        // Set normal text color
-        if (hasPassedWord) {
-          // Passed word - slightly transparent
-          ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, 0.8)`;
-        } else {
-          // Normal word - original text color
-          ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
-        }
+        // Set normal text color - in horizontal karaoke mode, all words should have full opacity
+        ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
       }
       
     // Clear shadow for stroke
