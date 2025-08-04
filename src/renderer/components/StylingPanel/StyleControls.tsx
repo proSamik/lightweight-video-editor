@@ -210,6 +210,87 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
     );
   };
 
+  // Text alignment selector (only shown for progressive mode)
+  const TextAlignmentSelector: React.FC = () => {
+    const currentAlign = style.textAlign || 'center';
+
+    const alignButtonStyles = (isSelected: boolean): React.CSSProperties => ({
+      flex: 1,
+      padding: `${spacing.sm}px ${spacing.md}px`,
+      backgroundColor: isSelected ? theme.colors.primary : theme.colors.surface,
+      color: isSelected ? theme.colors.primaryForeground : theme.colors.text,
+      border: `1px solid ${isSelected ? theme.colors.primary : theme.colors.border}`,
+      borderRadius: borderRadius.md,
+      cursor: 'pointer',
+      fontSize: typography.fontSize.sm,
+      fontWeight: typography.fontWeight.medium,
+      transition: 'all 0.2s ease',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+    });
+
+    // Only show for progressive mode
+    if (style.renderMode !== 'progressive') {
+      return null;
+    }
+
+    return (
+      <FormGroup 
+        label="Text Alignment" 
+        hint="How text is aligned in progressive mode"
+      >
+        <HStack gap="sm">
+          <button
+            onClick={() => onStyleUpdate({ textAlign: 'left' })}
+            style={alignButtonStyles(currentAlign === 'left')}
+            title="Left align"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path 
+                d="M3 6h18M3 12h12M3 18h18" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+          <button
+            onClick={() => onStyleUpdate({ textAlign: 'center' })}
+            style={alignButtonStyles(currentAlign === 'center')}
+            title="Center align"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path 
+                d="M3 6h18M6 12h12M3 18h18" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+          <button
+            onClick={() => onStyleUpdate({ textAlign: 'right' })}
+            style={alignButtonStyles(currentAlign === 'right')}
+            title="Right align"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path 
+                d="M3 6h18M9 12h12M3 18h18" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        </HStack>
+      </FormGroup>
+    );
+  };
+
   return (
     <FormSection 
       title="Style Settings" 
@@ -261,6 +342,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
         {/* Behavior Settings */}
         <Stack gap="lg">
           <RenderModeSelector />
+          <TextAlignmentSelector />
           
           <Checkbox
             label="Emphasis Mode"
