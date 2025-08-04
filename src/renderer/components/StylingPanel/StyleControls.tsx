@@ -424,6 +424,12 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
               <option value="Noto Sans">Noto Sans (Universal)</option>
               <option value="SF Pro Display">SF Pro Display (Apple)</option>
               <option value="Ubuntu">Ubuntu (Modern)</option>
+              <option value="Montserrat">Montserrat (Stylish & Modern)</option>
+              <option value="Poppins">Poppins (Clean & Geometric)</option>
+              <option value="Raleway">Raleway (Elegant & Light)</option>
+              <option value="Lato">Lato (Friendly & Readable)</option>
+              <option value="Nunito">Nunito (Rounded & Friendly)</option>
+              <option value="Quicksand">Quicksand (Modern & Rounded)</option>
               <option value="Arial">Arial (Classic)</option>
               <option value="Helvetica">Helvetica (Classic)</option>
             </Select>
