@@ -19,8 +19,7 @@ export interface CaptionStyle {
   position: {
     x: number;
     y: number;
-    z?: number; // Z rotation in degrees
-    zIndex?: number; // Z-index for layering (0-100, default 50)
+    z?: number; // Z-axis rotation in degrees (0-360)
   };
   scale?: number; // Scale factor for subtitle size (0.5 - 2.0)
   emphasizeMode?: boolean; // When true, highlighted words get emphasized instead of background highlight
