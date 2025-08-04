@@ -754,6 +754,12 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
                   <option value="Noto Sans">Noto Sans (Universal)</option>
                   <option value="SF Pro Display">SF Pro Display (Apple)</option>
                   <option value="Ubuntu">Ubuntu (Modern)</option>
+                  <option value="Montserrat">Montserrat (Stylish & Modern)</option>
+                  <option value="Poppins">Poppins (Clean & Geometric)</option>
+                  <option value="Raleway">Raleway (Elegant & Light)</option>
+                  <option value="Lato">Lato (Friendly & Readable)</option>
+                  <option value="Nunito">Nunito (Rounded & Friendly)</option>
+                  <option value="Quicksand">Quicksand (Modern & Rounded)</option>
                   <option value="Arial">Arial (Classic)</option>
                   <option value="Helvetica">Helvetica (Classic)</option>
                 </select>
@@ -1266,6 +1272,18 @@ function mapFontName(fontName: string): string {
       return '"Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif';
     case 'Ubuntu':
       return 'Ubuntu, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    case 'Montserrat':
+      return 'Montserrat, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    case 'Poppins':
+      return 'Poppins, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    case 'Raleway':
+      return 'Raleway, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    case 'Lato':
+      return 'Lato, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    case 'Nunito':
+      return 'Nunito, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    case 'Quicksand':
+      return 'Quicksand, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
     case 'Arial':
       return 'Arial, sans-serif';
     case 'Helvetica':
