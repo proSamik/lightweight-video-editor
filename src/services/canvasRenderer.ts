@@ -708,23 +708,29 @@ export class CanvasVideoRenderer {
    * Maps font names to Canvas-compatible fonts
    */
   private mapFontName(fontName: string): string {
-    // Use the actual font name from the caption style
-    // For Canvas rendering, we'll use system fonts that are available
     switch (fontName) {
-      case 'SF Pro Display Semibold':
+      case 'Inter':
+        return 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      case 'Roboto':
+        return 'Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+      case 'Open Sans':
+        return '"Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+      case 'Source Sans Pro':
+        return '"Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+      case 'Noto Sans':
+        return '"Noto Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
       case 'SF Pro Display':
-        return 'Arial'; // Fallback to Arial for consistency
+        return '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif';
+      case 'Segoe UI':
+        return '"Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif';
+      case 'Ubuntu':
+        return 'Ubuntu, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
       case 'Arial':
+        return 'Arial, sans-serif';
       case 'Helvetica':
-        return 'Arial';
-      case 'Times New Roman':
-        return 'Times New Roman';
-      case 'Georgia':
-        return 'Georgia';
-      case 'Montserrat':
-        return 'Montserrat, Arial';
+        return 'Helvetica, Arial, sans-serif';
       default:
-        return 'Arial'; // Default fallback
+        return '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'; // Default to system fonts
     }
   }
 
@@ -760,7 +766,7 @@ export class CanvasVideoRenderer {
       const baseFontSize = caption.style?.fontSize || 32;
       const scale = caption.style?.scale || 1;
       const fontSize = baseFontSize * scale;
-      const fontFamily = this.mapFontName(caption.style?.font || 'SF Pro Display Semibold');
+      const fontFamily = this.mapFontName(caption.style?.font || 'Segoe UI');
       const textColor = this.parseColor(caption.style?.textColor || '#ffffff');
       const highlighterColor = this.parseColor(caption.style?.highlighterColor || '#ffff00');
       const backgroundColor = this.parseColor(caption.style?.backgroundColor || '#80000000');
@@ -903,7 +909,7 @@ export class CanvasVideoRenderer {
       const baseFontSize = caption.style?.fontSize || 32;
       const scale = caption.style?.scale || 1;
       const fontSize = baseFontSize * scale;
-      const fontFamily = this.mapFontName(caption.style?.font || 'SF Pro Display Semibold');
+      const fontFamily = this.mapFontName(caption.style?.font || 'Segoe UI');
       const textColor = this.parseColor(caption.style?.textColor || '#ffffff');
       const backgroundColor = this.parseColor(caption.style?.backgroundColor || '#80000000');
       const strokeColor = this.parseColor(caption.style?.strokeColor || 'transparent');
@@ -1019,7 +1025,7 @@ export class CanvasVideoRenderer {
       const baseFontSize = caption.style?.fontSize || 32;
       const scale = caption.style?.scale || 1;
       const fontSize = baseFontSize * scale;
-      const fontFamily = this.mapFontName(caption.style?.font || 'SF Pro Display Semibold');
+      const fontFamily = this.mapFontName(caption.style?.font || 'Segoe UI');
       const textColor = this.parseColor(caption.style?.textColor || '#ffffff');
       const highlighterColor = this.parseColor(caption.style?.highlighterColor || '#ffff00');
       const backgroundColor = this.parseColor(caption.style?.backgroundColor || '#80000000');
