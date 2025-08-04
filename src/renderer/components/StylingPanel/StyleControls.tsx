@@ -416,12 +416,16 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
               value={style.font}
               onChange={(e) => onStyleUpdate({ font: e.target.value })}
             >
-              <option value="SF Pro Display Semibold">SF Pro Display Semibold</option>
-              <option value="Arial">Arial</option>
-              <option value="Helvetica">Helvetica</option>
-              <option value="Times New Roman">Times New Roman</option>
-              <option value="Georgia">Georgia</option>
-              <option value="Montserrat">Montserrat</option>
+              <option value="Segoe UI">Segoe UI (Microsoft System)</option>
+              <option value="Inter">Inter (Modern & Readable)</option>
+              <option value="Roboto">Roboto (Google System)</option>
+              <option value="Open Sans">Open Sans (Clean & Friendly)</option>
+              <option value="Source Sans Pro">Source Sans Pro (Adobe)</option>
+              <option value="Noto Sans">Noto Sans (Universal)</option>
+              <option value="SF Pro Display">SF Pro Display (Apple)</option>
+              <option value="Ubuntu">Ubuntu (Modern)</option>
+              <option value="Arial">Arial (Classic)</option>
+              <option value="Helvetica">Helvetica (Classic)</option>
             </Select>
           </FormGroup>
           
