@@ -254,6 +254,17 @@ export class ProjectManager {
     }
   }
 
+  /**
+   * Rename the current project
+   */
+  public async renameCurrentProject(newName: string): Promise<void> {
+    if (!this.currentProjectPath) {
+      throw new Error('No current project to rename');
+    }
+    
+    await this.renameProject(this.currentProjectPath, newName);
+  }
+
   public async autoSaveProject(projectData: ProjectData): Promise<string> {
     try {
       const autoSaveFileName = 'autosave.lvep';
