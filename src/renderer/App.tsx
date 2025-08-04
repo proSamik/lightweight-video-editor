@@ -310,8 +310,9 @@ const AppContent: React.FC = () => {
           strokeColor: ColorOption.BLACK,
           strokeWidth: 2,
           textTransform: 'none',
-          position: { x: 50, y: 80, z: 0 },
+          position: { x: 50, y: 80, z: 0, zIndex: 50 },
           renderMode: 'horizontal',
+          textAlign: 'center',
           scale: 1,
           emphasizeMode: true,
           burnInSubtitles: true
@@ -938,8 +939,9 @@ const AppContent: React.FC = () => {
             strokeColor: ColorOption.BLACK,
             strokeWidth: 2,
             textTransform: 'none',
-            position: { x: 50, y: 80, z: 0 },
+            position: { x: 50, y: 80, z: 0, zIndex: 50 },
             renderMode: 'horizontal',
+            textAlign: 'center',
             scale: 1,
             emphasizeMode: true,
             burnInSubtitles: true
@@ -1434,6 +1436,7 @@ const AppContent: React.FC = () => {
               onCaptionUpdate={handleCaptionUpdate}
               onPlayPause={handlePlayPause}
               isPlaying={isPlaying}
+              onSegmentSelect={setSelectedSegmentId}
             />
             
             {/* Unified Timeline - Moved up inside video panel */}
