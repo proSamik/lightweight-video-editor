@@ -10,7 +10,9 @@ import {
   X, 
   ExternalLink,
   PartyPopper,
-  Folder
+  Folder,
+  Video,
+  Download
 } from 'lucide-react';
 
 /**
@@ -125,4 +127,16 @@ export const ShowInFinderIcon: React.FC<{ size?: number }> = ({ size = 14 }) => 
 // Export SRT icon
 export const ExportSrtIcon: React.FC<{ size?: number }> = ({ size = 14 }) => (
   <FileText size={size} />
+);
+
+// Export Video icon
+export const ExportVideoIcon: React.FC<{ size?: number }> = ({ size = 14 }) => (
+  <div style={{ position: 'relative', display: 'inline-flex' }}>
+    <Video size={size} />
+    <Download size={size * 0.6} style={{ 
+      position: 'absolute', 
+      top: -2, 
+      right: -2
+    }} />
+  </div>
 ); 
