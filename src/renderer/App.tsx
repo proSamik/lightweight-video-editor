@@ -11,6 +11,8 @@ import SuccessModal from './components/SuccessModal';
 import LoadingScreen from './components/LoadingScreen';
 import AISettingsModal from './components/AISettingsModal';
 import AIContentModal from './components/AIContentModal';
+import ExportSettingsModal from './components/ExportSettings';
+import { Button } from './components/ui';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import ThemeToggle from './components/ThemeToggle';
 import {
@@ -23,7 +25,9 @@ import {
   MusicIcon,
   MusicWithCheckIcon,
   MusicExportIcon,
-  CloseIcon
+  CloseIcon,
+  ExportSrtIcon,
+  ExportVideoIcon
 } from './components/IconComponents';
 
 interface AppState {
@@ -55,11 +59,16 @@ const AppContent: React.FC = () => {
   const [showAIContent, setShowAIContent] = useState(false);
   const [aiSettings, setAISettings] = useState<AISettings | null>(null);
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null);
+  const [showExportSettings, setShowExportSettings] = useState(false);
+  const [showSrtSuccess, setShowSrtSuccess] = useState(false);
+  const [exportedSrtPath, setExportedSrtPath] = useState<string>('');
   const [currentProjectInfo, setCurrentProjectInfo] = useState<{
     projectPath: string | null;
     projectName: string;
     isModified: boolean;
   }>({ projectPath: null, projectName: 'Untitled Project', isModified: false });
+  const [isEditingProjectName, setIsEditingProjectName] = useState(false);
+  const [editingProjectName, setEditingProjectName] = useState('');
   const [transcriptionStatus, setTranscriptionStatus] = useState<{
     isTranscribing: boolean;
     progress: number;
@@ -626,6 +635,65 @@ const AppContent: React.FC = () => {
     }
   };
 
+  const handleStartRename = () => {
+    setEditingProjectName(currentProjectInfo.projectName);
+    setIsEditingProjectName(true);
+  };
+
+  const handleFinishRename = async () => {
+    if (editingProjectName.trim() && editingProjectName.trim() !== currentProjectInfo.projectName) {
+      try {
+        await window.electronAPI.renameCurrentProject(editingProjectName.trim());
+        await loadCurrentProjectInfo();
+        markProjectModified();
+      } catch (error) {
+        console.error('Failed to rename project:', error);
+        alert('Failed to rename project.');
+      }
+    }
+    setIsEditingProjectName(false);
+    setEditingProjectName('');
+  };
+
+  const handleCancelRename = () => {
+    setIsEditingProjectName(false);
+    setEditingProjectName('');
+  };
+
+  const handleShowExportSettings = () => {
+    setShowExportSettings(true);
+  };
+
+  const handleSrtExport = async () => {
+    if (!captions || captions.length === 0) {
+      alert('No captions available for export.');
+      return;
+    }
+
+    try {
+      // Use project name for SRT filename
+      const projectName = currentProjectInfo.projectName || 'subtitles';
+      const defaultFileName = `${projectName}.srt`;
+      
+      const result = await window.electronAPI.exportSrt(captions, defaultFileName);
+      if (result.success && !result.canceled) {
+        setExportedSrtPath(result.filePath);
+        setShowSrtSuccess(true);
+      }
+    } catch (error) {
+      console.error('Failed to export SRT:', error);
+      alert('Failed to export SRT file. Please try again.');
+    }
+  };
+
+  const handleShowSrtInFinder = async () => {
+    try {
+      await window.electronAPI.showItemInFolder(exportedSrtPath);
+    } catch (error) {
+      console.error('Failed to show SRT in finder:', error);
+    }
+  };
+
   const handleLoadProject = async (projectData: ProjectData) => {
     // Save current state to history before loading
     saveToHistory();
@@ -964,10 +1032,54 @@ const AppContent: React.FC = () => {
           fontSize: '14px',
           color: theme.colors.textSecondary
         }}>
-          <span style={{ fontWeight: 'bold' }}>
-            {currentProjectInfo.projectName}
-            {currentProjectInfo.isModified && <span style={{ color: theme.colors.warning }}> •</span>}
-          </span>
+          {isEditingProjectName ? (
+            <input
+              type="text"
+              value={editingProjectName}
+              onChange={(e) => setEditingProjectName(e.target.value)}
+              onBlur={handleFinishRename}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleFinishRename();
+                } else if (e.key === 'Escape') {
+                  handleCancelRename();
+                }
+              }}
+              autoFocus
+              style={{
+                fontWeight: 'bold',
+                fontSize: '14px',
+                backgroundColor: theme.colors.input.background,
+                color: theme.colors.text,
+                border: `1px solid ${theme.colors.borderFocus}`,
+                borderRadius: '4px',
+                padding: '4px 8px',
+                outline: 'none',
+                minWidth: '200px'
+              }}
+            />
+          ) : (
+            <span 
+              style={{ 
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                padding: '4px 8px',
+                borderRadius: '4px',
+                transition: 'background-color 0.2s'
+              }}
+              onClick={handleStartRename}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+              title="Click to rename project"
+            >
+              {currentProjectInfo.projectName}
+              {currentProjectInfo.isModified && <span style={{ color: theme.colors.warning }}> •</span>}
+            </span>
+          )}
           {currentProjectInfo.projectPath && (
             <span style={{ fontSize: '12px', opacity: 0.7 }}>
               ({currentProjectInfo.projectPath.split('/').pop()})
@@ -1178,21 +1290,29 @@ const AppContent: React.FC = () => {
               <button
                 onClick={() => setReplacementAudioPath(null)}
                 style={{
-                  padding: '4px 6px',
-                  backgroundColor: theme.colors.error,
-                  color: theme.colors.text,
+                  padding: '8px',
+                  backgroundColor: 'transparent',
+                  color: theme.colors.error,
                   border: `1px solid ${theme.colors.error}`,
-                  borderRadius: '3px',
+                  borderRadius: '6px',
                   cursor: 'pointer',
-                  fontSize: '10px',
-                  marginLeft: '2px',
+                  fontSize: '11px',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = theme.colors.error;
+                  e.currentTarget.style.color = theme.colors.errorForeground;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = theme.colors.error;
                 }}
                 title="Clear audio replacement"
               >
-                <CloseIcon size={10} />
+                <CloseIcon size={16} />
               </button>
             )}
             <button
@@ -1214,6 +1334,68 @@ const AppContent: React.FC = () => {
               title="Export Audio from Video"
             >
               <MusicExportIcon size={14} />
+            </button>
+          </div>
+
+          {/* Export Actions */}
+          <div style={{ display: 'flex', gap: '4px' }}>
+            <button
+              onClick={handleSrtExport}
+              disabled={!captions || captions.length === 0}
+              style={{
+                padding: '8px',
+                backgroundColor: 'transparent',
+                color: (captions && captions.length > 0) ? theme.colors.text : theme.colors.textMuted,
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: '6px',
+                cursor: (captions && captions.length > 0) ? 'pointer' : 'not-allowed',
+                fontSize: '11px',
+                opacity: (captions && captions.length > 0) ? 1 : 0.5,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                if (captions && captions.length > 0) {
+                  e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+              title="Export SRT Subtitle File"
+            >
+              <ExportSrtIcon size={16} />
+            </button>
+            <button
+              onClick={handleShowExportSettings}
+              disabled={!videoFile || !captions || captions.length === 0}
+              style={{
+                padding: '8px',
+                backgroundColor: 'transparent',
+                color: (videoFile && captions && captions.length > 0) ? theme.colors.text : theme.colors.textMuted,
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: '6px',
+                cursor: (videoFile && captions && captions.length > 0) ? 'pointer' : 'not-allowed',
+                fontSize: '11px',
+                opacity: (videoFile && captions && captions.length > 0) ? 1 : 0.5,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                if (videoFile && captions && captions.length > 0) {
+                  e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+              title="Export Video with Captions"
+            >
+              <ExportVideoIcon size={16} />
             </button>
           </div>
         </div>
@@ -1286,9 +1468,7 @@ const AppContent: React.FC = () => {
             <TabbedRightPanel
               selectedSegment={captions.find(c => c.id === selectedSegmentId) || null}
               onSegmentUpdate={handleCaptionUpdate}
-              videoFile={videoFile}
               captions={captions}
-              onExport={handleExport}
               onApplyToAll={handleApplyToAll}
               onTimeSeek={setCurrentTime}
               transcriptionStatus={transcriptionStatus}
@@ -1356,6 +1536,79 @@ const AppContent: React.FC = () => {
         }}
         initialContent={generatedContent || undefined}
       />
+
+      {/* Export Settings Modal */}
+      <ExportSettingsModal
+        isOpen={showExportSettings}
+        onClose={() => setShowExportSettings(false)}
+        onConfirm={(settings) => {
+          setShowExportSettings(false);
+          handleExport(settings);
+        }}
+      />
+
+      {/* SRT Export Success Modal */}
+      {showSrtSuccess && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.9)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1001
+        }}>
+          <div style={{
+            backgroundColor: theme.colors.surface,
+            borderRadius: '8px',
+            padding: '30px',
+            width: '400px',
+            maxWidth: '90vw',
+            color: theme.colors.text,
+            textAlign: 'center'
+          }}>
+            <div style={{ marginBottom: '20px' }}>
+              <ExportSrtIcon size={48} />
+            </div>
+            <h3 style={{ margin: '0 0 15px 0', fontSize: '18px', fontWeight: 'bold' }}>
+              SRT Export Successful!
+            </h3>
+            <p style={{ margin: '0 0 20px 0', fontSize: '14px', color: theme.colors.textSecondary }}>
+              Your subtitle file has been saved successfully.
+            </p>
+            <div style={{
+              backgroundColor: theme.colors.background,
+              padding: '10px',
+              borderRadius: '4px',
+              marginBottom: '20px',
+              fontSize: '12px',
+              wordBreak: 'break-all',
+              color: theme.colors.textSecondary
+            }}>
+              {exportedSrtPath}
+            </div>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+              <Button
+                onClick={() => setShowSrtSuccess(false)}
+                variant="secondary"
+                size="md"
+              >
+                Close
+              </Button>
+              <Button
+                onClick={handleShowSrtInFinder}
+                variant="primary"
+                size="md"
+              >
+                Show in Finder
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
