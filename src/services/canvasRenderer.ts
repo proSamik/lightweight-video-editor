@@ -725,6 +725,18 @@ export class CanvasVideoRenderer {
         return '"Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif';
       case 'Ubuntu':
         return 'Ubuntu, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+      case 'Montserrat':
+        return 'Montserrat, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+      case 'Poppins':
+        return 'Poppins, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+      case 'Raleway':
+        return 'Raleway, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+      case 'Lato':
+        return 'Lato, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+      case 'Nunito':
+        return 'Nunito, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+      case 'Quicksand':
+        return 'Quicksand, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
       case 'Arial':
         return 'Arial, sans-serif';
       case 'Helvetica':
