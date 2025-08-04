@@ -1223,12 +1223,14 @@ function renderProgressiveTextOnCanvas(
     const displayLine = lines[displayLineIndex];
     const lineHeight = fontSize + 8; // Add some padding between lines
     
-    // Calculate vertical position for the line
-    const lineY = centerY - ((displayLine.length - 1) * lineHeight) / 2;
+    // FIXED: First word stays at centerY, subsequent words appear below
+    // Don't center the entire line - keep first word fixed at centerY
+    const firstWordY = centerY;
     
     // Draw each word in the line vertically
     displayLine.forEach((word, wordIndex) => {
-      const wordY = lineY + (wordIndex * lineHeight);
+      // First word (index 0) stays at centerY, others appear below
+      const wordY = firstWordY + (wordIndex * lineHeight);
       const isHighlighted = frameTime >= word.start && frameTime <= word.end;
       
       // Apply text transformation and measure word for background
