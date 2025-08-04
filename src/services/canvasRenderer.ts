@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import ffmpeg = require('fluent-ffmpeg');
-import { createCanvas, loadImage, Canvas, CanvasRenderingContext2D } from 'canvas';
+import { createCanvas, loadImage, Canvas, CanvasRenderingContext2D, registerFont } from 'canvas';
 
 /**
  * True web-compatible Canvas-based video renderer
@@ -13,6 +13,7 @@ import { createCanvas, loadImage, Canvas, CanvasRenderingContext2D } from 'canva
  */
 export class CanvasVideoRenderer {
   private static instance: CanvasVideoRenderer;
+  private fontsRegistered = false;
 
   private constructor() {}
 
@@ -353,13 +354,13 @@ export class CanvasVideoRenderer {
       // Draw text with word-level highlighting
       if (words.length > 0) {
         if (caption.style.renderMode === 'progressive') {
-          await this.renderProgressiveTextOnCanvas(ctx, words, caption, frameTime, x, y);
+          await this.renderProgressiveTextOnCanvas(ctx, words, caption, frameTime, x, y, metadata);
         } else {
-          await this.renderKaraokeTextOnCanvas(ctx, words, caption, frameTime, x, y);
+          await this.renderKaraokeTextOnCanvas(ctx, words, caption, frameTime, x, y, metadata);
         }
       } else {
         // Simple text without word-level timing
-        await this.renderSimpleTextOnCanvas(ctx, text, caption, x, y);
+        await this.renderSimpleTextOnCanvas(ctx, text, caption, x, y, metadata);
       }
       
       // Restore context if rotation was applied
@@ -705,44 +706,102 @@ export class CanvasVideoRenderer {
   }
 
   /**
-   * Maps font names to Canvas-compatible fonts
+   * Registers Google Fonts with Node.js Canvas
+   */
+  private registerGoogleFonts(): void {
+    if (this.fontsRegistered) return;
+
+    try {
+      // In development: __dirname is src/services, so go up to src, then to assets/fonts
+      // In production: __dirname is dist/main/services, so go up to project root, then to src/assets/fonts
+      const isDevelopment = __dirname.includes('/src/');
+      const fontsDir = isDevelopment 
+        ? path.join(__dirname, '..', 'assets', 'fonts')
+        : path.join(__dirname, '..', '..', '..', 'src', 'assets', 'fonts');
+      
+      // Register Google Fonts (matching VideoPanel/StylingPanel exactly)
+      const fonts = [
+        { file: 'Inter-Bold.ttf', family: 'Inter', weight: 'bold' },
+        { file: 'Roboto-Bold.ttf', family: 'Roboto', weight: 'bold' },
+        { file: 'OpenSans-Bold.ttf', family: 'Open Sans', weight: 'bold' },
+        { file: 'SourceSansPro-Bold.ttf', family: 'Source Sans Pro', weight: 'bold' },
+        { file: 'NotoSans-Bold.ttf', family: 'Noto Sans', weight: 'bold' },
+        { file: 'Ubuntu-Bold.ttf', family: 'Ubuntu', weight: 'bold' },
+        { file: 'Montserrat-Bold.ttf', family: 'Montserrat', weight: 'bold' },
+        { file: 'Poppins-Bold.ttf', family: 'Poppins', weight: 'bold' },
+        { file: 'Raleway-Bold.ttf', family: 'Raleway', weight: 'bold' },
+        { file: 'Lato-Bold.ttf', family: 'Lato', weight: 'bold' },
+        { file: 'Nunito-Bold.ttf', family: 'Nunito', weight: 'bold' },
+        { file: 'Quicksand-Bold.ttf', family: 'Quicksand', weight: 'bold' }
+      ];
+
+      fonts.forEach(font => {
+        const fontPath = path.join(fontsDir, font.file);
+        if (fs.existsSync(fontPath)) {
+          registerFont(fontPath, { family: font.family, weight: font.weight });
+          console.log(`Registered font: ${font.family}`);
+        } else {
+          console.warn(`Font file not found: ${fontPath}`);
+        }
+      });
+
+      this.fontsRegistered = true;
+      console.log('All Google Fonts registered successfully');
+    } catch (error) {
+      console.error('Error registering fonts:', error);
+      this.fontsRegistered = false;
+    }
+  }
+
+  /**
+   * Maps font names to registered Google Fonts
    */
   private mapFontName(fontName: string): string {
+    // Ensure fonts are registered first
+    this.registerGoogleFonts();
+    
+    // Map fonts exactly as VideoPanel does - Node.js Canvas fallback chains
     switch (fontName) {
+      // Google Fonts (registered and available in Node.js Canvas)
       case 'Inter':
-        return 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        return 'Inter, Arial, sans-serif';
       case 'Roboto':
-        return 'Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+        return 'Roboto, Arial, sans-serif';
       case 'Open Sans':
-        return '"Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+        return '"Open Sans", Arial, sans-serif';
       case 'Source Sans Pro':
-        return '"Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+        return '"Source Sans Pro", Arial, sans-serif';
       case 'Noto Sans':
-        return '"Noto Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-      case 'SF Pro Display':
-        return '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif';
-      case 'Segoe UI':
-        return '"Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif';
+        return '"Noto Sans", Arial, sans-serif';
       case 'Ubuntu':
-        return 'Ubuntu, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+        return 'Ubuntu, Arial, sans-serif';
       case 'Montserrat':
-        return 'Montserrat, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+        return 'Montserrat, Arial, sans-serif';
       case 'Poppins':
-        return 'Poppins, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+        return 'Poppins, Arial, sans-serif';
       case 'Raleway':
-        return 'Raleway, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+        return 'Raleway, Arial, sans-serif';
       case 'Lato':
-        return 'Lato, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+        return 'Lato, Arial, sans-serif';
       case 'Nunito':
-        return 'Nunito, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+        return 'Nunito, Arial, sans-serif';
       case 'Quicksand':
-        return 'Quicksand, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+        return 'Quicksand, Arial, sans-serif';
+      
+      // System fonts (map to registered Google Fonts that are similar)
+      case 'SF Pro Display':   // Apple system font
+        return 'Inter, Arial, sans-serif'; // Inter is closest modern alternative
+      case 'Segoe UI':         // Windows system font  
+        return 'Inter, Arial, sans-serif'; // Inter is closest modern alternative
+      
+      // Standard fonts (available on most systems)
       case 'Arial':
         return 'Arial, sans-serif';
       case 'Helvetica':
         return 'Helvetica, Arial, sans-serif';
+      
       default:
-        return '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'; // Default to system fonts
+        return 'Inter, Arial, sans-serif'; // Default fallback
     }
   }
 
@@ -772,7 +831,8 @@ export class CanvasVideoRenderer {
     caption: any,
     frameTime: number,
     centerX: number,
-    centerY: number
+    centerY: number,
+    metadata: any
   ): Promise<void> {
     try {
       const baseFontSize = caption.style?.fontSize || 32;
@@ -787,7 +847,8 @@ export class CanvasVideoRenderer {
       const textTransform = caption.style?.textTransform || 'none';
       
       // Set font with precise sizing
-      ctx.font = `bold ${fontSize}px ${fontFamily}, Arial, sans-serif`;
+      const fontString = `bold ${fontSize}px ${fontFamily}`;
+      ctx.font = fontString;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle'; // Changed to middle for better centering
       
@@ -888,7 +949,7 @@ export class CanvasVideoRenderer {
         
         // Reset font size if it was changed for emphasis
         if (isHighlighted && caption.style.emphasizeMode) {
-          ctx.font = `bold ${fontSize}px ${fontFamily}, Arial, sans-serif`;
+          ctx.font = `bold ${fontSize}px ${fontFamily}`;
         }
         
         // Move to next word position with uniform spacing
@@ -903,6 +964,9 @@ export class CanvasVideoRenderer {
       
     } catch (error) {
       console.error('Error in karaoke text rendering:', error);
+      console.error('Stack trace:', (error as Error).stack);
+      console.error('Caption data:', caption);
+      console.error('Words data:', words);
       throw error;
     }
   }
@@ -915,7 +979,8 @@ export class CanvasVideoRenderer {
     text: string,
     caption: any,
     x: number,
-    y: number
+    y: number,
+    metadata: any
   ): Promise<void> {
     try {
       const baseFontSize = caption.style?.fontSize || 32;
@@ -932,7 +997,8 @@ export class CanvasVideoRenderer {
       const displayText = this.applyTextTransform(text, textTransform);
       
       // Set font with fallback
-      ctx.font = `bold ${fontSize}px ${fontFamily}, Arial, sans-serif`;
+      const fontString = `bold ${fontSize}px ${fontFamily}`;
+      ctx.font = fontString;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle'; // Changed to middle for better centering
       
@@ -1031,7 +1097,8 @@ export class CanvasVideoRenderer {
     caption: any,
     frameTime: number,
     centerX: number,
-    centerY: number
+    centerY: number,
+    metadata: any
   ): Promise<void> {
     try {
       const baseFontSize = caption.style?.fontSize || 32;
@@ -1044,7 +1111,7 @@ export class CanvasVideoRenderer {
       
       // Set font with precise sizing
       const textAlign = caption.style?.textAlign || 'center';
-      ctx.font = `bold ${fontSize}px ${fontFamily}, Arial, sans-serif`;
+      ctx.font = `bold ${fontSize}px ${fontFamily}`;
       ctx.textAlign = textAlign;
       ctx.textBaseline = 'bottom';
       
@@ -1154,7 +1221,7 @@ export class CanvasVideoRenderer {
           
           // Reset font size if changed
           if (isHighlighted && caption.style.emphasizeMode) {
-            ctx.font = `bold ${fontSize}px ${fontFamily}, Arial, sans-serif`;
+            ctx.font = `bold ${fontSize}px ${fontFamily}`;
           }
         }
         
