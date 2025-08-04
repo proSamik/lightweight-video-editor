@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
-import { CaptionSegment, ExportSettings } from '../../../types';
-import ExportSettingsModal from '../ExportSettings';
+import React from 'react';
+import { CaptionSegment } from '../../../types';
 import { useTheme } from '../../contexts/ThemeContext';
 
 // Import UI components
@@ -18,14 +17,10 @@ import { TranscriptionStatus } from './TranscriptionStatus';
 import { TextEditor } from './TextEditor';
 import { WordLevelEditor } from './WordLevelEditor';
 import { StyleControls } from './StyleControls';
-import { ExportSection } from './ExportSection';
 
 interface StylingPanelProps {
   selectedSegment: CaptionSegment | null;
   onSegmentUpdate: (segmentId: string, updates: Partial<CaptionSegment>) => void;
-  videoFile?: { path: string; name: string } | null;
-  captions?: CaptionSegment[];
-  onExport?: (settings: ExportSettings) => void;
   onApplyToAll?: (styleUpdates: Partial<CaptionSegment['style']>) => void;
   onTimeSeek?: (time: number) => void;
   transcriptionStatus?: {
@@ -38,15 +33,11 @@ interface StylingPanelProps {
 const StylingPanel: React.FC<StylingPanelProps> = ({
   selectedSegment,
   onSegmentUpdate,
-  videoFile,
-  captions,
-  onExport,
   onApplyToAll,
   onTimeSeek,
   transcriptionStatus,
 }) => {
   const { theme } = useTheme();
-  const [showExportSettings, setShowExportSettings] = useState(false);
 
   // Handle style updates
   const handleStyleUpdate = (styleUpdates: Partial<CaptionSegment['style']>) => {
@@ -327,24 +318,9 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
               style={selectedSegment.style}
               onStyleUpdate={handleStyleUpdate}
             />
-            
-            <ExportSection
-              videoFile={videoFile}
-              captions={captions}
-              onExport={onExport}
-              onShowExportSettings={() => setShowExportSettings(true)}
-            />
           </Stack>
         </div>
       </div>
-
-      {showExportSettings && onExport && (
-        <ExportSettingsModal
-          isOpen={showExportSettings}
-          onClose={() => setShowExportSettings(false)}
-          onConfirm={onExport}
-        />
-      )}
     </>
   );
 };
