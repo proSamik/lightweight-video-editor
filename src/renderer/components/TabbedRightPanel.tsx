@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
-import { CaptionSegment, VideoFile, ExportSettings } from '../../types';
+import { CaptionSegment } from '../../types';
 import StylingPanel from './StylingPanel';
 import SubtitlePanel from './SubtitlePanel';
 import { Palette, FileText } from 'lucide-react';
@@ -8,9 +8,7 @@ import { Palette, FileText } from 'lucide-react';
 interface TabbedRightPanelProps {
   selectedSegment: CaptionSegment | null;
   onSegmentUpdate: (segmentId: string, updates: Partial<CaptionSegment>) => void;
-  videoFile: VideoFile | null;
   captions: CaptionSegment[];
-  onExport: (settings: ExportSettings) => void;
   onApplyToAll: (styleUpdates: Partial<CaptionSegment['style']>) => void;
   onTimeSeek: (time: number) => void;
   transcriptionStatus: {
@@ -29,9 +27,7 @@ type TabType = 'styling' | 'subtitles';
 const TabbedRightPanel: React.FC<TabbedRightPanelProps> = ({
   selectedSegment,
   onSegmentUpdate,
-  videoFile,
   captions,
-  onExport,
   onApplyToAll,
   onTimeSeek,
   transcriptionStatus,
@@ -99,9 +95,6 @@ const TabbedRightPanel: React.FC<TabbedRightPanelProps> = ({
           <StylingPanel
             selectedSegment={selectedSegment}
             onSegmentUpdate={onSegmentUpdate}
-            videoFile={videoFile}
-            captions={captions}
-            onExport={onExport}
             onApplyToAll={onApplyToAll}
             onTimeSeek={onTimeSeek}
             transcriptionStatus={transcriptionStatus}
