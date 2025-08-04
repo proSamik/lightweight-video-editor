@@ -55,12 +55,16 @@ export interface TranscriptionSegment {
 }
 
 export enum FontOption {
-  SF_PRO_DISPLAY_SEMIBOLD = 'SF Pro Display Semibold',
+  INTER = 'Inter',
+  ROBOTO = 'Roboto',
+  OPEN_SANS = 'Open Sans',
+  SOURCE_SANS_PRO = 'Source Sans Pro',
+  NOTO_SANS = 'Noto Sans',
+  SF_PRO_DISPLAY = 'SF Pro Display',
+  SEGOE_UI = 'Segoe UI',
+  UBUNTU = 'Ubuntu',
   ARIAL = 'Arial',
-  HELVETICA = 'Helvetica',
-  TIMES_NEW_ROMAN = 'Times New Roman',
-  GEORGIA = 'Georgia',
-  MONTSERRAT = 'Montserrat'
+  HELVETICA = 'Helvetica'
 }
 
 export enum ColorOption {
