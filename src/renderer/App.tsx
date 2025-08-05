@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { VideoFile, CaptionSegment, FontOption, ColorOption, ExportSettings, ProjectData, AISettings, GeneratedContent } from '../types';
 import VideoPanel from './components/VideoPanel';
-import TimelinePanel from './components/TimelinePanel';
 import UnifiedTimeline from './components/UnifiedTimeline';
-import StylingPanel from './components/StylingPanel';
 import TabbedRightPanel from './components/TabbedRightPanel';
 import TranscriptionSettings from './components/TranscriptionSettings';
 import ProjectManagerModal from './components/ProjectManager';
