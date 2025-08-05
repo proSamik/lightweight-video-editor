@@ -1,13 +1,14 @@
 import React from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 
-interface LoadingScreenProps {
-  message: string;
-  progress?: number; // Progress percentage (0-100)
-  onCancel?: () => void; // Optional cancel callback
+export interface LoadingScreenProps {
+  message?: string;
+  progress?: number;
+  onCancel?: () => void;
+  elapsedTime?: number;
 }
 
-const LoadingScreen: React.FC<LoadingScreenProps> = ({ message, progress, onCancel }) => {
+const LoadingScreen: React.FC<LoadingScreenProps> = ({ message, progress, onCancel, elapsedTime }) => {
   const { theme } = useTheme();
   return (
     <div style={{
@@ -29,7 +30,6 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ message, progress, onCanc
         animation: 'spin 1s linear infinite',
         marginBottom: '20px'
       }} />
-      
       <h2 style={{ 
         margin: '0 0 10px 0', 
         fontSize: '24px',
@@ -37,7 +37,6 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ message, progress, onCanc
       }}>
         Processing...
       </h2>
-      
       <p style={{ 
         margin: '0 0 20px 0', 
         fontSize: '16px',
@@ -47,7 +46,6 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ message, progress, onCanc
       }}>
         {message}
       </p>
-      
       {progress !== undefined && (
         <div style={{ width: '300px', marginTop: '10px' }}>
           <div style={{
@@ -75,29 +73,24 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ message, progress, onCanc
           </div>
         </div>
       )}
-      
+      {elapsedTime !== undefined && (
+        <div style={{ marginTop: '16px', fontSize: '15px', color: theme.colors.textSecondary }}>
+          Elapsed Time: {Math.floor(elapsedTime / 60)}:{(elapsedTime % 60).toString().padStart(2, '0')}
+        </div>
+      )}
       {onCancel && (
         <button
           onClick={onCancel}
           style={{
-            marginTop: '20px',
-            padding: '12px 24px',
-            backgroundColor: 'transparent',
-            border: `2px solid ${theme.colors.border}`,
-            borderRadius: '8px',
-            color: theme.colors.text,
-            fontSize: '14px',
-            fontWeight: '500',
+            marginTop: '30px',
+            padding: '10px 24px',
+            fontSize: '16px',
+            backgroundColor: theme.colors.error,
+            color: theme.colors.errorForeground,
+            border: 'none',
+            borderRadius: '6px',
             cursor: 'pointer',
-            transition: 'all 0.2s ease',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = theme.colors.border;
-            e.currentTarget.style.borderColor = theme.colors.text;
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'transparent';
-            e.currentTarget.style.borderColor = theme.colors.border;
+            fontWeight: 500
           }}
         >
           Cancel
