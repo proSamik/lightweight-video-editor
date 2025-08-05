@@ -1,21 +1,28 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { Worker, isMainThread, parentPort, workerData } from 'worker_threads';
 import ffmpeg = require('fluent-ffmpeg');
 import { Canvas, CanvasRenderingContext2D, loadImage } from 'skia-canvas';
 
 /**
- * GPU-Accelerated Canvas-based video renderer using Skia Canvas
- * This approach leverages hardware acceleration for text rendering:
+ * GPU-Accelerated Canvas-based video renderer using Skia Canvas with multi-threading
+ * This approach leverages hardware acceleration for text rendering and CPU parallelism:
  * 1. Extract video frames using FFmpeg (necessary for video decoding)
- * 2. Use Skia Canvas to render captions on each frame (GPU-accelerated)
- * 3. Encode frames back to video using FFmpeg with hardware acceleration
+ * 2. Use multiple worker threads to render captions on frames in parallel (CPU-optimized)
+ * 3. Use Skia Canvas for GPU-accelerated text rendering within each worker
+ * 4. Encode frames back to video using FFmpeg with hardware acceleration
  */
 export class GPUCanvasVideoRenderer {
   private static instance: GPUCanvasVideoRenderer;
   private fontsRegistered = false;
+  private maxWorkers: number;
 
-  private constructor() {}
+  private constructor() {
+    // Determine optimal number of worker threads based on CPU cores
+    this.maxWorkers = this.getOptimalWorkerCount();
+    console.log(`GPU Canvas Renderer initialized with ${this.maxWorkers} worker threads`);
+  }
 
   public static getInstance(): GPUCanvasVideoRenderer {
     if (!GPUCanvasVideoRenderer.instance) {
@@ -25,8 +32,30 @@ export class GPUCanvasVideoRenderer {
   }
 
   /**
-   * Main method to render video with captions using GPU-accelerated Canvas approach
-   * This uses Skia Canvas for hardware acceleration instead of node-canvas
+   * Determine optimal number of worker threads based on CPU cores and system resources
+   */
+  private getOptimalWorkerCount(): number {
+    const cpuCores = os.cpus().length;
+    const totalMemory = os.totalmem();
+    const freeMemory = os.freemem();
+    const memoryGB = totalMemory / (1024 * 1024 * 1024);
+    
+    // Base calculation: use 75% of available CPU cores
+    let optimalWorkers = Math.max(1, Math.floor(cpuCores * 0.75));
+    
+    // Adjust based on available memory (each worker needs ~100-200MB)
+    const memoryBasedWorkers = Math.floor(freeMemory / (150 * 1024 * 1024)); // 150MB per worker
+    optimalWorkers = Math.min(optimalWorkers, memoryBasedWorkers);
+    
+    // Cap at reasonable maximum to prevent system overload
+    optimalWorkers = Math.min(optimalWorkers, 16);
+    
+    console.log(`CPU cores: ${cpuCores}, Memory: ${Math.round(memoryGB)}GB, Optimal workers: ${optimalWorkers}`);
+    return optimalWorkers;
+  }
+
+  /**
+   * Main method to render video with captions using GPU-accelerated Canvas approach with multi-threading
    */
   public async renderVideoWithCaptions(
     videoPath: string,
@@ -40,8 +69,9 @@ export class GPUCanvasVideoRenderer {
       console.log('Input video path:', videoPath);
       console.log('Output path:', outputPath);
       console.log('Captions count:', captions?.length || 0);
-      console.log('Captions data:', JSON.stringify(captions?.slice(0, 2), null, 2)); // Log first 2 captions
+      console.log('Captions data:', JSON.stringify(captions?.slice(0, 2), null, 2));
       console.log('Export settings:', exportSettings);
+      console.log('Using worker threads:', this.maxWorkers);
       
       // Validate inputs
       await this.validateInputs(videoPath, captions, outputPath);
@@ -78,9 +108,15 @@ export class GPUCanvasVideoRenderer {
         // Validate frame extraction
         await this.validateFrameExtraction(framesDir);
         
-        // Step 2: Render captions on each frame using GPU-accelerated Skia Canvas
-        console.log('Starting caption rendering on frames...');
-        await this.renderCaptionsOnFramesWithGPUCanvas(framesDir, captions, metadata, onProgress);
+        // Step 2: Render captions on frames using multi-threaded GPU-accelerated Canvas
+        console.log('Starting multi-threaded caption rendering on frames...');
+        try {
+          await this.renderCaptionsOnFramesWithMultiThreading(framesDir, captions, metadata, onProgress);
+        } catch (error) {
+          console.warn('Multi-threaded rendering failed, falling back to single-threaded:', error);
+          console.log('Starting single-threaded caption rendering on frames...');
+          await this.renderCaptionsOnFramesWithGPUCanvas(framesDir, captions, metadata, onProgress);
+        }
         
         // Step 3: Encode frames back to video with hardware acceleration
         console.log('Starting video encoding...');
@@ -107,7 +143,138 @@ export class GPUCanvasVideoRenderer {
   }
 
   /**
-   * Render captions on frames using GPU-accelerated Skia Canvas
+   * Render captions on frames using multi-threaded GPU-accelerated Canvas
+   */
+  private async renderCaptionsOnFramesWithMultiThreading(
+    framesDir: string,
+    captions: any[],
+    metadata: any,
+    onProgress?: (progress: number) => void
+  ): Promise<void> {
+    const frameFiles = await fs.promises.readdir(framesDir);
+    const pngFrames = frameFiles.filter(file => file.endsWith('.png')).sort();
+    const frameCount = pngFrames.length;
+    
+    console.log(`Starting multi-threaded GPU-accelerated text rendering on ${frameCount} frames...`);
+    console.log('Captions to render:', captions.length);
+    console.log('Sample caption:', captions[0]);
+
+    if (frameCount === 0) {
+      console.log('No frames to process');
+      return;
+    }
+
+    // Determine optimal batch size based on frame count and worker count
+    const batchSize = Math.max(1, Math.ceil(frameCount / this.maxWorkers));
+    const batches = this.createBatches(pngFrames, batchSize);
+    
+    console.log(`Created ${batches.length} batches with ${batchSize} frames per batch`);
+
+    let processedFrames = 0;
+    const startTime = Date.now();
+
+    // Process batches in parallel using worker threads
+    const batchPromises = batches.map(async (batch, batchIndex) => {
+      return await this.processFrameBatch(
+        batch,
+        framesDir,
+        captions,
+        metadata,
+        batchIndex,
+        (batchProgress) => {
+          // Update overall progress
+          const totalProgress = ((batchIndex * batchSize + batchProgress) / frameCount) * 100;
+          if (onProgress) {
+            onProgress(totalProgress);
+          }
+        }
+      );
+    });
+
+    // Wait for all batches to complete
+    const batchResults = await Promise.all(batchPromises);
+    
+    // Sum up processed frames from all batches
+    processedFrames = batchResults.reduce((sum, count) => sum + count, 0);
+    
+    const endTime = Date.now();
+    const duration = (endTime - startTime) / 1000;
+    
+    console.log(`Multi-threaded GPU rendering completed: ${processedFrames} frames processed in ${duration.toFixed(2)}s`);
+    console.log(`Average processing speed: ${(processedFrames / duration).toFixed(2)} frames/second`);
+  }
+
+  /**
+   * Create batches of frames for parallel processing
+   */
+  private createBatches(frameFiles: string[], batchSize: number): string[][] {
+    const batches: string[][] = [];
+    
+    for (let i = 0; i < frameFiles.length; i += batchSize) {
+      batches.push(frameFiles.slice(i, i + batchSize));
+    }
+    
+    return batches;
+  }
+
+  /**
+   * Process a batch of frames using a worker thread
+   */
+  private async processFrameBatch(
+    frameBatch: string[],
+    framesDir: string,
+    captions: any[],
+    metadata: any,
+    batchIndex: number,
+    onBatchProgress?: (progress: number) => void
+  ): Promise<number> {
+    return new Promise((resolve, reject) => {
+      // Create worker thread for this batch
+      const worker = new Worker(__filename, {
+        workerData: {
+          frameBatch,
+          framesDir,
+          captions,
+          metadata,
+          batchIndex,
+          isWorker: true
+        }
+      });
+
+      let processedFrames = 0;
+
+      worker.on('message', (message) => {
+        if (message.type === 'progress') {
+          processedFrames = message.processedFrames;
+          if (onBatchProgress) {
+            onBatchProgress(processedFrames);
+          }
+        } else if (message.type === 'complete') {
+          console.log(`Batch ${batchIndex} completed: ${message.processedFrames} frames`);
+          resolve(message.processedFrames);
+        } else if (message.type === 'error') {
+          console.error(`Batch ${batchIndex} error:`, message.error);
+          reject(new Error(message.error));
+        }
+      });
+
+      worker.on('error', (error) => {
+        console.error(`Worker ${batchIndex} error:`, error);
+        reject(error);
+      });
+
+      worker.on('exit', (code) => {
+        if (code !== 0) {
+          console.error(`Worker ${batchIndex} exited with code ${code}`);
+          reject(new Error(`Worker exited with code ${code}`));
+        }
+      });
+    });
+  }
+
+  /**
+   * Fallback method: Render captions on frames using single-threaded GPU-accelerated Canvas
+   * Used when multi-threading fails or is disabled
    */
   private async renderCaptionsOnFramesWithGPUCanvas(
     framesDir: string,
@@ -119,7 +286,7 @@ export class GPUCanvasVideoRenderer {
     const frameCount = frameFiles.length;
     let processedFrames = 0;
 
-    console.log(`Starting GPU-accelerated text rendering on ${frameCount} frames...`);
+    console.log(`Starting single-threaded GPU-accelerated text rendering on ${frameCount} frames...`);
     console.log('Captions to render:', captions.length);
     console.log('Sample caption:', captions[0]);
 
@@ -174,7 +341,7 @@ export class GPUCanvasVideoRenderer {
       }
     }
 
-    console.log(`GPU-accelerated text rendering completed: ${processedFrames} frames processed`);
+    console.log(`Single-threaded GPU rendering completed: ${processedFrames} frames processed`);
   }
 
   /**
@@ -316,11 +483,6 @@ export class GPUCanvasVideoRenderer {
       if (captionStart === undefined || captionEnd === undefined || captionStart >= captionEnd) {
         console.warn('Skipping caption with invalid timing:', caption);
         continue;
-      }
-      
-      // Debug: Log timing check for first few captions
-      if (captionsRendered < 3) {
-        console.log(`Caption timing check: frameTime=${frameTime}ms, caption.startTime=${captionStart}ms, caption.endTime=${captionEnd}ms, match=${frameTime >= captionStart && frameTime <= captionEnd}`);
       }
       
       if (frameTime >= captionStart && frameTime <= captionEnd) {
@@ -924,4 +1086,544 @@ export class GPUCanvasVideoRenderer {
         return text;
     }
   }
+}
+
+// Worker thread execution logic
+if (!isMainThread && workerData?.isWorker) {
+  // This code runs in worker threads
+  const { frameBatch, framesDir, captions, metadata, batchIndex } = workerData;
+  
+  // Import required modules in worker context
+  const fs = require('fs');
+  const path = require('path');
+  const { Canvas, loadImage } = require('skia-canvas');
+  
+  /**
+   * Worker thread frame processing function
+   */
+  async function processFrameBatchInWorker() {
+    let processedFrames = 0;
+    
+    try {
+      for (const frameFile of frameBatch) {
+        const framePath = path.join(framesDir, frameFile);
+        const frameNumber = extractFrameNumber(frameFile);
+        const frameTime = (frameNumber / metadata.fps) * 1000; // Convert to milliseconds
+        
+        try {
+          // Load frame image using Skia Canvas
+          const frameImage = await loadImage(framePath);
+          
+          // Create GPU-accelerated canvas with frame dimensions
+          const canvas = new Canvas(frameImage.width, frameImage.height);
+          const ctx = canvas.getContext('2d');
+          
+          // Draw the original frame
+          ctx.drawImage(frameImage, 0, 0);
+          
+          // Render captions on this frame
+          const captionsRendered = await renderCaptionsForFrameInWorker(ctx, captions, frameTime, frameImage.width, frameImage.height);
+          
+          // Save the rendered frame back to disk
+          const buffer = await canvas.toBuffer('png');
+          await fs.promises.writeFile(framePath, buffer);
+          
+          processedFrames++;
+          
+          // Report progress every 10 frames
+          if (processedFrames % 10 === 0) {
+            parentPort?.postMessage({
+              type: 'progress',
+              processedFrames,
+              batchIndex
+            });
+          }
+        } catch (error) {
+          console.error(`Worker ${batchIndex} - Error rendering frame ${frameFile}:`, error);
+          // Continue with next frame
+        }
+      }
+      
+      // Report completion
+      parentPort?.postMessage({
+        type: 'complete',
+        processedFrames,
+        batchIndex
+      });
+      
+         } catch (error) {
+       // Report error
+       const errorMessage = error instanceof Error ? error.message : String(error);
+       parentPort?.postMessage({
+         type: 'error',
+         error: errorMessage,
+         batchIndex
+       });
+     }
+  }
+  
+  /**
+   * Extract frame number from filename
+   */
+  function extractFrameNumber(filename: string): number {
+    const match = filename.match(/frame_(\d+)\.png/);
+    return match ? parseInt(match[1]) : 0;
+  }
+  
+  /**
+   * Render captions for a specific frame in worker thread
+   */
+  async function renderCaptionsForFrameInWorker(
+    ctx: any,
+    captions: any[],
+    frameTime: number,
+    canvasWidth: number,
+    canvasHeight: number
+  ): Promise<number> {
+    let captionsRendered = 0;
+    
+    for (const caption of captions) {
+      // Use startTime/endTime properties (matching app structure)
+      const captionStart = caption.startTime !== undefined ? caption.startTime : caption.start;
+      const captionEnd = caption.endTime !== undefined ? caption.endTime : caption.end;
+      
+      // Skip captions with invalid timing
+      if (captionStart === undefined || captionEnd === undefined || captionStart >= captionEnd) {
+        continue;
+      }
+      
+      if (frameTime >= captionStart && frameTime <= captionEnd) {
+        captionsRendered++;
+        if (caption.words && caption.words.length > 0) {
+          if (caption.style.renderMode === 'progressive') {
+            await renderProgressiveTextInWorker(ctx, caption.words, caption, frameTime, canvasWidth, canvasHeight);
+          } else {
+            await renderKaraokeTextInWorker(ctx, caption.words, caption, frameTime, canvasWidth, canvasHeight);
+          }
+        } else {
+          await renderSimpleTextInWorker(ctx, caption.text, caption, canvasWidth, canvasHeight);
+        }
+      }
+    }
+    
+    return captionsRendered;
+  }
+  
+  /**
+   * Render simple text in worker thread
+   */
+  async function renderSimpleTextInWorker(
+    ctx: any,
+    text: string,
+    caption: any,
+    canvasWidth: number,
+    canvasHeight: number
+  ): Promise<void> {
+    const baseFontSize = caption.style?.fontSize || 32;
+    const scale = caption.style?.scale || 1;
+    const fontSize = baseFontSize * scale;
+    const fontFamily = mapFontNameInWorker(caption.style?.font || 'Segoe UI');
+    const textColor = parseColorInWorker(caption.style?.textColor || '#ffffff');
+    const backgroundColor = parseColorInWorker(caption.style?.backgroundColor || '#80000000');
+    const strokeColor = parseColorInWorker(caption.style?.strokeColor || 'transparent');
+    const strokeWidth = caption.style?.strokeWidth || 0;
+    
+    // Apply text transformation
+    const displayText = applyTextTransformInWorker(text, caption.style?.textTransform || 'none');
+    
+    // Set font with fallback
+    ctx.font = `bold ${fontSize}px ${fontFamily}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    // Calculate position
+    const x = (canvasWidth * caption.style.position.x) / 100;
+    const y = (canvasHeight * caption.style.position.y) / 100;
+    
+    // Measure text for background box
+    const textMetrics = ctx.measureText(displayText);
+    const textWidth = textMetrics.width;
+    const textHeight = fontSize;
+    
+    // Calculate background box
+    const boxX = x - (textWidth / 2) - 12;
+    const boxY = y - (textHeight / 2) - 12;
+    const boxWidth = textWidth + 24;
+    const boxHeight = textHeight + 24;
+    
+    // Draw background box if not transparent
+    if (backgroundColor.alpha > 0) {
+      ctx.fillStyle = `rgba(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b}, ${backgroundColor.alpha})`;
+      ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+    }
+    
+    // Add text shadow for better visibility
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 2;
+    
+    // Draw stroke if specified
+    if (strokeWidth > 0 && strokeColor.alpha > 0) {
+      ctx.strokeStyle = `rgba(${strokeColor.r}, ${strokeColor.g}, ${strokeColor.b}, ${strokeColor.alpha})`;
+      ctx.lineWidth = strokeWidth;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.strokeText(displayText, x, y);
+    }
+    
+    // Draw text
+    ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.alpha})`;
+    ctx.fillText(displayText, x, y);
+    
+    // Reset shadow
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+  }
+  
+  /**
+   * Render karaoke text in worker thread
+   */
+  async function renderKaraokeTextInWorker(
+    ctx: any,
+    words: any[],
+    caption: any,
+    frameTime: number,
+    canvasWidth: number,
+    canvasHeight: number
+  ): Promise<void> {
+    const baseFontSize = caption.style?.fontSize || 32;
+    const scale = caption.style?.scale || 1;
+    const fontSize = baseFontSize * scale;
+    const fontFamily = mapFontNameInWorker(caption.style?.font || 'Segoe UI');
+    const textColor = parseColorInWorker(caption.style?.textColor || '#ffffff');
+    const highlighterColor = parseColorInWorker(caption.style?.highlighterColor || '#ffff00');
+    const backgroundColor = parseColorInWorker(caption.style?.backgroundColor || '#80000000');
+    const strokeColor = parseColorInWorker(caption.style?.strokeColor || 'transparent');
+    const strokeWidth = caption.style?.strokeWidth || 0;
+    const textTransform = caption.style?.textTransform || 'none';
+    
+    // Set font with precise sizing
+    const fontString = `bold ${fontSize}px ${fontFamily}`;
+    ctx.font = fontString;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    const x = (canvasWidth * caption.style.position.x) / 100;
+    const y = (canvasHeight * caption.style.position.y) / 100;
+    
+    // Calculate total width for single line
+    const wordSpacing = 12 * scale;
+    const wordPadding = 4 * scale;
+    
+    let totalWidth = 0;
+    for (const word of words) {
+      const transformedWord = applyTextTransformInWorker(word.word, textTransform);
+      const wordWidth = ctx.measureText(transformedWord).width;
+      totalWidth += wordWidth + (wordPadding * 2) + wordSpacing;
+    }
+    totalWidth -= wordSpacing;
+    
+    // Calculate background box
+    const boxX = x - (totalWidth / 2) - 12;
+    const boxY = y - (fontSize / 2) - 12;
+    const boxWidth = totalWidth + 24;
+    const boxHeight = fontSize + 24;
+    
+    // Draw main background box
+    if (backgroundColor.alpha > 0) {
+      ctx.fillStyle = `rgba(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b}, ${backgroundColor.alpha})`;
+      ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+    }
+    
+    // Add text shadow
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 2;
+    
+    // Draw words in single line
+    let currentX = x - (totalWidth / 2) + wordPadding;
+    
+    for (let i = 0; i < words.length; i++) {
+      const word = words[i];
+      const wordStart = word.start;
+      const wordEnd = word.end;
+      
+      const displayWord = applyTextTransformInWorker(word.word, textTransform);
+      const isHighlighted = frameTime >= wordStart && frameTime <= wordEnd;
+      
+      const wordWidth = ctx.measureText(displayWord).width;
+      const wordBoxWidth = wordWidth + (wordPadding * 2);
+      const wordBoxHeight = fontSize + (wordPadding * 2);
+      const wordBoxX = currentX - wordPadding;
+      const wordBoxY = y - (fontSize / 2) - wordPadding;
+        
+      if (isHighlighted) {
+        if (caption.style.emphasizeMode) {
+          const emphasizedFontSize = fontSize * 1.05;
+          ctx.font = `bold ${emphasizedFontSize}px ${fontFamily}, Arial, sans-serif`;
+          ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.alpha})`;
+        } else {
+          ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.alpha})`;
+          ctx.fillRect(wordBoxX, wordBoxY, wordBoxWidth, wordBoxHeight);
+          ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.alpha})`;
+        }
+      } else {
+        ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.alpha})`;
+      }
+      
+      // Clear shadow for stroke
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+      
+      // Draw stroke if enabled
+      if (strokeWidth > 0 && strokeColor.alpha > 0) {
+        ctx.strokeStyle = `rgba(${strokeColor.r}, ${strokeColor.g}, ${strokeColor.b}, ${strokeColor.alpha})`;
+        ctx.lineWidth = strokeWidth;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.strokeText(displayWord, currentX + wordWidth/2, y);
+      }
+      
+      // Add shadow for text fill
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+      ctx.shadowBlur = 4;
+      ctx.shadowOffsetX = 2;
+      ctx.shadowOffsetY = 2;
+      
+      // Draw the word
+      ctx.fillText(displayWord, currentX + wordWidth/2, y);
+      
+      // Reset font size if changed
+      if (isHighlighted && caption.style.emphasizeMode) {
+        ctx.font = `bold ${fontSize}px ${fontFamily}`;
+      }
+      
+      // Move to next word position
+      currentX += wordWidth + (wordPadding * 2) + wordSpacing;
+    }
+    
+    // Reset shadow
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+  }
+  
+  /**
+   * Render progressive text in worker thread
+   */
+  async function renderProgressiveTextInWorker(
+    ctx: any,
+    words: any[],
+    caption: any,
+    frameTime: number,
+    canvasWidth: number,
+    canvasHeight: number
+  ): Promise<void> {
+    const baseFontSize = caption.style?.fontSize || 32;
+    const scale = caption.style?.scale || 1;
+    const fontSize = baseFontSize * scale;
+    const fontFamily = mapFontNameInWorker(caption.style?.font || 'Segoe UI');
+    const textColor = parseColorInWorker(caption.style?.textColor || '#ffffff');
+    const highlighterColor = parseColorInWorker(caption.style?.highlighterColor || '#ffff00');
+    const backgroundColor = parseColorInWorker(caption.style?.backgroundColor || '#80000000');
+    
+    ctx.font = `bold ${fontSize}px ${fontFamily}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    
+    const x = (canvasWidth * caption.style.position.x) / 100;
+    const y = (canvasHeight * caption.style.position.y) / 100;
+    
+    // Find words that should be visible up to current time
+    const visibleWords: any[] = [];
+    for (const word of words) {
+      if (frameTime >= word.start) {
+        visibleWords.push(word);
+      }
+    }
+    
+    if (visibleWords.length === 0) return;
+    
+    // Group words into lines
+    const lines: any[][] = [];
+    for (let i = 0; i < visibleWords.length; i++) {
+      lines.push(visibleWords.slice(0, i + 1));
+    }
+    
+    // Show only the line that corresponds to the currently highlighted word
+    const currentWord = words.find(word => frameTime >= word.start && frameTime <= word.end);
+    const currentWordIndex = currentWord ? words.indexOf(currentWord) : visibleWords.length - 1;
+    const displayLineIndex = Math.min(currentWordIndex, lines.length - 1);
+    
+    if (displayLineIndex >= 0 && lines[displayLineIndex]) {
+      const displayLine = lines[displayLineIndex];
+      const lineHeight = fontSize + 8;
+      const firstWordY = y;
+      
+      // Draw each word in the line vertically
+      for (let wordIndex = 0; wordIndex < displayLine.length; wordIndex++) {
+        const word = displayLine[wordIndex];
+        const wordY = firstWordY + (wordIndex * lineHeight);
+        const isHighlighted = frameTime >= word.start && frameTime <= word.end;
+        
+        const displayWord = applyTextTransformInWorker(word.word, caption.style?.textTransform || 'none');
+        
+        // Measure transformed word for background
+        const wordWidth = ctx.measureText(displayWord).width;
+        const boxX = x - (wordWidth / 2) - 8;
+        const boxY = wordY - fontSize - 8;
+        const boxWidth = wordWidth + 16;
+        const boxHeight = fontSize + 16;
+        
+        // Draw background for each word
+        if (backgroundColor.alpha > 0) {
+          ctx.fillStyle = `rgba(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b}, ${backgroundColor.alpha})`;
+          ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+        }
+        
+        // Handle highlighting
+        if (isHighlighted) {
+          if (caption.style.emphasizeMode) {
+            const emphasizedFontSize = fontSize * 1.05;
+            ctx.font = `bold ${emphasizedFontSize}px ${fontFamily}, Arial, sans-serif`;
+            ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.alpha})`;
+          } else {
+            ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.alpha})`;
+            ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+            ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.alpha})`;
+          }
+        } else {
+          ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.alpha})`;
+        }
+        
+        // Add text shadow
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+        ctx.shadowBlur = 4;
+        ctx.shadowOffsetX = 2;
+        ctx.shadowOffsetY = 2;
+        
+        // Clear shadow for stroke
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        
+        const strokeColor = parseColorInWorker(caption.style?.strokeColor || 'transparent');
+        const strokeWidth = caption.style?.strokeWidth || 0;
+        if (strokeWidth > 0 && strokeColor.alpha > 0) {
+          ctx.strokeStyle = `rgba(${strokeColor.r}, ${strokeColor.g}, ${strokeColor.b}, ${strokeColor.alpha})`;
+          ctx.lineWidth = strokeWidth;
+          ctx.lineJoin = 'round';
+          ctx.lineCap = 'round';
+          ctx.strokeText(displayWord, x, wordY);
+        }
+        
+        // Add shadow for text fill
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+        ctx.shadowBlur = 4;
+        ctx.shadowOffsetX = 2;
+        ctx.shadowOffsetY = 2;
+        
+        // Draw the word
+        ctx.fillText(displayWord, x, wordY);
+        
+        // Reset font size if changed
+        if (isHighlighted && caption.style.emphasizeMode) {
+          ctx.font = `bold ${fontSize}px ${fontFamily}`;
+        }
+      }
+      
+      // Reset shadow
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+    }
+  }
+  
+  /**
+   * Helper functions for worker thread
+   */
+  function mapFontNameInWorker(fontName: string): string {
+    switch (fontName) {
+      case 'Inter':
+        return 'Inter, Arial, sans-serif';
+      case 'Roboto':
+        return 'Roboto, Arial, sans-serif';
+      case 'Open Sans':
+        return '"Open Sans", Arial, sans-serif';
+      case 'Source Sans Pro':
+        return '"Source Sans Pro", Arial, sans-serif';
+      case 'Noto Sans':
+        return '"Noto Sans", Arial, sans-serif';
+      case 'Ubuntu':
+        return 'Ubuntu, Arial, sans-serif';
+      case 'Montserrat':
+        return 'Montserrat, Arial, sans-serif';
+      case 'Poppins':
+        return 'Poppins, Arial, sans-serif';
+      case 'Raleway':
+        return 'Raleway, Arial, sans-serif';
+      case 'Lato':
+        return 'Lato, Arial, sans-serif';
+      case 'Nunito':
+        return 'Nunito, Arial, sans-serif';
+      case 'Quicksand':
+        return 'Quicksand, Arial, sans-serif';
+      case 'SF Pro Display':
+        return 'Inter, Arial, sans-serif';
+      case 'Segoe UI':
+        return 'Inter, Arial, sans-serif';
+      case 'Arial':
+        return 'Arial, sans-serif';
+      case 'Helvetica':
+        return 'Helvetica, Arial, sans-serif';
+      default:
+        return 'Inter, Arial, sans-serif';
+    }
+  }
+  
+  function parseColorInWorker(color: string): { r: number; g: number; b: number; alpha: number } {
+    if (color === 'transparent') {
+      return { r: 0, g: 0, b: 0, alpha: 0 };
+    }
+    
+    const hex = color.replace('#', '');
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+    const alpha = hex.length === 8 ? parseInt(hex.substr(6, 2), 16) / 255 : 1;
+    
+    return { r, g, b, alpha };
+  }
+  
+  function applyTextTransformInWorker(text: string, transform?: string): string {
+    switch (transform) {
+      case 'uppercase':
+        return text.toUpperCase();
+      case 'lowercase':
+        return text.toLowerCase();
+      case 'capitalize':
+        return text.replace(/\b\w/g, l => l.toUpperCase());
+      default:
+        return text;
+    }
+  }
+  
+  // Start processing the frame batch
+  processFrameBatchInWorker().catch((error: unknown) => {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    parentPort?.postMessage({
+      type: 'error',
+      error: errorMessage,
+      batchIndex
+    });
+  });
 } 
