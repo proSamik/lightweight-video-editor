@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { VideoFile, CaptionSegment, FontOption, ColorOption, ExportSettings, ProjectData, AISettings, GeneratedContent } from '../types';
+import { VideoFile, CaptionSegment,ColorOption, ExportSettings, ProjectData, AISettings, GeneratedContent } from '../types';
 import VideoPanel from './components/VideoPanel';
-import TimelinePanel from './components/TimelinePanel';
 import UnifiedTimeline from './components/UnifiedTimeline';
-import StylingPanel from './components/StylingPanel';
 import TabbedRightPanel from './components/TabbedRightPanel';
 import TranscriptionSettings from './components/TranscriptionSettings';
 import ProjectManagerModal from './components/ProjectManager';
@@ -75,6 +73,8 @@ const AppContent: React.FC = () => {
     message: string;
   }>({ isTranscribing: false, progress: 0, message: '' });
   const [cancelController, setCancelController] = useState<AbortController | null>(null);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const timerRef = React.useRef<NodeJS.Timeout | null>(null);
 
   // Handle cancel operation
   const handleCancel = () => {
@@ -965,11 +965,34 @@ const AppContent: React.FC = () => {
     }
   };
 
+  // Start/stop timer for export progress
+  useEffect(() => {
+    if (isLoading) {
+      setElapsedTime(0);
+      if (timerRef.current) clearInterval(timerRef.current);
+      timerRef.current = setInterval(() => {
+        setElapsedTime((prev) => prev + 1);
+      }, 1000);
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [isLoading]);
+
   if (isLoading) {
     return <LoadingScreen 
       message={loadingMessage} 
       progress={loadingProgress} 
       onCancel={cancelController ? handleCancel : undefined}
+      elapsedTime={elapsedTime}
     />;
   }
 

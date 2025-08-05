@@ -283,11 +283,11 @@ export class FFmpegService {
         return;
       }
 
-      // Use Canvas-based rendering for perfect preview matching
+      // Use GPU-accelerated Canvas-based rendering for perfect preview matching
       try {
-        console.log('Starting Canvas-based video rendering...');
-        const { CanvasVideoRenderer } = await import('./canvasRenderer');
-        const renderer = CanvasVideoRenderer.getInstance();
+        console.log('Starting GPU-accelerated Canvas-based video rendering...');
+        const { GPUCanvasVideoRenderer } = await import('./gpuCanvasRenderer');
+        const renderer = GPUCanvasVideoRenderer.getInstance();
         
         // Create progress wrapper to provide detailed updates
         const progressWrapper = (progress: number) => {
@@ -297,20 +297,39 @@ export class FFmpegService {
         };
         
         const result = await renderer.renderVideoWithCaptions(videoPath, captionsData, outputPath, progressWrapper, exportSettings);
-        console.log('Canvas-based rendering completed successfully');
+        console.log('GPU-accelerated Canvas-based rendering completed successfully');
         resolve(result);
       } catch (error) {
-        console.error('Canvas rendering failed, fallback to basic copy:', error);
+        console.error('GPU-accelerated rendering failed, trying CPU fallback:', error);
         
-        // Fallback: just copy the video if modern rendering fails
-        const command = ffmpeg(videoPath)
-          .videoCodec('copy')
-          .audioCodec('copy')
-          .output(outputPath)
-          .on('end', () => resolve(outputPath))
-          .on('error', (err: any) => reject(new Error(`Fallback failed: ${err.message}`)));
-        
-        command.run();
+        // Fallback to CPU-based rendering
+        // try {
+        //   console.log('Falling back to CPU-based Canvas rendering...');
+        //   const { CanvasVideoRenderer } = await import('./canvasRenderer');
+        //   const renderer = CanvasVideoRenderer.getInstance();
+          
+        //   const progressWrapper = (progress: number) => {
+        //     if (onProgress) {
+        //       onProgress(progress);
+        //     }
+        //   };
+          
+        //   const result = await renderer.renderVideoWithCaptions(videoPath, captionsData, outputPath, progressWrapper, exportSettings);
+        //   console.log('CPU-based rendering completed successfully');
+        //   resolve(result);
+        // } catch (fallbackError) {
+        //   console.error('CPU rendering also failed, fallback to basic copy:', fallbackError);
+          
+        //   // Final fallback: just copy the video if all rendering fails
+        //   const command = ffmpeg(videoPath)
+        //     .videoCodec('copy')
+        //     .audioCodec('copy')
+        //     .output(outputPath)
+        //     .on('end', () => resolve(outputPath))
+        //     .on('error', (err: any) => reject(new Error(`All rendering methods failed: ${err.message}`)));
+          
+        //   command.run();
+        // }
       }
     });
   }
