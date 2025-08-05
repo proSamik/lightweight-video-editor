@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { VideoFile, CaptionSegment, FontOption, ColorOption, ExportSettings, ProjectData, AISettings, GeneratedContent } from '../types';
+import { VideoFile, CaptionSegment,ColorOption, ExportSettings, ProjectData, AISettings, GeneratedContent } from '../types';
 import VideoPanel from './components/VideoPanel';
 import UnifiedTimeline from './components/UnifiedTimeline';
 import TabbedRightPanel from './components/TabbedRightPanel';
