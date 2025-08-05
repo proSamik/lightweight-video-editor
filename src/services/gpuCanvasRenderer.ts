@@ -345,7 +345,7 @@ export class GPUCanvasVideoRenderer {
   }
 
   /**
-   * Encode frames to video using FFmpeg with hardware acceleration
+   * Encode frames to video using FFmpeg with hardware acceleration and I/O error handling
    */
   private async encodeFramesToVideoWithHardwareAccel(
     framesDir: string,
@@ -355,74 +355,209 @@ export class GPUCanvasVideoRenderer {
     onProgress?: (progress: number) => void,
     exportSettings?: { framerate: number; quality: string }
   ): Promise<string> {
+    return new Promise(async (resolve, reject) => {
+      try {
+        // Pre-encode validation and preparation
+        await this.validateEncodingEnvironment(outputPath, framesDir);
+        
+        const fps = exportSettings?.framerate || metadata.fps;
+        const quality = exportSettings?.quality || 'high';
+        
+        // Determine hardware acceleration based on system
+        const hwaccel = this.detectHardwareAcceleration();
+        
+        console.log(`Starting hardware-accelerated video encoding with ${hwaccel}...`);
+
+        let command = ffmpeg()
+          .input(path.join(framesDir, 'frame_%06d.png'))
+          .inputFPS(fps)
+          .input(originalVideoPath)
+          .audioCodec('copy'); // Copy original audio
+
+        // Apply hardware acceleration if available
+        if (hwaccel) {
+          // Use hardware-accelerated codec based on detected hardware
+          if (hwaccel === 'cuda') {
+            command = command.videoCodec('h264_nvenc');
+          } else if (hwaccel === 'qsv') {
+            command = command.videoCodec('h264_qsv');
+          } else if (hwaccel === 'amf') {
+            command = command.videoCodec('h264_amf');
+          }
+        } else {
+          // Fallback to software encoding with optimization
+          command = command.videoCodec('libx264')
+            .videoFilters('scale=trunc(iw/2)*2:trunc(ih/2)*2'); // Ensure even dimensions
+        }
+
+        // Set quality based on export settings
+        if (quality === 'high') {
+          command = command.outputOptions(['-crf', '18']);
+        } else if (quality === 'medium') {
+          command = command.outputOptions(['-crf', '23']);
+        } else {
+          command = command.outputOptions(['-crf', '28']);
+        }
+
+        // Add Mac Quick Look compatibility options and I/O optimization
+        command = command.outputOptions([
+          '-movflags', '+faststart',
+          '-pix_fmt', 'yuv420p',
+          '-profile:v', 'baseline',
+          '-level', '3.0',
+          '-threads', Math.max(1, Math.floor(this.maxWorkers / 2)).toString(), // Limit FFmpeg threads
+          '-max_muxing_queue_size', '1024' // Increase queue size for large files
+        ]);
+
+        command
+          .output(outputPath)
+          .on('start', (commandLine: string) => {
+            console.log('FFmpeg encoding command:', commandLine);
+          })
+          .on('progress', (progress: any) => {
+            console.log('Video encoding progress:', progress);
+            if (onProgress) {
+              // Combine frame rendering progress (50%) with encoding progress (50%)
+              const encodingProgress = (progress.percent || 0) * 0.5 + 50;
+              onProgress(encodingProgress);
+            }
+          })
+          .on('end', () => {
+            console.log('Hardware-accelerated video encoding completed successfully');
+            resolve(outputPath);
+          })
+          .on('error', async (err: any) => {
+            console.error('Hardware-accelerated encoding failed:', err);
+            
+            // Check if it's an I/O error and try fallback
+            const errorMessage = err.message || String(err);
+            if (errorMessage.includes('EIO') || errorMessage.includes('ENOSPC') || errorMessage.includes('write')) {
+              console.log('I/O error detected, trying fallback encoding...');
+              try {
+                const fallbackResult = await this.encodeFramesToVideoFallback(framesDir, originalVideoPath, outputPath, metadata, onProgress, exportSettings);
+                resolve(fallbackResult);
+              } catch (fallbackError) {
+                reject(new Error(`Both hardware and fallback encoding failed. Hardware error: ${errorMessage}. Fallback error: ${fallbackError}`));
+              }
+            } else {
+              reject(new Error(`Hardware-accelerated encoding failed: ${errorMessage}`));
+            }
+          })
+          .run();
+      } catch (error) {
+        reject(new Error(`Encoding setup failed: ${error}`));
+      }
+    });
+  }
+
+  /**
+   * Validate encoding environment before starting FFmpeg
+   */
+  private async validateEncodingEnvironment(outputPath: string, framesDir: string): Promise<void> {
+    // Check disk space
+    const outputDir = path.dirname(outputPath);
+    const freeSpace = await this.getDiskFreeSpace(outputDir);
+    const requiredSpace = 500 * 1024 * 1024; // 500MB minimum
+    
+    if (freeSpace < requiredSpace) {
+      throw new Error(`Insufficient disk space. Available: ${Math.round(freeSpace / (1024 * 1024))}MB, Required: ${Math.round(requiredSpace / (1024 * 1024))}MB`);
+    }
+    
+    // Check if output directory is writable
+    try {
+      const testFile = path.join(outputDir, '.test-write');
+      await fs.promises.writeFile(testFile, 'test');
+      await fs.promises.unlink(testFile);
+    } catch (error) {
+      throw new Error(`Output directory is not writable: ${outputPath}`);
+    }
+    
+    // Check if frames directory exists and has files
+    const frameFiles = await fs.promises.readdir(framesDir);
+    const pngFiles = frameFiles.filter(file => file.endsWith('.png'));
+    if (pngFiles.length === 0) {
+      throw new Error('No frame files found for encoding');
+    }
+    
+    console.log(`Encoding environment validated: ${pngFiles.length} frames, ${Math.round(freeSpace / (1024 * 1024))}MB free space`);
+  }
+
+  /**
+   * Get available disk space for a directory
+   */
+  private async getDiskFreeSpace(directory: string): Promise<number> {
+    try {
+      const { execSync } = require('child_process');
+      const platform = process.platform;
+      
+      let command: string;
+      if (platform === 'win32') {
+        command = `wmic logicaldisk where "DeviceID='${directory.charAt(0)}:'" get freespace /value`;
+        const output = execSync(command, { encoding: 'utf8' });
+        const match = output.match(/FreeSpace=(\d+)/);
+        return match ? parseInt(match[1]) : 0;
+      } else {
+        command = `df -k "${directory}" | tail -1 | awk '{print $4}'`;
+        const output = execSync(command, { encoding: 'utf8' });
+        return parseInt(output.trim()) * 1024; // Convert KB to bytes
+      }
+    } catch (error) {
+      console.warn('Could not determine disk space, assuming sufficient:', error);
+      return 1024 * 1024 * 1024; // Assume 1GB available
+    }
+  }
+
+  /**
+   * Fallback encoding method with reduced quality and simpler settings
+   */
+  private async encodeFramesToVideoFallback(
+    framesDir: string,
+    originalVideoPath: string,
+    outputPath: string,
+    metadata: any,
+    onProgress?: (progress: number) => void,
+    exportSettings?: { framerate: number; quality: string }
+  ): Promise<string> {
     return new Promise((resolve, reject) => {
       const fps = exportSettings?.framerate || metadata.fps;
-      const quality = exportSettings?.quality || 'high';
       
-      // Determine hardware acceleration based on system
-      const hwaccel = this.detectHardwareAcceleration();
+      console.log('Using fallback encoding with software codec...');
       
-      console.log(`Starting hardware-accelerated video encoding with ${hwaccel}...`);
-
       let command = ffmpeg()
         .input(path.join(framesDir, 'frame_%06d.png'))
         .inputFPS(fps)
         .input(originalVideoPath)
-        .audioCodec('copy'); // Copy original audio
-
-      // Apply hardware acceleration if available
-      if (hwaccel) {
-        // Use hardware-accelerated codec based on detected hardware
-        if (hwaccel === 'cuda') {
-          command = command.videoCodec('h264_nvenc');
-        } else if (hwaccel === 'qsv') {
-          command = command.videoCodec('h264_qsv');
-        } else if (hwaccel === 'amf') {
-          command = command.videoCodec('h264_amf');
-        }
-      } else {
-        // Fallback to software encoding with optimization
-        command = command.videoCodec('libx264')
-          .videoFilters('scale=trunc(iw/2)*2:trunc(ih/2)*2'); // Ensure even dimensions
-      }
-
-      // Set quality based on export settings
-      if (quality === 'high') {
-        command = command.outputOptions(['-crf', '18']);
-      } else if (quality === 'medium') {
-        command = command.outputOptions(['-crf', '23']);
-      } else {
-        command = command.outputOptions(['-crf', '28']);
-      }
-
-      // Add Mac Quick Look compatibility options
-      command = command.outputOptions([
-        '-movflags', '+faststart',
-        '-pix_fmt', 'yuv420p',
-        '-profile:v', 'baseline',
-        '-level', '3.0'
-      ]);
+        .audioCodec('copy')
+        .videoCodec('libx264')
+        .outputOptions([
+          '-crf', '28', // Lower quality for faster encoding
+          '-preset', 'ultrafast', // Fastest preset
+          '-tune', 'fastdecode',
+          '-threads', '1', // Single thread to avoid I/O conflicts
+          '-max_muxing_queue_size', '512',
+          '-movflags', '+faststart',
+          '-pix_fmt', 'yuv420p'
+        ]);
 
       command
         .output(outputPath)
         .on('start', (commandLine: string) => {
-          console.log('FFmpeg encoding command:', commandLine);
+          console.log('Fallback FFmpeg encoding command:', commandLine);
         })
         .on('progress', (progress: any) => {
-          console.log('Video encoding progress:', progress);
+          console.log('Fallback encoding progress:', progress);
           if (onProgress) {
-            // Combine frame rendering progress (50%) with encoding progress (50%)
             const encodingProgress = (progress.percent || 0) * 0.5 + 50;
             onProgress(encodingProgress);
           }
         })
         .on('end', () => {
-          console.log('Hardware-accelerated video encoding completed successfully');
+          console.log('Fallback video encoding completed successfully');
           resolve(outputPath);
         })
         .on('error', (err: any) => {
-          console.error('Hardware-accelerated encoding failed:', err);
-          reject(new Error(`Hardware-accelerated encoding failed: ${err.message}`));
+          console.error('Fallback encoding failed:', err);
+          reject(new Error(`Fallback encoding failed: ${err.message}`));
         })
         .run();
     });
@@ -825,7 +960,6 @@ export class GPUCanvasVideoRenderer {
         ctx.shadowOffsetX = 2;
         ctx.shadowOffsetY = 2;
         
-        // Draw stroke if enabled
         // Clear shadow for stroke
         ctx.shadowColor = 'transparent';
         ctx.shadowBlur = 0;
@@ -897,28 +1031,224 @@ export class GPUCanvasVideoRenderer {
     return metadata && metadata.width && metadata.height && metadata.fps;
   }
 
+  /**
+   * Extract video frames using multi-threaded FFmpeg with hardware acceleration
+   */
   private async extractVideoFrames(videoPath: string, framesDir: string, fps: number, onProgress?: (progress: number) => void): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      ffmpeg(videoPath)
+      console.log('Starting multi-threaded frame extraction...');
+      
+      // Use FFmpeg with multi-threading and hardware acceleration
+      let command = ffmpeg(videoPath)
         .fps(fps)
         .output(path.join(framesDir, 'frame_%06d.png'))
+        // Enable multi-threading for faster processing
+        .outputOptions([
+          '-threads', this.maxWorkers.toString(), // Use all available worker threads
+          '-preset', 'ultrafast', // Fastest encoding preset
+          '-tune', 'fastdecode' // Optimize for fast decoding
+        ]);
+
+      // Add hardware acceleration if available
+      const hwaccel = this.detectHardwareAcceleration();
+      if (hwaccel) {
+        console.log(`Using hardware acceleration (${hwaccel}) for frame extraction`);
+        if (hwaccel === 'cuda') {
+          command = command.outputOptions(['-hwaccel', 'cuda', '-hwaccel_output_format', 'cuda']);
+        } else if (hwaccel === 'qsv') {
+          command = command.outputOptions(['-hwaccel', 'qsv', '-hwaccel_output_format', 'qsv']);
+        } else if (hwaccel === 'amf') {
+          command = command.outputOptions(['-hwaccel', 'amf', '-hwaccel_output_format', 'amf']);
+        }
+      }
+
+      command
         .on('start', (commandLine: string) => {
-          // Frame extraction started
+          console.log('Multi-threaded FFmpeg frame extraction command:', commandLine);
         })
         .on('progress', (progress: any) => {
+          console.log('Frame extraction progress:', progress);
           if (onProgress) {
             onProgress((progress.percent || 0) * 0.5); // Frame extraction is 50% of total progress
           }
         })
         .on('end', () => {
+          console.log('Multi-threaded frame extraction completed successfully');
           resolve();
         })
         .on('error', (err: any) => {
-          console.error('Frame extraction error:', err);
+          console.error('Multi-threaded frame extraction error:', err);
           reject(err);
         })
         .run();
     });
+  }
+
+  /**
+   * Alternative: Extract frames in parallel chunks for very long videos
+   * This method splits the video into time segments and extracts frames in parallel
+   */
+  private async extractVideoFramesParallel(videoPath: string, framesDir: string, fps: number, metadata: any, onProgress?: (progress: number) => void): Promise<void> {
+    const videoDuration = metadata.duration;
+    const totalFrames = Math.ceil(videoDuration * fps);
+    
+    // For videos longer than 30 seconds, use parallel extraction
+    if (videoDuration < 30) {
+      console.log('Video is short, using standard extraction');
+      return this.extractVideoFrames(videoPath, framesDir, fps, onProgress);
+    }
+    
+    console.log(`Video is long (${videoDuration.toFixed(1)}s), using parallel frame extraction`);
+    
+    // Split video into chunks based on worker count
+    const chunkCount = Math.min(this.maxWorkers, 8); // Max 8 chunks to avoid too many FFmpeg processes
+    const chunkDuration = videoDuration / chunkCount;
+    
+    console.log(`Splitting video into ${chunkCount} chunks of ${chunkDuration.toFixed(1)}s each`);
+    
+    // Create temporary directories for each chunk
+    const chunkDirs: string[] = [];
+    for (let i = 0; i < chunkCount; i++) {
+      const chunkDir = path.join(framesDir, `chunk_${i}`);
+      await fs.promises.mkdir(chunkDir);
+      chunkDirs.push(chunkDir);
+    }
+    
+    try {
+      // Extract frames for each chunk in parallel
+      const chunkPromises = chunkDirs.map(async (chunkDir, chunkIndex) => {
+        const startTime = chunkIndex * chunkDuration;
+        const endTime = (chunkIndex + 1) * chunkDuration;
+        
+        return this.extractVideoChunk(
+          videoPath,
+          chunkDir,
+          fps,
+          startTime,
+          endTime,
+          chunkIndex,
+          (chunkProgress) => {
+            // Calculate overall progress
+            const overallProgress = ((chunkIndex + chunkProgress) / chunkCount) * 100;
+            if (onProgress) {
+              onProgress(overallProgress * 0.5); // Frame extraction is 50% of total progress
+            }
+          }
+        );
+      });
+      
+      // Wait for all chunks to complete
+      await Promise.all(chunkPromises);
+      
+      // Merge all chunk frames into the main frames directory
+      console.log('Merging chunk frames...');
+      await this.mergeChunkFrames(chunkDirs, framesDir, chunkCount, totalFrames);
+      
+      console.log('Parallel frame extraction completed successfully');
+      
+    } finally {
+      // Clean up chunk directories
+      for (const chunkDir of chunkDirs) {
+        try {
+          await fs.promises.rm(chunkDir, { recursive: true, force: true });
+        } catch (error) {
+          console.warn(`Failed to cleanup chunk directory ${chunkDir}:`, error);
+        }
+      }
+    }
+  }
+
+  /**
+   * Extract a specific chunk of video frames
+   */
+  private async extractVideoChunk(
+    videoPath: string,
+    chunkDir: string,
+    fps: number,
+    startTime: number,
+    endTime: number,
+    chunkIndex: number,
+    onProgress?: (progress: number) => void
+  ): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const duration = endTime - startTime;
+      const frameCount = Math.ceil(duration * fps);
+      
+      console.log(`Extracting chunk ${chunkIndex}: ${startTime.toFixed(1)}s - ${endTime.toFixed(1)}s (${frameCount} frames)`);
+      
+      let command = ffmpeg(videoPath)
+        .inputOptions([
+          '-ss', startTime.toString(), // Start time
+          '-t', duration.toString() // Duration
+        ])
+        .fps(fps)
+        .output(path.join(chunkDir, `chunk_${chunkIndex}_frame_%06d.png`))
+        .outputOptions([
+          '-threads', Math.max(1, Math.floor(this.maxWorkers / 4)).toString(), // Use subset of workers per chunk
+          '-preset', 'ultrafast',
+          '-tune', 'fastdecode'
+        ]);
+
+      // Add hardware acceleration if available
+      const hwaccel = this.detectHardwareAcceleration();
+      if (hwaccel) {
+        if (hwaccel === 'cuda') {
+          command = command.outputOptions(['-hwaccel', 'cuda', '-hwaccel_output_format', 'cuda']);
+        } else if (hwaccel === 'qsv') {
+          command = command.outputOptions(['-hwaccel', 'qsv', '-hwaccel_output_format', 'qsv']);
+        } else if (hwaccel === 'amf') {
+          command = command.outputOptions(['-hwaccel', 'amf', '-hwaccel_output_format', 'amf']);
+        }
+      }
+
+      command
+        .on('start', (commandLine: string) => {
+          console.log(`Chunk ${chunkIndex} FFmpeg command:`, commandLine);
+        })
+        .on('progress', (progress: any) => {
+          if (onProgress) {
+            onProgress(progress.percent || 0);
+          }
+        })
+        .on('end', () => {
+          console.log(`Chunk ${chunkIndex} extraction completed`);
+          resolve();
+        })
+        .on('error', (err: any) => {
+          console.error(`Chunk ${chunkIndex} extraction error:`, err);
+          reject(err);
+        })
+        .run();
+    });
+  }
+
+  /**
+   * Merge frames from chunk directories into the main frames directory
+   */
+  private async mergeChunkFrames(chunkDirs: string[], framesDir: string, chunkCount: number, totalFrames: number): Promise<void> {
+    let frameIndex = 1;
+    
+    for (let chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
+      const chunkDir = chunkDirs[chunkIndex];
+      const chunkFiles = await fs.promises.readdir(chunkDir);
+      const pngFiles = chunkFiles.filter(file => file.endsWith('.png')).sort();
+      
+      console.log(`Merging chunk ${chunkIndex}: ${pngFiles.length} frames`);
+      
+      for (const pngFile of pngFiles) {
+        const sourcePath = path.join(chunkDir, pngFile);
+        const targetPath = path.join(framesDir, `frame_${String(frameIndex).padStart(6, '0')}.png`);
+        
+        try {
+          await fs.promises.copyFile(sourcePath, targetPath);
+          frameIndex++;
+        } catch (error) {
+          console.error(`Failed to copy frame ${pngFile}:`, error);
+        }
+      }
+    }
+    
+    console.log(`Merged ${frameIndex - 1} frames into main directory`);
   }
 
   private async validateFrameExtraction(framesDir: string): Promise<void> {
@@ -948,9 +1278,26 @@ export class GPUCanvasVideoRenderer {
 
   private async cleanupTempFiles(tempDir: string): Promise<void> {
     try {
-      await fs.promises.rm(tempDir, { recursive: true, force: true });
+      // Check if directory exists before trying to remove it
+      if (await fs.promises.access(tempDir).then(() => true).catch(() => false)) {
+        await fs.promises.rm(tempDir, { recursive: true, force: true });
+        console.log('Temporary files cleaned up successfully');
+      }
     } catch (error) {
       console.warn('Failed to cleanup temporary files:', error);
+      
+      // Try alternative cleanup method
+      try {
+        const { execSync } = require('child_process');
+        if (process.platform === 'win32') {
+          execSync(`rmdir /s /q "${tempDir}"`, { stdio: 'ignore' });
+        } else {
+          execSync(`rm -rf "${tempDir}"`, { stdio: 'ignore' });
+        }
+        console.log('Temporary files cleaned up using alternative method');
+      } catch (altError) {
+        console.error('All cleanup methods failed:', altError);
+      }
     }
   }
 
@@ -1101,7 +1448,7 @@ if (!isMainThread && workerData?.isWorker) {
   /**
    * Worker thread frame processing function
    */
-  async function processFrameBatchInWorker() {
+  const processFrameBatchInWorker = async () => {
     let processedFrames = 0;
     
     try {
@@ -1165,7 +1512,7 @@ if (!isMainThread && workerData?.isWorker) {
   /**
    * Extract frame number from filename
    */
-  function extractFrameNumber(filename: string): number {
+  const extractFrameNumber = (filename: string): number => {
     const match = filename.match(/frame_(\d+)\.png/);
     return match ? parseInt(match[1]) : 0;
   }
@@ -1173,13 +1520,13 @@ if (!isMainThread && workerData?.isWorker) {
   /**
    * Render captions for a specific frame in worker thread
    */
-  async function renderCaptionsForFrameInWorker(
+  const renderCaptionsForFrameInWorker = async (
     ctx: any,
     captions: any[],
     frameTime: number,
     canvasWidth: number,
     canvasHeight: number
-  ): Promise<number> {
+  ): Promise<number> => {
     let captionsRendered = 0;
     
     for (const caption of captions) {
@@ -1212,13 +1559,13 @@ if (!isMainThread && workerData?.isWorker) {
   /**
    * Render simple text in worker thread
    */
-  async function renderSimpleTextInWorker(
+  const renderSimpleTextInWorker = async (
     ctx: any,
     text: string,
     caption: any,
     canvasWidth: number,
     canvasHeight: number
-  ): Promise<void> {
+  ): Promise<void> => {
     const baseFontSize = caption.style?.fontSize || 32;
     const scale = caption.style?.scale || 1;
     const fontSize = baseFontSize * scale;
@@ -1286,14 +1633,14 @@ if (!isMainThread && workerData?.isWorker) {
   /**
    * Render karaoke text in worker thread
    */
-  async function renderKaraokeTextInWorker(
+  const renderKaraokeTextInWorker = async (
     ctx: any,
     words: any[],
     caption: any,
     frameTime: number,
     canvasWidth: number,
     canvasHeight: number
-  ): Promise<void> {
+  ): Promise<void> => {
     const baseFontSize = caption.style?.fontSize || 32;
     const scale = caption.style?.scale || 1;
     const fontSize = baseFontSize * scale;
