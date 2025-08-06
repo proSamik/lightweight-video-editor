@@ -603,39 +603,17 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
                 >
                   <div style={{ 
                     fontSize: '13px', 
-                    lineHeight: '1.5',
-                    marginBottom: '10px'
+                    lineHeight: '1.5'
                   }}>
                     <strong style={{ color: theme.colors.primary }}>Concept {index + 1}:</strong> {thumbnail}
                   </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigator.clipboard.writeText(thumbnail);
-                    }}
-                    style={{
-                      position: 'absolute',
-                      top: '10px',
-                      right: '10px',
-                      padding: '4px',
-                      backgroundColor: theme.colors.primary,
-                      color: theme.colors.text,
-                      border: 'none',
-                      borderRadius: '3px',
-                      fontSize: '12px',
-                      cursor: 'pointer'
-                    }}
-                    title="Copy thumbnail concept"
-                  >
-                    <FiCopy size={12} />
-                  </button>
                 </div>
               ))}
             </div>
           )}
           {thumbnails.length > 0 && (
             <div style={{ marginTop: '8px', fontSize: '12px', color: theme.colors.textSecondary }}>
-              Visual concepts optimized for 2025 CTR trends. Click copy to use in design tools.
+              Visual concepts optimized for 2025 CTR trends.
             </div>
           )}
         </div>
