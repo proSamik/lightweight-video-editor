@@ -123,6 +123,8 @@ export interface ProjectData {
   description?: string;
   title?: string;
   aiGeneratedTitles?: string[];
+  tweets?: { hook: string; lineCount: number; wordCount: number }[];
+  thumbnails?: string[];
 }
 
 export interface AIModel {
