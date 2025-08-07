@@ -20,6 +20,7 @@ interface WordLevelEditorProps {
   onWordDelete: (wordIndex: number) => void;
   onWordMerge: (wordIndex: number) => void;
   onJumpToWord: (wordStart: number) => void;
+  onWordDeleteWithAudio?: (wordIndex: number) => void;
 }
 
 export const WordLevelEditor: React.FC<WordLevelEditorProps> = ({
@@ -28,6 +29,7 @@ export const WordLevelEditor: React.FC<WordLevelEditorProps> = ({
   onWordDelete,
   onWordMerge,
   onJumpToWord,
+  onWordDeleteWithAudio,
 }) => {
   const { theme } = useTheme();
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -111,8 +113,29 @@ export const WordLevelEditor: React.FC<WordLevelEditorProps> = ({
     return `${seconds.toFixed(1)}s`;
   };
 
-  // Delete icon
-  const DeleteIcon = () => (
+  // Delete text only icon (eraser)
+  const DeleteTextIcon = () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+      <path 
+        d="M7 7l10 10M7 17L17 7" 
+        stroke={theme.colors.warning} 
+        strokeWidth="2" 
+        strokeLinecap="round" 
+        strokeLinejoin="round"
+      />
+      <path 
+        d="M3 12h18" 
+        stroke={theme.colors.warning} 
+        strokeWidth="1" 
+        strokeLinecap="round" 
+        strokeLinejoin="round"
+        opacity="0.6"
+      />
+    </svg>
+  );
+  
+  // Delete with audio icon (trash)
+  const DeleteWithAudioIcon = () => (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
       <path 
         d="M3 6h18m-2 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" 
@@ -260,13 +283,26 @@ export const WordLevelEditor: React.FC<WordLevelEditorProps> = ({
                           )}
 
                           <IconButton
-                            icon={<DeleteIcon />}
+                            icon={<DeleteTextIcon />}
                             size="sm"
                             variant="ghost"
                             onClick={() => onWordDelete(index)}
-                            aria-label="Delete word"
-                            title="Delete word"
+                            aria-label="Clear word text (keep audio)"
+                            title="Clear word text (keep audio)"
+                            style={{ color: theme.colors.warning }}
                           />
+                          
+                          {onWordDeleteWithAudio && (
+                            <IconButton
+                              icon={<DeleteWithAudioIcon />}
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => onWordDeleteWithAudio(index)}
+                              aria-label="Delete word and audio"
+                              title="Delete word and audio completely"
+                              style={{ color: theme.colors.error }}
+                            />
+                          )}
                         </HStack>
                       </HStack>
                     )}
