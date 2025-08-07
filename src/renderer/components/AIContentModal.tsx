@@ -51,6 +51,13 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      // Reset states first
+      setDescription('');
+      setTitles([]);
+      setTweets([]);
+      setThumbnails([]);
+      
+      // Then load initial content if available
       if (initialContent?.description) {
         setDescription(initialContent.description);
       }
@@ -63,6 +70,8 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
       if (initialContent?.thumbnails) {
         setThumbnails(initialContent.thumbnails);
       }
+      
+      console.log('AIContentModal - Loading initial content:', initialContent);
     }
   }, [isOpen, initialContent]);
 
@@ -156,6 +165,9 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
       tweets: tweets.length > 0 ? tweets : undefined,
       thumbnails: thumbnails.length > 0 ? thumbnails : undefined
     };
+    console.log('AIContentModal - Saving content:', content);
+    console.log('AIContentModal - tweets state:', tweets);
+    console.log('AIContentModal - thumbnails state:', thumbnails);
     onSave(content);
     onClose();
   };
@@ -467,8 +479,8 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
                       top: '8px',
                       right: '8px',
                       padding: '4px',
-                      backgroundColor: copiedTitleIndex === index ? theme.colors.success : theme.colors.surface,
-                      color: copiedTitleIndex === index ? theme.colors.successForeground : theme.colors.text,
+                      backgroundColor: 'transparent',
+                      color: copiedTitleIndex === index ? theme.colors.success : theme.colors.text,
                       border: 'none',
                       borderRadius: '3px',
                       fontSize: '12px',
@@ -561,8 +573,8 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
                       top: '10px',
                       right: '10px',
                       padding: '4px',
-                      backgroundColor: copiedTweetIndex === index ? theme.colors.success : theme.colors.surface,
-                      color: copiedTweetIndex === index ? theme.colors.successForeground : theme.colors.text,
+                      backgroundColor: 'transparent',
+                      color: copiedTweetIndex === index ? theme.colors.success : theme.colors.text,
                       border: 'none',
                       borderRadius: '3px',
                       fontSize: '12px',
