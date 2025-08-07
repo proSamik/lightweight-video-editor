@@ -127,6 +127,21 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
   const handleWordDelete = (wordIndex: number) => {
     if (!selectedSegment?.words) return;
     
+    // Just clear the text, keep the timing for empty space
+    const updatedWords = [...selectedSegment.words];
+    updatedWords[wordIndex] = { ...updatedWords[wordIndex], word: '' };
+    const newText = updatedWords.filter(w => w.word.trim() !== '').map(w => w.word).join(' ');
+    
+    onSegmentUpdate(selectedSegment.id, {
+      text: newText,
+      words: updatedWords
+    });
+  };
+  
+  const handleWordDeleteWithAudio = (wordIndex: number) => {
+    if (!selectedSegment?.words) return;
+    
+    // Completely remove the word and its timing
     const updatedWords = selectedSegment.words.filter((_, index) => index !== wordIndex);
     const newText = updatedWords.map(w => w.word).join(' ');
     
@@ -308,6 +323,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
                   words={selectedSegment.words}
                   onWordUpdate={handleWordUpdate}
                   onWordDelete={handleWordDelete}
+                  onWordDeleteWithAudio={handleWordDeleteWithAudio}
                   onWordMerge={handleWordMerge}
                   onJumpToWord={handleJumpToWord}
                 />
