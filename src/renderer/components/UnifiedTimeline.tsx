@@ -62,6 +62,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   const [contextMenu, setContextMenu] = useState<{x: number, y: number, segmentId: string} | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{segmentId: string, text: string} | null>(null);
   const [isWaveformLoading, setIsWaveformLoading] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1); // 1 = fit to window, >1 = zoomed in
 
   // Timeline dimensions
   const TIMELINE_HEIGHT = 180;
@@ -70,11 +71,14 @@ const WAVEFORM_HEIGHT = 100;
   const SCRUBBER_HEIGHT = 20;
 
   // Use video duration if available, otherwise fallback to caption duration
-  const totalDuration = videoFile?.duration 
+  const actualDuration = videoFile?.duration 
     ? videoFile.duration * 1000 // Convert from seconds to milliseconds
     : captions.length > 0 
       ? Math.max(...captions.map(c => c.endTime))
       : 60000; // Default 1 minute
+      
+  // Apply zoom level to create virtual timeline width
+  const totalDuration = actualDuration * zoomLevel;
 
   /**
    * Format time display in MM:SS.ms format
@@ -96,7 +100,7 @@ const WAVEFORM_HEIGHT = 100;
     const rect = timelineRef.current.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const percentage = clickX / rect.width;
-    const seekTime = percentage * totalDuration;
+    const seekTime = percentage * actualDuration; // Use actual duration for seeking
     
     setIsDragging(true);
     setDragStartX(clickX);
@@ -112,7 +116,7 @@ const WAVEFORM_HEIGHT = 100;
     const rect = timelineRef.current.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const percentage = Math.max(0, Math.min(1, mouseX / rect.width));
-    const seekTime = percentage * totalDuration;
+    const seekTime = percentage * actualDuration; // Use actual duration for seeking
     
     onTimeSeek(seekTime);
   }, [isDragging, totalDuration, onTimeSeek]);
@@ -302,18 +306,38 @@ const WAVEFORM_HEIGHT = 100;
    * Update waveform progress based on current time
    */
   useEffect(() => {
-    if (wavesurferRef.current && totalDuration > 0) {
-      const progress = currentTime / totalDuration;
+    if (wavesurferRef.current && actualDuration > 0) {
+      const progress = currentTime / actualDuration;
       wavesurferRef.current.setTime(progress * wavesurferRef.current.getDuration());
     }
-  }, [currentTime, totalDuration]);
+  }, [currentTime, actualDuration]);
+  
+  /**
+   * Update waveform zoom when zoom level changes
+   */
+  useEffect(() => {
+    if (wavesurferRef.current) {
+      // Force waveform to redraw with new zoom level
+      wavesurferRef.current.zoom(zoomLevel * 100); // WaveSurfer zoom takes pixels per second
+    }
+  }, [zoomLevel]);
 
   /**
-   * Handle segment double click to select and seek
+   * Handle segment double click to select and seek to middle
    */
   const handleSegmentDoubleClick = (segment: CaptionSegment) => {
     onSegmentSelect(segment.id);
-    onTimeSeek(segment.startTime);
+    const middleTime = segment.startTime + ((segment.endTime - segment.startTime) / 2);
+    onTimeSeek(middleTime);
+  };
+  
+  /**
+   * Handle segment single click to select and seek to middle
+   */
+  const handleSegmentClick = (segment: CaptionSegment) => {
+    onSegmentSelect(segment.id);
+    const middleTime = segment.startTime + ((segment.endTime - segment.startTime) / 2);
+    onTimeSeek(middleTime);
   };
 
 
@@ -349,7 +373,7 @@ const WAVEFORM_HEIGHT = 100;
         {/* Left side - Time Display */}
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <span style={{ color: theme.colors.textSecondary, fontFamily: 'monospace' }}>
-            {formatTime(currentTime)} / {formatTime(totalDuration)}
+            {formatTime(currentTime)} / {formatTime(actualDuration)}
           </span>
         </div>
 
@@ -415,7 +439,7 @@ const WAVEFORM_HEIGHT = 100;
 
           {/* Skip Forward */}
           <button
-            onClick={() => onTimeSeek(Math.min(totalDuration, currentTime + 5000))}
+            onClick={() => onTimeSeek(Math.min(actualDuration, currentTime + 5000))}
             style={{
               padding: '4px',
               backgroundColor: 'transparent',
@@ -443,6 +467,44 @@ const WAVEFORM_HEIGHT = 100;
         </div>
 
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', paddingRight: '8px' }}>
+          {/* Zoom Control */}
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '6px',
+            fontSize: '11px',
+            color: theme.colors.textSecondary
+          }}>
+            <span style={{ minWidth: '28px' }}>Zoom</span>
+            <input
+              type="range"
+              min="0.1"
+              max="10"
+              step="0.1"
+              value={zoomLevel}
+              onChange={(e) => setZoomLevel(parseFloat(e.target.value))}
+              style={{
+                width: '80px',
+                height: '20px',
+                backgroundColor: theme.colors.surface,
+                outline: 'none',
+                cursor: 'pointer',
+                borderRadius: '4px',
+              }}
+              title={`Zoom: ${Math.round(zoomLevel * 100)}%`}
+            />
+            <span style={{ minWidth: '32px', fontSize: '10px' }}>
+              {Math.round(zoomLevel * 100)}%
+            </span>
+          </div>
+          
+          {/* Separator */}
+          <div style={{
+            width: '1px',
+            height: '16px',
+            backgroundColor: theme.colors.border,
+            margin: '0 4px'
+          }} />
           {/* Undo/Redo Controls */}
           <button
             onClick={onUndo}
@@ -558,91 +620,173 @@ const WAVEFORM_HEIGHT = 100;
 
       {/* Main Timeline Area */}
       <div 
-        ref={timelineRef}
         style={{
           height: `${TIMELINE_HEIGHT - 32}px`,
           position: 'relative',
-          cursor: isDragging ? 'grabbing' : 'pointer',
           backgroundColor: theme.colors.background,
-          overflow: 'hidden',
+          overflowX: 'auto',
+          overflowY: 'hidden',
           paddingBottom: '8px',
-          marginLeft: '10px',
         }}
-        onMouseDown={handleTimelineMouseDown}
       >
-        {/* Waveform Background - Only show when video file is available */}
-        {videoFile && (
-          <div 
-            ref={waveformRef}
-            style={{
+        <div 
+          ref={timelineRef}
+          style={{
+            height: '100%',
+            position: 'relative',
+            cursor: isDragging ? 'grabbing' : 'pointer',
+            backgroundColor: theme.colors.background,
+            width: `${Math.max(100 * zoomLevel, 100)}%`, // Minimum 100% width, scales with zoom
+            minWidth: '100%',
+            marginLeft: '10px',
+          }}
+          onMouseDown={handleTimelineMouseDown}
+        >
+          {/* Waveform Background - Only show when video file is available */}
+          {videoFile && (
+            <div 
+              ref={waveformRef}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: `${WAVEFORM_HEIGHT}px`,
+                backgroundColor: theme.colors.background
+              }}
+            />
+          )}
+          
+          {/* Loading indicator overlay */}
+          {videoFile && isWaveformLoading && (
+            <div style={{
               position: 'absolute',
               top: 0,
               left: 0,
-              right: 0,
+              width: '100%',
               height: `${WAVEFORM_HEIGHT}px`,
-              backgroundColor: theme.colors.background
-            }}
-          />
-        )}
-        
-        {/* Loading indicator overlay */}
-        {videoFile && isWaveformLoading && (
-          <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: `${WAVEFORM_HEIGHT}px`,
-            backgroundColor: theme.colors.background,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 10
-          }}>
-            <div style={{
+              backgroundColor: theme.colors.background,
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
-              color: theme.colors.textSecondary,
-              fontSize: '12px'
+              justifyContent: 'center',
+              zIndex: 10
             }}>
               <div style={{
-                width: '16px',
-                height: '16px',
-                border: `2px solid ${theme.colors.border}`,
-                borderTop: `2px solid ${theme.colors.primary}`,
-                borderRadius: '50%',
-                animation: 'spin 1s linear infinite'
-              }} />
-              <span>Generating waveform...</span>
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                color: theme.colors.textSecondary,
+                fontSize: '12px'
+              }}>
+                <div style={{
+                  width: '16px',
+                  height: '16px',
+                  border: `2px solid ${theme.colors.border}`,
+                  borderTop: `2px solid ${theme.colors.primary}`,
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite'
+                }} />
+                <span>Generating waveform...</span>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Scrubber/Playhead */}
-        <div style={{
-          position: 'absolute',
-          left: `${(currentTime / totalDuration) * 100}%`,
-          top: 0,
-          bottom: 0,
-          width: '2px',
-          backgroundColor: theme.colors.error,
-          zIndex: 10,
-          pointerEvents: 'none',
-          boxShadow: '0 0 4px rgba(255, 68, 68, 0.5)'
-        }}>
-          {/* Playhead handle */}
+          {/* Scrubber/Playhead */}
           <div style={{
             position: 'absolute',
-            top: '-4px',
-            left: '-6px',
-            width: '14px',
-            height: '14px',
+            left: `${(currentTime / actualDuration) * 100}%`,  // Use actual duration for playhead position
+            top: 0,
+            bottom: 0,
+            width: '2px',
             backgroundColor: theme.colors.error,
-            border: `2px solid ${theme.colors.text}`,
-            borderRadius: '50%',
-            cursor: 'grab'
-          }} />
+            zIndex: 10,
+            pointerEvents: 'none',
+            boxShadow: '0 0 4px rgba(255, 68, 68, 0.5)'
+          }}>
+            {/* Playhead handle */}
+            <div style={{
+              position: 'absolute',
+              top: '-4px',
+              left: '-6px',
+              width: '14px',
+              height: '14px',
+              backgroundColor: theme.colors.error,
+              border: `2px solid ${theme.colors.text}`,
+              borderRadius: '50%',
+              cursor: 'grab'
+            }} />
+          </div>
+        
+        {/* Caption Segments */}
+        <div style={{
+          position: 'absolute',
+          top: `${WAVEFORM_HEIGHT + 8}px`,
+          left: 0,
+          right: 0,
+          height: `${CAPTION_TRACK_HEIGHT}px`,
+          pointerEvents: 'none'
+        }}>
+          {captions.map((segment) => {
+            const startPercent = (segment.startTime / actualDuration) * 100;
+            const widthPercent = ((segment.endTime - segment.startTime) / actualDuration) * 100;
+            const isSelected = segment.id === selectedSegmentId;
+            const isHovered = segment.id === hoveredSegmentId;
+            
+            return (
+              <div
+                key={segment.id}
+                style={{
+                  position: 'absolute',
+                  left: `${startPercent}%`,
+                  width: `${widthPercent}%`,
+                  height: '100%',
+                  backgroundColor: isSelected 
+                    ? theme.colors.primary 
+                    : isHovered 
+                      ? theme.colors.primaryHover 
+                      : theme.colors.surface,
+                  border: isSelected 
+                    ? `2px solid ${theme.colors.accent}` 
+                    : `1px solid ${theme.colors.border}`,
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  pointerEvents: 'all',
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '0 4px',
+                  overflow: 'hidden',
+                  transition: 'all 0.2s ease',
+                  minWidth: '2px'
+                }}
+                onClick={() => handleSegmentClick(segment)}
+                onDoubleClick={() => handleSegmentDoubleClick(segment)}
+                onMouseEnter={() => setHoveredSegmentId(segment.id)}
+                onMouseLeave={() => setHoveredSegmentId(null)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setContextMenu({
+                    x: e.clientX,
+                    y: e.clientY,
+                    segmentId: segment.id
+                  });
+                }}
+                title={`${segment.text} (${formatTime(segment.startTime)} - ${formatTime(segment.endTime)})`}
+              >
+                <span style={{
+                  fontSize: '11px',
+                  color: isSelected ? theme.colors.primaryForeground : theme.colors.text,
+                  fontWeight: isSelected ? '600' : '400',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  lineHeight: '1.2'
+                }}>
+                  {segment.text}
+                </span>
+              </div>
+            );
+          })}
+          </div>
         </div>
       </div>
 
