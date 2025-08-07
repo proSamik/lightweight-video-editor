@@ -555,7 +555,7 @@ const AppContent: React.FC = () => {
   };
 
   const getCurrentProjectData = (): ProjectData => {
-    return {
+    const projectData = {
       version: '1.0',
       videoFile,
       captions,
@@ -564,8 +564,11 @@ const AppContent: React.FC = () => {
       lastModified: Date.now(),
       description: generatedContent?.description,
       title: generatedContent?.titles?.[0]?.title,
-      aiGeneratedTitles: generatedContent?.titles?.map(t => t.title)
+      aiGeneratedTitles: generatedContent?.titles?.map(t => t.title),
+      tweets: generatedContent?.tweets,
+      thumbnails: generatedContent?.thumbnails
     };
+    return projectData;
   };
 
   const handleSaveProject = async () => {
@@ -707,7 +710,7 @@ const AppContent: React.FC = () => {
     setCurrentTime(0);
 
     // Restore AI generated content
-    if (projectData.description || projectData.aiGeneratedTitles) {
+    if (projectData.description || projectData.aiGeneratedTitles || projectData.tweets || projectData.thumbnails) {
       const restoredContent: GeneratedContent = {};
       if (projectData.description) {
         restoredContent.description = projectData.description;
@@ -717,6 +720,12 @@ const AppContent: React.FC = () => {
           title,
           characterCount: title.length
         }));
+      }
+      if (projectData.tweets) {
+        restoredContent.tweets = projectData.tweets;
+      }
+      if (projectData.thumbnails) {
+        restoredContent.thumbnails = projectData.thumbnails;
       }
       setGeneratedContent(restoredContent);
     } else {
@@ -1557,6 +1566,7 @@ const AppContent: React.FC = () => {
         onClose={() => setShowAIContent(false)}
         captions={captions}
         onSave={(content) => {
+          console.log('App.tsx - Received content from AIContentModal:', content);
           setGeneratedContent(content);
           setShowAIContent(false);
         }}
