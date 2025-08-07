@@ -621,6 +621,12 @@ export class GPUCanvasVideoRenderer {
       }
       
       if (frameTime >= captionStart && frameTime <= captionEnd) {
+        // Check if subtitles should be burned in (default: true)
+        const shouldBurnIn = caption.style?.burnInSubtitles !== false;
+        if (!shouldBurnIn) {
+          continue; // Skip this caption if burnInSubtitles is false
+        }
+        
         captionsRendered++;
         if (caption.words && caption.words.length > 0) {
           if (caption.style.renderMode === 'progressive') {
@@ -680,8 +686,8 @@ export class GPUCanvasVideoRenderer {
     const boxHeight = textHeight + 24;
     
     // Draw background box if not transparent
-    if (backgroundColor.alpha > 0) {
-      ctx.fillStyle = `rgba(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b}, ${backgroundColor.alpha})`;
+    if (backgroundColor.a > 0) {
+      ctx.fillStyle = `rgba(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b}, ${backgroundColor.a})`;
       ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
     }
     
@@ -692,8 +698,8 @@ export class GPUCanvasVideoRenderer {
     ctx.shadowOffsetY = 2;
     
     // Draw stroke if specified
-    if (strokeWidth > 0 && strokeColor.alpha > 0) {
-      ctx.strokeStyle = `rgba(${strokeColor.r}, ${strokeColor.g}, ${strokeColor.b}, ${strokeColor.alpha})`;
+    if (strokeWidth > 0 && strokeColor.a > 0) {
+      ctx.strokeStyle = `rgba(${strokeColor.r}, ${strokeColor.g}, ${strokeColor.b}, ${strokeColor.a})`;
       ctx.lineWidth = strokeWidth;
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
@@ -701,7 +707,7 @@ export class GPUCanvasVideoRenderer {
     }
     
     // Draw text
-    ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.alpha})`;
+    ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
     ctx.fillText(displayText, x, y);
     
     // Reset shadow
@@ -763,8 +769,8 @@ export class GPUCanvasVideoRenderer {
     const boxHeight = fontSize + 24;
     
     // Draw main background box - only if not transparent
-    if (backgroundColor.alpha > 0) {
-      ctx.fillStyle = `rgba(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b}, ${backgroundColor.alpha})`;
+    if (backgroundColor.a > 0) {
+      ctx.fillStyle = `rgba(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b}, ${backgroundColor.a})`;
       ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
     }
     
@@ -802,16 +808,16 @@ export class GPUCanvasVideoRenderer {
           // Emphasis mode: increase font size by 5% and use highlighter color as text color
           const emphasizedFontSize = fontSize * 1.05;
           ctx.font = `bold ${emphasizedFontSize}px ${fontFamily}, Arial, sans-serif`;
-          ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.alpha})`;
+          ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.a})`;
         } else {
           // Background highlighting mode
-          ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.alpha})`;
+          ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.a})`;
           ctx.fillRect(wordBoxX, wordBoxY, wordBoxWidth, wordBoxHeight);
-          ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.alpha})`;
+          ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
         }
       } else {
         // Set normal text color - in horizontal karaoke mode, all words should have full opacity
-        ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.alpha})`;
+        ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
       }
       
       // Clear shadow for stroke
@@ -821,8 +827,8 @@ export class GPUCanvasVideoRenderer {
       ctx.shadowOffsetY = 0;
       
       // Draw stroke if enabled (must be drawn before fill)
-      if (strokeWidth > 0 && strokeColor.alpha > 0) {
-        ctx.strokeStyle = `rgba(${strokeColor.r}, ${strokeColor.g}, ${strokeColor.b}, ${strokeColor.alpha})`;
+      if (strokeWidth > 0 && strokeColor.a > 0) {
+        ctx.strokeStyle = `rgba(${strokeColor.r}, ${strokeColor.g}, ${strokeColor.b}, ${strokeColor.a})`;
         ctx.lineWidth = strokeWidth;
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
@@ -931,8 +937,8 @@ export class GPUCanvasVideoRenderer {
         const boxHeight = fontSize + 16;
         
         // Draw background for each word if not transparent
-        if (backgroundColor.alpha > 0) {
-          ctx.fillStyle = `rgba(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b}, ${backgroundColor.alpha})`;
+        if (backgroundColor.a > 0) {
+          ctx.fillStyle = `rgba(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b}, ${backgroundColor.a})`;
           ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
         }
         
@@ -942,16 +948,16 @@ export class GPUCanvasVideoRenderer {
             // Emphasis mode
             const emphasizedFontSize = fontSize * 1.05;
             ctx.font = `bold ${emphasizedFontSize}px ${fontFamily}, Arial, sans-serif`;
-            ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.alpha})`;
+            ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.a})`;
           } else {
             // Background highlighting
-            ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.alpha})`;
+            ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.a})`;
             ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
-            ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.alpha})`;
+            ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
           }
         } else {
           // Normal text color - all revealed words should have full opacity
-          ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.alpha})`;
+          ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
         }
         
         // Add text shadow
@@ -968,8 +974,8 @@ export class GPUCanvasVideoRenderer {
         
         const strokeColor = this.parseColor(caption.style?.strokeColor || 'transparent');
         const strokeWidth = caption.style?.strokeWidth || 0;
-        if (strokeWidth > 0 && strokeColor.alpha > 0) {
-          ctx.strokeStyle = `rgba(${strokeColor.r}, ${strokeColor.g}, ${strokeColor.b}, ${strokeColor.alpha})`;
+        if (strokeWidth > 0 && strokeColor.a > 0) {
+          ctx.strokeStyle = `rgba(${strokeColor.r}, ${strokeColor.g}, ${strokeColor.b}, ${strokeColor.a})`;
           ctx.lineWidth = strokeWidth;
           ctx.lineJoin = 'round';
           ctx.lineCap = 'round';
@@ -1407,18 +1413,18 @@ export class GPUCanvasVideoRenderer {
     }
   }
 
-  private parseColor(color: string): { r: number; g: number; b: number; alpha: number } {
+  private parseColor(color: string): { r: number; g: number; b: number; a: number } {
     if (color === 'transparent') {
-      return { r: 0, g: 0, b: 0, alpha: 0 };
+      return { r: 0, g: 0, b: 0, a: 0 };
     }
     
     const hex = color.replace('#', '');
     const r = parseInt(hex.substr(0, 2), 16);
     const g = parseInt(hex.substr(2, 2), 16);
     const b = parseInt(hex.substr(4, 2), 16);
-    const alpha = hex.length === 8 ? parseInt(hex.substr(6, 2), 16) / 255 : 1;
+    const a = hex.length === 8 ? parseInt(hex.substr(6, 2), 16) / 255 : 1;
     
-    return { r, g, b, alpha };
+    return { r, g, b, a };
   }
 
   private applyTextTransform(text: string, transform?: string): string {
@@ -1540,6 +1546,12 @@ if (!isMainThread && workerData?.isWorker) {
       }
       
       if (frameTime >= captionStart && frameTime <= captionEnd) {
+        // Check if subtitles should be burned in (default: true)
+        const shouldBurnIn = caption.style?.burnInSubtitles !== false;
+        if (!shouldBurnIn) {
+          continue; // Skip this caption if burnInSubtitles is false
+        }
+        
         captionsRendered++;
         if (caption.words && caption.words.length > 0) {
           if (caption.style.renderMode === 'progressive') {
@@ -1599,8 +1611,8 @@ if (!isMainThread && workerData?.isWorker) {
     const boxHeight = textHeight + 24;
     
     // Draw background box if not transparent
-    if (backgroundColor.alpha > 0) {
-      ctx.fillStyle = `rgba(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b}, ${backgroundColor.alpha})`;
+    if (backgroundColor.a > 0) {
+      ctx.fillStyle = `rgba(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b}, ${backgroundColor.a})`;
       ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
     }
     
@@ -1611,8 +1623,8 @@ if (!isMainThread && workerData?.isWorker) {
     ctx.shadowOffsetY = 2;
     
     // Draw stroke if specified
-    if (strokeWidth > 0 && strokeColor.alpha > 0) {
-      ctx.strokeStyle = `rgba(${strokeColor.r}, ${strokeColor.g}, ${strokeColor.b}, ${strokeColor.alpha})`;
+    if (strokeWidth > 0 && strokeColor.a > 0) {
+      ctx.strokeStyle = `rgba(${strokeColor.r}, ${strokeColor.g}, ${strokeColor.b}, ${strokeColor.a})`;
       ctx.lineWidth = strokeWidth;
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
@@ -1620,7 +1632,7 @@ if (!isMainThread && workerData?.isWorker) {
     }
     
     // Draw text
-    ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.alpha})`;
+    ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
     ctx.fillText(displayText, x, y);
     
     // Reset shadow
@@ -1680,8 +1692,8 @@ if (!isMainThread && workerData?.isWorker) {
     const boxHeight = fontSize + 24;
     
     // Draw main background box
-    if (backgroundColor.alpha > 0) {
-      ctx.fillStyle = `rgba(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b}, ${backgroundColor.alpha})`;
+    if (backgroundColor.a > 0) {
+      ctx.fillStyle = `rgba(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b}, ${backgroundColor.a})`;
       ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
     }
     
@@ -1712,14 +1724,14 @@ if (!isMainThread && workerData?.isWorker) {
         if (caption.style.emphasizeMode) {
           const emphasizedFontSize = fontSize * 1.05;
           ctx.font = `bold ${emphasizedFontSize}px ${fontFamily}, Arial, sans-serif`;
-          ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.alpha})`;
+          ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.a})`;
         } else {
-          ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.alpha})`;
+          ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.a})`;
           ctx.fillRect(wordBoxX, wordBoxY, wordBoxWidth, wordBoxHeight);
-          ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.alpha})`;
+          ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
         }
       } else {
-        ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.alpha})`;
+        ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
       }
       
       // Clear shadow for stroke
@@ -1729,8 +1741,8 @@ if (!isMainThread && workerData?.isWorker) {
       ctx.shadowOffsetY = 0;
       
       // Draw stroke if enabled
-      if (strokeWidth > 0 && strokeColor.alpha > 0) {
-        ctx.strokeStyle = `rgba(${strokeColor.r}, ${strokeColor.g}, ${strokeColor.b}, ${strokeColor.alpha})`;
+      if (strokeWidth > 0 && strokeColor.a > 0) {
+        ctx.strokeStyle = `rgba(${strokeColor.r}, ${strokeColor.g}, ${strokeColor.b}, ${strokeColor.a})`;
         ctx.lineWidth = strokeWidth;
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
@@ -1782,7 +1794,7 @@ if (!isMainThread && workerData?.isWorker) {
     const backgroundColor = parseColorInWorker(caption.style?.backgroundColor || '#80000000');
     
     ctx.font = `bold ${fontSize}px ${fontFamily}`;
-    ctx.textAlign = 'center';
+    ctx.textAlign = caption.style?.textAlign || 'center';
     ctx.textBaseline = 'bottom';
     
     const x = (canvasWidth * caption.style.position.x) / 100;
@@ -1830,8 +1842,8 @@ if (!isMainThread && workerData?.isWorker) {
         const boxHeight = fontSize + 16;
         
         // Draw background for each word
-        if (backgroundColor.alpha > 0) {
-          ctx.fillStyle = `rgba(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b}, ${backgroundColor.alpha})`;
+        if (backgroundColor.a > 0) {
+          ctx.fillStyle = `rgba(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b}, ${backgroundColor.a})`;
           ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
         }
         
@@ -1840,14 +1852,14 @@ if (!isMainThread && workerData?.isWorker) {
           if (caption.style.emphasizeMode) {
             const emphasizedFontSize = fontSize * 1.05;
             ctx.font = `bold ${emphasizedFontSize}px ${fontFamily}, Arial, sans-serif`;
-            ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.alpha})`;
+            ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.a})`;
           } else {
-            ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.alpha})`;
+            ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.a})`;
             ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
-            ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.alpha})`;
+            ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
           }
         } else {
-          ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.alpha})`;
+          ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
         }
         
         // Add text shadow
@@ -1864,8 +1876,8 @@ if (!isMainThread && workerData?.isWorker) {
         
         const strokeColor = parseColorInWorker(caption.style?.strokeColor || 'transparent');
         const strokeWidth = caption.style?.strokeWidth || 0;
-        if (strokeWidth > 0 && strokeColor.alpha > 0) {
-          ctx.strokeStyle = `rgba(${strokeColor.r}, ${strokeColor.g}, ${strokeColor.b}, ${strokeColor.alpha})`;
+        if (strokeWidth > 0 && strokeColor.a > 0) {
+          ctx.strokeStyle = `rgba(${strokeColor.r}, ${strokeColor.g}, ${strokeColor.b}, ${strokeColor.a})`;
           ctx.lineWidth = strokeWidth;
           ctx.lineJoin = 'round';
           ctx.lineCap = 'round';
@@ -1937,18 +1949,18 @@ if (!isMainThread && workerData?.isWorker) {
     }
   }
   
-  function parseColorInWorker(color: string): { r: number; g: number; b: number; alpha: number } {
+  function parseColorInWorker(color: string): { r: number; g: number; b: number; a: number } {
     if (color === 'transparent') {
-      return { r: 0, g: 0, b: 0, alpha: 0 };
+      return { r: 0, g: 0, b: 0, a: 0 };
     }
     
     const hex = color.replace('#', '');
     const r = parseInt(hex.substr(0, 2), 16);
     const g = parseInt(hex.substr(2, 2), 16);
     const b = parseInt(hex.substr(4, 2), 16);
-    const alpha = hex.length === 8 ? parseInt(hex.substr(6, 2), 16) / 255 : 1;
+    const a = hex.length === 8 ? parseInt(hex.substr(6, 2), 16) / 255 : 1;
     
-    return { r, g, b, alpha };
+    return { r, g, b, a };
   }
   
   function applyTextTransformInWorker(text: string, transform?: string): string {
