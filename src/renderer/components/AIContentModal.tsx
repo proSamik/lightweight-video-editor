@@ -45,6 +45,9 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
   const [selectedTweetIndex, setSelectedTweetIndex] = useState<number | null>(null);
   const [showSrtSuccess, setShowSrtSuccess] = useState(false);
   const [exportedSrtPath, setExportedSrtPath] = useState<string>('');
+  const [copiedDescription, setCopiedDescription] = useState(false);
+  const [copiedTitleIndex, setCopiedTitleIndex] = useState<number | null>(null);
+  const [copiedTweetIndex, setCopiedTweetIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -62,6 +65,24 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
       }
     }
   }, [isOpen, initialContent]);
+
+  const handleCopyDescription = async () => {
+    await navigator.clipboard.writeText(description);
+    setCopiedDescription(true);
+    setTimeout(() => setCopiedDescription(false), 1000);
+  };
+
+  const handleCopyTitle = async (title: string, index: number) => {
+    await navigator.clipboard.writeText(title);
+    setCopiedTitleIndex(index);
+    setTimeout(() => setCopiedTitleIndex(null), 1000);
+  };
+
+  const handleCopyTweet = async (tweet: string, index: number) => {
+    await navigator.clipboard.writeText(tweet);
+    setCopiedTweetIndex(index);
+    setTimeout(() => setCopiedTweetIndex(null), 1000);
+  };
 
   const generateDescription = async () => {
     setIsGeneratingDescription(true);
@@ -315,12 +336,12 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
             <div style={{ display: 'flex', gap: '8px' }}>
               {description.trim() && (
                 <Button
-                  onClick={() => navigator.clipboard.writeText(description)}
+                  onClick={handleCopyDescription}
                   variant="outline"
                   size="sm"
-                  leftIcon={<FiCopy size={14} />}
+                  leftIcon={copiedDescription ? <FiCheckCircle size={14} /> : <FiCopy size={14} />}
                 >
-                  Copy
+                  {copiedDescription ? 'Copied!' : 'Copy'}
                 </Button>
               )}
               <Button
@@ -439,23 +460,23 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      navigator.clipboard.writeText(titleObj.title);
+                      handleCopyTitle(titleObj.title, index);
                     }}
                     style={{
                       position: 'absolute',
                       top: '8px',
                       right: '8px',
                       padding: '4px',
-                      backgroundColor: theme.colors.surface,
-                      color: theme.colors.text,
+                      backgroundColor: copiedTitleIndex === index ? theme.colors.success : theme.colors.surface,
+                      color: copiedTitleIndex === index ? theme.colors.successForeground : theme.colors.text,
                       border: 'none',
                       borderRadius: '3px',
                       fontSize: '12px',
                       cursor: 'pointer'
                     }}
-                    title="Copy title"
+                    title={copiedTitleIndex === index ? "Copied!" : "Copy title"}
                   >
-                    <FiCopy size={12} />
+                    {copiedTitleIndex === index ? <FiCheckCircle size={12} /> : <FiCopy size={12} />}
                   </button>
                 </div>
               ))}
@@ -533,23 +554,23 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      navigator.clipboard.writeText(tweetObj.hook);
+                      handleCopyTweet(tweetObj.hook, index);
                     }}
                     style={{
                       position: 'absolute',
                       top: '10px',
                       right: '10px',
                       padding: '4px',
-                      backgroundColor: theme.colors.surface,
-                      color: theme.colors.text,
+                      backgroundColor: copiedTweetIndex === index ? theme.colors.success : theme.colors.surface,
+                      color: copiedTweetIndex === index ? theme.colors.successForeground : theme.colors.text,
                       border: 'none',
                       borderRadius: '3px',
                       fontSize: '12px',
                       cursor: 'pointer'
                     }}
-                    title="Copy tweet hook"
+                    title={copiedTweetIndex === index ? "Copied!" : "Copy tweet hook"}
                   >
-                    <FiCopy size={12} />
+                    {copiedTweetIndex === index ? <FiCheckCircle size={12} /> : <FiCopy size={12} />}
                   </button>
                 </div>
               ))}
