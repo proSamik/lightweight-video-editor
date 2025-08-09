@@ -306,21 +306,34 @@ const WAVEFORM_HEIGHT = 100;
    * Update waveform progress based on current time
    */
   useEffect(() => {
-    if (wavesurferRef.current && actualDuration > 0) {
-      const progress = currentTime / actualDuration;
-      wavesurferRef.current.setTime(progress * wavesurferRef.current.getDuration());
+    if (wavesurferRef.current && actualDuration > 0 && !isWaveformLoading) {
+      try {
+        const duration = wavesurferRef.current.getDuration();
+        if (duration > 0) {
+          const progress = currentTime / actualDuration;
+          wavesurferRef.current.setTime(progress * duration);
+        }
+      } catch (error) {
+        // Silently handle wavesurfer errors - audio might not be loaded yet
+        console.debug('Wavesurfer setTime error (audio may not be loaded):', error);
+      }
     }
-  }, [currentTime, actualDuration]);
+  }, [currentTime, actualDuration, isWaveformLoading]);
   
   /**
    * Update waveform zoom when zoom level changes
    */
   useEffect(() => {
-    if (wavesurferRef.current) {
-      // Force waveform to redraw with new zoom level
-      wavesurferRef.current.zoom(zoomLevel * 100); // WaveSurfer zoom takes pixels per second
+    if (wavesurferRef.current && !isWaveformLoading) {
+      try {
+        // Force waveform to redraw with new zoom level
+        wavesurferRef.current.zoom(zoomLevel * 100); // WaveSurfer zoom takes pixels per second
+      } catch (error) {
+        // Silently handle wavesurfer errors - audio might not be loaded yet
+        console.debug('Wavesurfer zoom error (audio may not be loaded):', error);
+      }
     }
-  }, [zoomLevel]);
+  }, [zoomLevel, isWaveformLoading]);
 
   /**
    * Handle segment double click to select and seek to middle
@@ -479,7 +492,7 @@ const WAVEFORM_HEIGHT = 100;
             <input
               type="range"
               min="0.1"
-              max="10"
+              max="20"
               step="0.1"
               value={zoomLevel}
               onChange={(e) => setZoomLevel(parseFloat(e.target.value))}
