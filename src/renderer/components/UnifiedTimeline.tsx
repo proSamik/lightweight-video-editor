@@ -56,6 +56,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   const timelineRef = useRef<HTMLDivElement>(null);
   const waveformRef = useRef<HTMLDivElement>(null);
   const wavesurferRef = useRef<WaveSurfer | null>(null);
+  const timelineContainerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartX, setDragStartX] = useState(0);
   const [hoveredSegmentId, setHoveredSegmentId] = useState<string | null>(null);
@@ -303,7 +304,7 @@ const WAVEFORM_HEIGHT = 100;
   }, [theme.colors.primary, theme.colors.accent]);
 
   /**
-   * Update waveform progress based on current time
+   * Update waveform progress based on current time and auto-scroll timeline
    */
   useEffect(() => {
     if (wavesurferRef.current && actualDuration > 0 && !isWaveformLoading) {
@@ -318,7 +319,37 @@ const WAVEFORM_HEIGHT = 100;
         console.debug('Wavesurfer setTime error (audio may not be loaded):', error);
       }
     }
-  }, [currentTime, actualDuration, isWaveformLoading]);
+
+    // Auto-scroll timeline to keep playhead visible when zoomed
+    if (timelineContainerRef.current && timelineRef.current && zoomLevel > 1) {
+      const container = timelineContainerRef.current;
+      const timeline = timelineRef.current;
+      
+      const playheadPosition = (currentTime / actualDuration) * timeline.offsetWidth;
+      const containerWidth = container.offsetWidth;
+      const scrollLeft = container.scrollLeft;
+      const scrollRight = scrollLeft + containerWidth;
+      
+      // Check if playhead is outside visible area
+      const margin = containerWidth * 0.1; // 10% margin from edges
+      
+      if (playheadPosition < scrollLeft + margin) {
+        // Playhead is too far left, scroll left to center it
+        const targetScroll = Math.max(0, playheadPosition - containerWidth / 2);
+        container.scrollTo({
+          left: targetScroll,
+          behavior: 'smooth'
+        });
+      } else if (playheadPosition > scrollRight - margin) {
+        // Playhead is too far right, scroll right to center it
+        const targetScroll = playheadPosition - containerWidth / 2;
+        container.scrollTo({
+          left: targetScroll,
+          behavior: 'smooth'
+        });
+      }
+    }
+  }, [currentTime, actualDuration, isWaveformLoading, zoomLevel]);
   
   /**
    * Update waveform zoom when zoom level changes
@@ -633,6 +664,7 @@ const WAVEFORM_HEIGHT = 100;
 
       {/* Main Timeline Area */}
       <div 
+        ref={timelineContainerRef}
         style={{
           height: `${TIMELINE_HEIGHT - 32}px`,
           position: 'relative',
