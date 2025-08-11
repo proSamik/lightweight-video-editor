@@ -576,7 +576,10 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        minHeight: 0
+        minHeight: 0,
+        maxHeight: 'calc(100vh - 300px)', // Constrain to viewport height minus space for UI
+        overflow: 'hidden',
+        padding: '10px'
       }}>
         <video
           ref={videoRef}
@@ -584,7 +587,10 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
           style={{
             maxWidth: '100%',
             maxHeight: '100%',
-            objectFit: 'contain'
+            width: 'auto',
+            height: 'auto',
+            objectFit: 'contain',
+            display: 'block'
           }}
           onTimeUpdate={(e) => {
             const video = e.currentTarget;
