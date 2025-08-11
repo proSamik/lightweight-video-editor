@@ -97,6 +97,11 @@ export enum ColorOption {
 export interface ExportSettings {
   framerate: 30 | 60;
   quality: 'fast' | 'balanced' | 'high';
+  aspectRatio?: 'original' | '16:9' | '9:16';
+  resolution?: {
+    width: number;
+    height: number;
+  };
 }
 
 export interface SearchResult {
