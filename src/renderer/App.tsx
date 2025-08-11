@@ -291,6 +291,22 @@ const AppContent: React.FC = () => {
       setTranscriptionStatus({ isTranscribing: true, progress: 80, message: 'Processing transcription results...' });
       
       // Convert transcription to caption segments with optional line wrapping
+      // Get video metadata to determine aspect ratio for responsive font sizing
+      const videoMetadata = await window.electronAPI.getVideoMetadata(videoPath);
+      const isVertical = videoMetadata && videoMetadata.width && videoMetadata.height && 
+                        (videoMetadata.height / videoMetadata.width) > 1.5; // 9:16 or more vertical
+      
+      // Use smaller font size for vertical videos (9:16)
+      const defaultFontSize = isVertical ? 20 : 85;
+      
+      console.log('Video metadata for font sizing:', {
+        width: videoMetadata?.width,
+        height: videoMetadata?.height,
+        aspectRatio: videoMetadata?.width && videoMetadata?.height ? videoMetadata.width / videoMetadata.height : 'unknown',
+        isVertical,
+        defaultFontSize
+      });
+      
       let captionSegments: CaptionSegment[] = transcriptionResult.segments.map((segment: any, index: number) => ({
         id: `segment-${index}`,
         startTime: segment.start, // Already in milliseconds from Whisper service
@@ -303,7 +319,7 @@ const AppContent: React.FC = () => {
         })) : [],
         style: {
           font: 'Segoe UI',
-          fontSize: 85,
+          fontSize: defaultFontSize,
           textColor: ColorOption.WHITE,
           highlighterColor: ColorOption.YELLOW,
           backgroundColor: ColorOption.TRANSPARENT,
