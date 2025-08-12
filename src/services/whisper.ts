@@ -2,14 +2,32 @@ import { spawn } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import { TranscriptionResult } from '../types';
+import DeviceDetector, { DeviceInfo } from './deviceDetector';
 
 export class WhisperService {
   private static instance: WhisperService;
   private whisperPath: string = '';
   private modelPath: string = '';
+  private deviceDetector: DeviceDetector;
+  private bestDevice: DeviceInfo | null = null;
+  private deviceDetectionCompleted: boolean = false;
 
   private constructor() {
+    this.deviceDetector = DeviceDetector.getInstance();
     this.detectWhisperPaths();
+    this.initializeDeviceDetection();
+  }
+
+  private async initializeDeviceDetection(): Promise<void> {
+    try {
+      this.bestDevice = await this.deviceDetector.detectBestDevice();
+      this.deviceDetectionCompleted = true;
+      console.log(`Whisper will use device: ${this.bestDevice.type}`, this.bestDevice);
+    } catch (error) {
+      console.warn('Device detection failed, falling back to CPU:', error);
+      this.bestDevice = { type: 'cpu', available: true, name: 'CPU Fallback' };
+      this.deviceDetectionCompleted = true;
+    }
   }
 
   public static getInstance(): WhisperService {
@@ -80,8 +98,76 @@ export class WhisperService {
     console.log(`Final whisper path: ${this.whisperPath}`);
   }
 
+  private async waitForDeviceDetection(): Promise<void> {
+    if (this.deviceDetectionCompleted) {
+      return;
+    }
+
+    // Wait up to 10 seconds for device detection to complete
+    const timeout = 10000;
+    const interval = 100;
+    let elapsed = 0;
+
+    while (!this.deviceDetectionCompleted && elapsed < timeout) {
+      await new Promise(resolve => setTimeout(resolve, interval));
+      elapsed += interval;
+    }
+
+    if (!this.deviceDetectionCompleted) {
+      console.warn('Device detection timed out, falling back to CPU');
+      this.bestDevice = { type: 'cpu', available: true, name: 'CPU Fallback' };
+      this.deviceDetectionCompleted = true;
+    }
+  }
+
   public async transcribeAudio(
     audioPath: string,
+    onProgress?: (progress: number) => void
+  ): Promise<TranscriptionResult> {
+    // Wait for device detection to complete
+    await this.waitForDeviceDetection();
+    
+    // Try with best device first, then fall back to CPU if it fails
+    try {
+      return await this.attemptTranscription(audioPath, this.bestDevice, onProgress);
+    } catch (error) {
+      const errorMessage = (error as Error).message;
+      
+      // Check if it's a device-specific error that might be fixed with CPU fallback
+      if (this.isDeviceSpecificError(errorMessage) && this.bestDevice?.type !== 'cpu') {
+        console.warn(`Transcription failed with ${this.bestDevice?.type}, falling back to CPU:`, errorMessage);
+        
+        // Force CPU fallback
+        const cpuDevice = { type: 'cpu' as const, available: true, name: 'CPU Fallback' };
+        try {
+          return await this.attemptTranscription(audioPath, cpuDevice, onProgress);
+        } catch (cpuError) {
+          throw new Error(`Transcription failed on both ${this.bestDevice?.type} and CPU: ${(cpuError as Error).message}`);
+        }
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  private isDeviceSpecificError(errorMessage: string): boolean {
+    const deviceErrorPatterns = [
+      'NotImplementedError',
+      'aten::_sparse_coo_tensor_with_dims_and_tensors',
+      'SparseMPS backend',
+      'MPS backend',
+      'CUDA',
+      'device'
+    ];
+    
+    return deviceErrorPatterns.some(pattern => 
+      errorMessage.toLowerCase().includes(pattern.toLowerCase())
+    );
+  }
+
+  private async attemptTranscription(
+    audioPath: string,
+    device: DeviceInfo | null,
     onProgress?: (progress: number) => void
   ): Promise<TranscriptionResult> {
     return new Promise((resolve, reject) => {
@@ -99,6 +185,7 @@ export class WhisperService {
       console.log(`Using Whisper path: ${this.whisperPath}`);
       console.log(`Audio file: ${audioPath}`);
       console.log(`Output directory: ${outputDir}`);
+      console.log(`Using device: ${device?.type || 'cpu'}`, device);
       
       // Set up enhanced environment for Whisper execution
       const env = {
@@ -107,12 +194,16 @@ export class WhisperService {
         PYTHONPATH: `/opt/homebrew/lib/python3.*/site-packages:${process.env.PYTHONPATH || ''}`
       };
 
+      // Get device string for Whisper
+      const deviceString = this.deviceDetector.getWhisperDeviceString(device || undefined);
+
       if (this.whisperPath.includes('python3 -m whisper')) {
         // Use python3 -m whisper
         const args = [
           '-m', 'whisper',
           audioPath,
           '--model', 'base',
+          '--device', deviceString,
           '--output_format', 'json',
           '--word_timestamps', 'True',
           '--output_dir', outputDir,
@@ -125,6 +216,7 @@ export class WhisperService {
         const args = [
           audioPath,
           '--model', 'base',
+          '--device', deviceString,
           '--output_format', 'json',
           '--word_timestamps', 'True',
           '--output_dir', outputDir,
@@ -395,6 +487,46 @@ export class WhisperService {
 
   public getAvailableModels(): string[] {
     return ['tiny', 'base', 'small', 'medium', 'large'];
+  }
+
+  /**
+   * Get information about the currently selected device
+   */
+  public getCurrentDevice(): DeviceInfo | null {
+    return this.bestDevice;
+  }
+
+  /**
+   * Get all detected devices
+   */
+  public getDetectedDevices(): DeviceInfo[] {
+    return this.deviceDetector.getDetectedDevices();
+  }
+
+  /**
+   * Force device detection refresh
+   */
+  public async refreshDeviceDetection(): Promise<DeviceInfo> {
+    this.deviceDetectionCompleted = false;
+    this.bestDevice = await this.deviceDetector.detectBestDevice();
+    this.deviceDetectionCompleted = true;
+    console.log(`Device detection refreshed. Using: ${this.bestDevice.type}`, this.bestDevice);
+    return this.bestDevice;
+  }
+
+  /**
+   * Check if GPU acceleration is being used
+   */
+  public isUsingGPU(): boolean {
+    return this.bestDevice?.type === 'cuda' || this.bestDevice?.type === 'mps';
+  }
+
+  /**
+   * Test if the currently selected device is working
+   */
+  public async testCurrentDevice(): Promise<boolean> {
+    if (!this.bestDevice) return false;
+    return this.deviceDetector.testDevice(this.bestDevice.type);
   }
 }
 
