@@ -149,9 +149,20 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
       icon={<FiSettings size={24} color="white" />}
       maxWidth="600px"
     >
-
+      <div style={{ 
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        minHeight: '500px'
+      }}>
         {/* Modal Content */}
-        <div style={{ padding: '32px', background: theme.colors.modal.background }}>
+        <div style={{ 
+          padding: '32px', 
+          background: theme.colors.modal.background,
+          flex: 1,
+          overflowY: 'auto',
+          minHeight: 0
+        }}>
 
         {/* Provider Selection */}
         <div style={{ marginBottom: '32px' }}>
@@ -492,7 +503,15 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
         </div>
 
         {/* Buttons */}
-        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+        <div style={{ 
+          display: 'flex', 
+          gap: '10px', 
+          justifyContent: 'flex-end',
+          padding: '20px 32px',
+          flexShrink: 0,
+          backgroundColor: theme.colors.modal.background,
+          borderTop: `1px solid ${theme.colors.border}`
+        }}>
           <Button
             onClick={onClose}
             variant="secondary"
@@ -508,6 +527,7 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
             Save Settings
           </Button>
         </div>
+      </div>
     </LiquidModal>
   );
 };
