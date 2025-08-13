@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { CaptionSegment } from '../../types';
 import { useTheme } from '../contexts/ThemeContext';
+import { Button } from './ui';
 import { 
   FiPlay, 
   FiPause, 
@@ -9,7 +10,9 @@ import {
   FiRotateCcw, 
   FiRotateCw, 
   FiTrash2,
-  FiMaximize2
+  FiMaximize2,
+  FiCheck,
+  FiSquare
 } from 'react-icons/fi';
 
 
@@ -29,6 +32,8 @@ interface UnifiedTimelineProps {
   onRedo?: () => void;
   canUndo?: boolean;
   canRedo?: boolean;
+  replacementAudioPath?: string | null;
+  onAudioPreviewToggle?: (enabled: boolean) => void;
 }
 
 /**
@@ -50,11 +55,14 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   onRedo,
   canUndo = false,
   canRedo = false,
+  replacementAudioPath,
+  onAudioPreviewToggle,
 }) => {
   const { theme } = useTheme();
   const timelineRef = useRef<HTMLDivElement>(null);
   const timelineContainerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isAudioPreviewEnabled, setIsAudioPreviewEnabled] = useState(true); // Default to enabled when replacement audio is loaded
 
   const [contextMenu, setContextMenu] = useState<{x: number, y: number, segmentId: string} | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{segmentId: string, text: string} | null>(null);
@@ -277,6 +285,45 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
         }}>
           {formatTime(currentTime)} / {formatTime(actualDuration)}
         </div>
+
+        {/* Audio Replacement Indicator */}
+        {replacementAudioPath && (
+          <div style={{ position: 'relative', zIndex: 10 }}>
+            <Button
+              variant="primary"
+              size="sm"
+              leftIcon={
+                <div style={{
+                  width: '12px',
+                  height: '12px',
+                  border: '1px solid white',
+                  borderRadius: '2px',
+                  backgroundColor: isAudioPreviewEnabled ? 'white' : 'transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  {isAudioPreviewEnabled && <FiCheck size={8} color={theme.colors.primary} />}
+                </div>
+              }
+              onClick={() => {
+                const newState = !isAudioPreviewEnabled;
+                setIsAudioPreviewEnabled(newState);
+                onAudioPreviewToggle?.(newState);
+                console.log('Audio preview toggled:', newState);
+              }}
+              style={{
+                fontSize: '10px',
+                fontWeight: '500',
+                padding: '4px 8px',
+                height: 'auto',
+                minHeight: '20px'
+              }}
+            >
+              Preview with new audio
+            </Button>
+          </div>
+        )}
 
         {/* Control Buttons */}
         <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
