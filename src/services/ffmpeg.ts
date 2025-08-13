@@ -199,6 +199,42 @@ export class FFmpegService {
     });
   }
 
+  public async exportVideoWithNewAudio(
+    videoPath: string,
+    newAudioPath: string,
+    outputPath: string,
+    onProgress?: (progress: number) => void
+  ): Promise<string> {
+    return new Promise((resolve, reject) => {
+      // Merge video with new audio (no subtitles)
+      const command = ffmpeg()
+        .input(videoPath)
+        .input(newAudioPath)
+        .outputOptions([
+          '-c:v copy',        // Copy video stream without re-encoding (faster)
+          '-c:a aac',         // Re-encode audio to AAC for compatibility
+          '-map 0:v:0',       // Use video from first input
+          '-map 1:a:0',       // Use audio from second input (new audio)
+          '-shortest'         // Match duration to shortest input
+        ])
+        .format('mp4')
+        .output(outputPath)
+        .on('progress', (progress: any) => {
+          if (onProgress && progress.percent) {
+            onProgress(progress.percent);
+          }
+        })
+        .on('end', () => {
+          resolve(outputPath);
+        })
+        .on('error', (err: any) => {
+          reject(err);
+        });
+
+      command.run();
+    });
+  }
+
   public async replaceAudioTrack(videoPath: string, audioPath: string, outputPath: string): Promise<string> {
     return new Promise((resolve, reject) => {
       ffmpeg()
