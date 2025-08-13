@@ -480,11 +480,106 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
           <button
             onClick={() => {
               const videoPreviewContainer = document.querySelector('[data-video-preview]');
+              const video = document.querySelector('video');
+              
               if (videoPreviewContainer) {
                 if (document.fullscreenElement) {
                   document.exitFullscreen();
                 } else {
                   videoPreviewContainer.requestFullscreen();
+                  
+                  // Handle aspect ratio for videos
+                  if (video) {
+                    const handleFullscreenChange = () => {
+                      if (document.fullscreenElement) {
+                        const aspectRatio = video.videoWidth / video.videoHeight;
+                        
+                        // Get the video container div (the one with flex: 1)
+                        const videoContainer = video.closest('div[style*="flex: 1"]');
+                        const canvas = document.querySelector('canvas');
+                        
+                        // Check if video is 9:16 (portrait) or close to it
+                        if (aspectRatio < 0.6) { // 9:16 = 0.5625, allowing some tolerance
+                          // Apply styles for portrait video to use full height
+                          video.style.maxWidth = 'none';
+                          video.style.maxHeight = '100vh';
+                          video.style.width = 'auto';
+                          video.style.height = '100vh';
+                          video.style.objectFit = 'contain';
+                          
+                          // Update container to remove constraints
+                          if (videoContainer) {
+                            (videoContainer as HTMLElement).style.maxHeight = '100vh';
+                            (videoContainer as HTMLElement).style.height = '100vh';
+                            (videoContainer as HTMLElement).style.padding = '0';
+                          }
+                          
+                          // Also apply to canvas overlay
+                          if (canvas) {
+                            canvas.style.maxWidth = 'none';
+                            canvas.style.maxHeight = '100vh';
+                            canvas.style.width = 'auto';
+                            canvas.style.height = '100vh';
+                          }
+                        } else {
+                          // For landscape videos, use full width and height
+                          video.style.maxWidth = '100vw';
+                          video.style.maxHeight = '100vh';
+                          video.style.width = '100vw';
+                          video.style.height = '100vh';
+                          video.style.objectFit = 'contain';
+                          
+                          // Update container for landscape videos
+                          if (videoContainer) {
+                            (videoContainer as HTMLElement).style.maxHeight = '100vh';
+                            (videoContainer as HTMLElement).style.height = '100vh';
+                            (videoContainer as HTMLElement).style.padding = '0';
+                          }
+                          
+                          if (canvas) {
+                            canvas.style.maxWidth = '100vw';
+                            canvas.style.maxHeight = '100vh';
+                            canvas.style.width = '100vw';
+                            canvas.style.height = '100vh';
+                          }
+                        }
+                      } else {
+                        // Reset to original styles when exiting fullscreen
+                        video.style.maxWidth = '100%';
+                        video.style.maxHeight = '100%';
+                        video.style.width = 'auto';
+                        video.style.height = 'auto';
+                        video.style.objectFit = 'contain';
+                        
+                        // Reset container styles
+                        const videoContainer = video.closest('div[style*="flex: 1"]');
+                        if (videoContainer) {
+                          (videoContainer as HTMLElement).style.maxHeight = 'calc(100vh - 300px)';
+                          (videoContainer as HTMLElement).style.height = '';
+                          (videoContainer as HTMLElement).style.padding = '10px';
+                        }
+                        
+                        const canvas = document.querySelector('canvas');
+                        if (canvas) {
+                          canvas.style.maxWidth = '100%';
+                          canvas.style.maxHeight = '100%';
+                          canvas.style.width = '';
+                          canvas.style.height = '';
+                        }
+                      }
+                    };
+                    
+                    // Listen for fullscreen changes
+                    document.addEventListener('fullscreenchange', handleFullscreenChange);
+                    
+                    // Clean up listener when component unmounts or fullscreen exits
+                    const cleanup = () => {
+                      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+                    };
+                    
+                    // Store cleanup function for potential future use
+                    (window as any).fullscreenCleanup = cleanup;
+                  }
                 }
               }
             }}
