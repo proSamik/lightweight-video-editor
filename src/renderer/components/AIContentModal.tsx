@@ -219,7 +219,7 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
     maxHeight: '90vh',
     overflowY: 'auto',
     color: theme.colors.text,
-    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+    boxShadow: theme.colors.modal.shadow,
   };
 
   return (
@@ -231,7 +231,8 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
           borderBottom: `1px solid ${theme.colors.border}`,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between'
+          justifyContent: 'space-between',
+          background: theme.colors.modal.background
         }}>
           <div>
             <h2 style={{ 
@@ -262,7 +263,7 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
         </div>
 
         {/* Modal Content */}
-        <div style={{ padding: '32px' }}>
+        <div style={{ padding: '32px', background: theme.colors.modal.background }}>
 
         {error && (
           <div style={{
@@ -286,7 +287,7 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
         <div style={{ 
           marginBottom: '32px', 
           padding: '20px', 
-          backgroundColor: theme.colors.surface, 
+          backgroundColor: theme.colors.modal.background, 
           borderRadius: '12px',
           border: `1px solid ${theme.colors.border}`
         }}>
@@ -376,7 +377,7 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
             style={{
               width: '100%',
               padding: '16px',
-              backgroundColor: theme.colors.input.background,
+              backgroundColor: theme.colors.modal.background,
               color: theme.colors.text,
               border: `1px solid ${theme.colors.border}`,
               borderRadius: '8px',
@@ -389,11 +390,11 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
             }}
             onFocus={(e) => {
               e.currentTarget.style.borderColor = theme.colors.borderFocus;
-              e.currentTarget.style.backgroundColor = theme.colors.input.backgroundFocus;
+              e.currentTarget.style.backgroundColor = theme.colors.modal.background;
             }}
             onBlur={(e) => {
               e.currentTarget.style.borderColor = theme.colors.border;
-              e.currentTarget.style.backgroundColor = theme.colors.input.background;
+              e.currentTarget.style.backgroundColor = theme.colors.modal.background;
             }}
           />
           <div style={{ 
@@ -433,7 +434,7 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
           {titles.length === 0 ? (
             <div style={{
               padding: '20px',
-              backgroundColor: theme.colors.background,
+              backgroundColor: theme.colors.modal.background,
               borderRadius: '4px',
               textAlign: 'center',
               color: theme.colors.textSecondary,
@@ -448,7 +449,7 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
                   key={index}
                   style={{
                     padding: '12px',
-                    backgroundColor: selectedTitleIndex === index ? theme.colors.primary : theme.colors.background,
+                    backgroundColor: selectedTitleIndex === index ? theme.colors.primary : theme.colors.modal.background,
                     border: '2px solid transparent',
                     borderColor: selectedTitleIndex === index ? theme.colors.primary : 'transparent',
                     borderRadius: '4px',
@@ -519,7 +520,7 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
           {tweets.length === 0 ? (
             <div style={{
               padding: '20px',
-              backgroundColor: theme.colors.background,
+              backgroundColor: theme.colors.modal.background,
               borderRadius: '4px',
               textAlign: 'center',
               color: theme.colors.textSecondary,
@@ -534,7 +535,7 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
                   key={index}
                   style={{
                     padding: '15px',
-                    backgroundColor: selectedTweetIndex === index ? theme.colors.primary : theme.colors.background,
+                    backgroundColor: selectedTweetIndex === index ? theme.colors.primary : theme.colors.modal.background,
                     border: '2px solid transparent',
                     borderColor: selectedTweetIndex === index ? theme.colors.primary : 'transparent',
                     borderRadius: '6px',
@@ -555,7 +556,7 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
                   </div>
                   <div style={{ 
                     fontSize: '11px', 
-                    color: selectedTweetIndex === index ? 'rgba(255,255,255,0.8)' : theme.colors.textSecondary,
+                    color: selectedTweetIndex === index ? theme.colors.primaryForeground : theme.colors.textSecondary,
                     display: 'flex',
                     gap: '15px'
                   }}>
@@ -613,7 +614,7 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
           {thumbnails.length === 0 ? (
             <div style={{
               padding: '20px',
-              backgroundColor: theme.colors.background,
+              backgroundColor: theme.colors.modal.background,
               borderRadius: '4px',
               textAlign: 'center',
               color: theme.colors.textSecondary,
@@ -628,7 +629,7 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
                   key={index}
                   style={{
                     padding: '15px',
-                    backgroundColor: theme.colors.background,
+                    backgroundColor: theme.colors.modal.background,
                     border: `1px solid ${theme.colors.border}`,
                     borderRadius: '6px',
                     position: 'relative'
@@ -678,14 +679,14 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.9)',
+            backgroundColor: theme.colors.modal.overlay,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 1001
           }}>
             <div style={{
-              backgroundColor: theme.colors.surface,
+              backgroundColor: theme.colors.modal.background,
               borderRadius: '8px',
               padding: '30px',
               width: '400px',
@@ -703,7 +704,7 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
                 Your subtitle file has been saved successfully.
               </p>
               <div style={{
-                backgroundColor: theme.colors.background,
+                backgroundColor: theme.colors.modal.background,
                 padding: '10px',
                 borderRadius: '4px',
                 marginBottom: '20px',
