@@ -994,12 +994,8 @@ const AppContent: React.FC = () => {
     try {
       const audioPath = await window.electronAPI.selectAudioFile();
       if (audioPath) {
-        const proceed = confirm(`Replace audio track in "${videoFile.name}" with:\n"${audioPath}"\n\nThe audio will be replaced during video rendering/export. Continue?`);
-        
-        if (proceed) {
-          setReplacementAudioPath(audioPath);
-          alert(`✅ Audio replacement set!\n\nFile: ${audioPath}\n\nThe new audio will be used when you export the video.`);
-        }
+        setReplacementAudioPath(audioPath);
+        console.log(`Audio replacement set: ${audioPath}`);
       }
     } catch (error) {
       console.error('Error selecting audio file:', error);
