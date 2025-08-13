@@ -87,7 +87,10 @@ const electronAPI = {
     ipcRenderer.invoke('get-file-url', filePath),
   // Get audio buffer for WaveSurfer
   getAudioBuffer: (filePath: string) => 
-    ipcRenderer.invoke('get-audio-buffer', filePath)
+    ipcRenderer.invoke('get-audio-buffer', filePath),
+  // Extract audio for project (persistent audio file)
+  extractAudioForProject: (videoPath: string, projectPath: string) =>
+    ipcRenderer.invoke('extract-audio-for-project', videoPath, projectPath)
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);
