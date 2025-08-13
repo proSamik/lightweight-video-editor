@@ -168,7 +168,7 @@ const ProjectManagerModal: React.FC<ProjectManagerProps> = ({
           alignItems: 'center',
           padding: '24px 32px',
           borderBottom: `1px solid ${theme.colors.border}`,
-          backgroundColor: theme.colors.backgroundSecondary
+          backgroundColor: theme.colors.background
         }}>
           <h2 style={{ 
             margin: 0, 
@@ -269,7 +269,12 @@ const ProjectManagerModal: React.FC<ProjectManagerProps> = ({
         </div>
 
         {/* Tab Content */}
-        <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
+        <div style={{ 
+          flex: 1, 
+          overflow: 'auto', 
+          padding: '24px',
+          backgroundColor: theme.colors.background
+        }}>
           {activeTab === 'recent' && (
             <div>
               {loading ? (
@@ -322,12 +327,14 @@ const ProjectManagerModal: React.FC<ProjectManagerProps> = ({
                         cursor: 'pointer'
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
-                        e.currentTarget.style.borderColor = theme.colors.borderHover;
+                        e.currentTarget.style.backgroundColor = theme.colors.sidebar.itemHover;
+                        e.currentTarget.style.borderColor = theme.colors.primary + '40';
+                        e.currentTarget.style.boxShadow = `0 4px 12px ${theme.colors.primary}15`;
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.backgroundColor = theme.colors.background;
                         e.currentTarget.style.borderColor = theme.colors.border;
+                        e.currentTarget.style.boxShadow = 'none';
                       }}
                     >
                       <div style={{ flex: 1 }}>
