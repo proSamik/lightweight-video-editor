@@ -12,7 +12,6 @@ import AIContentModal from './components/AIContentModal';
 import ExportSettingsModal from './components/ExportSettings';
 import { Button, Card } from './components/ui';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
-import ThemeToggle from './components/ThemeToggle';
 import {
   ProjectManagerIcon,
   NewProjectIcon,
@@ -1123,7 +1122,6 @@ const AppContent: React.FC = () => {
       fontFamily: theme.typography.fontFamily,
       overflow: 'hidden'
     }}>
-      <ThemeToggle />
       
       {/* Liquid Glass Drag Region */}
       <div 
@@ -1131,7 +1129,7 @@ const AppContent: React.FC = () => {
           position: 'absolute',
           top: 0,
           left: 0,
-          right: '80px',
+          right: '16px',
           height: '72px',
           WebkitAppRegion: 'drag',
           zIndex: 50,
@@ -1149,7 +1147,7 @@ const AppContent: React.FC = () => {
         position: 'absolute',
         top: '16px',
         left: '80px',
-        right: '100px',
+        right: '16px',
         zIndex: 100,
         display: 'flex',
         justifyContent: 'space-between',
@@ -1386,83 +1384,111 @@ const AppContent: React.FC = () => {
           flex: 1,
           display: 'flex',
           minHeight: 0,
-          gap: theme.spacing.sm,
-          padding: theme.spacing.sm,
+          gap: videoFile ? theme.spacing.sm : 0,
+          padding: videoFile ? theme.spacing.sm : 0,
         }}>
-          {/* Left Panel - Video Preview with Timeline */}
-          <Card 
-            variant="default" 
-            padding="none"
-            style={{ 
-              flex: '1 1 70%', 
-              display: 'flex', 
-              flexDirection: 'column',
-              minHeight: 0,
-              overflow: 'hidden',
-            }}
-          >
-            <VideoPanel
-              videoFile={videoFile}
-              captions={captions}
-              currentTime={currentTime}
-              onTimeUpdate={setCurrentTime}
-              onTimeSeek={setCurrentTime}
-              onVideoSelect={handleVideoSelect}
-              onVideoDropped={handleVideoDropped}
-              selectedSegmentId={selectedSegmentId}
-              onCaptionUpdate={handleCaptionUpdate}
-              onPlayPause={handlePlayPause}
-              isPlaying={isPlaying}
-              onSegmentSelect={setSelectedSegmentId}
-            />
-            
-            {/* Unified Timeline - Moved up inside video panel */}
-            <UnifiedTimeline
-              captions={captions}
-              currentTime={currentTime}
-              selectedSegmentId={selectedSegmentId}
-              onSegmentSelect={setSelectedSegmentId}
-              onTimeSeek={setCurrentTime}
-              onSegmentDelete={handleCaptionDelete}
-              onCaptionUpdate={handleCaptionUpdate}
-              videoFile={videoFile}
-              onReTranscribeSegment={handleReTranscribeSegment}
-              onPlayPause={handlePlayPause}
-              isPlaying={isPlaying}
-              onUndo={undo}
-              onRedo={redo}
-              canUndo={historyIndex > 0}
-              canRedo={historyIndex < history.length - 1}
-            />
-          </Card>
+          {videoFile ? (
+            <>
+              {/* Left Panel - Video Preview with Timeline */}
+              <Card 
+                variant="default" 
+                padding="none"
+                style={{ 
+                  flex: '1 1 70%', 
+                  display: 'flex', 
+                  flexDirection: 'column',
+                  minHeight: 0,
+                  overflow: 'hidden',
+                }}
+              >
+                <VideoPanel
+                  videoFile={videoFile}
+                  captions={captions}
+                  currentTime={currentTime}
+                  onTimeUpdate={setCurrentTime}
+                  onTimeSeek={setCurrentTime}
+                  onVideoSelect={handleVideoSelect}
+                  onVideoDropped={handleVideoDropped}
+                  selectedSegmentId={selectedSegmentId}
+                  onCaptionUpdate={handleCaptionUpdate}
+                  onPlayPause={handlePlayPause}
+                  isPlaying={isPlaying}
+                  onSegmentSelect={setSelectedSegmentId}
+                />
+                
+                {/* Unified Timeline - Only show when video is loaded */}
+                <UnifiedTimeline
+                  captions={captions}
+                  currentTime={currentTime}
+                  selectedSegmentId={selectedSegmentId}
+                  onSegmentSelect={setSelectedSegmentId}
+                  onTimeSeek={setCurrentTime}
+                  onSegmentDelete={handleCaptionDelete}
+                  onCaptionUpdate={handleCaptionUpdate}
+                  videoFile={videoFile}
+                  onReTranscribeSegment={handleReTranscribeSegment}
+                  onPlayPause={handlePlayPause}
+                  isPlaying={isPlaying}
+                  onUndo={undo}
+                  onRedo={redo}
+                  canUndo={historyIndex > 0}
+                  canRedo={historyIndex < history.length - 1}
+                />
+              </Card>
 
-          {/* Right Panel - Tabbed Controls */}
-          <Card 
-            variant="default" 
-            padding="none"
-            style={{ 
-              flex: '1 1 30%', 
-              minWidth: '300px',
-              maxWidth: '400px',
-              minHeight: 0,
+              {/* Right Panel - Tabbed Controls - Only show when video is loaded */}
+              <Card 
+                variant="default" 
+                padding="none"
+                style={{ 
+                  flex: '1 1 30%', 
+                  minWidth: '300px',
+                  maxWidth: '400px',
+                  minHeight: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden',
+                }}
+              >
+                <TabbedRightPanel
+                  selectedSegment={captions.find(c => c.id === selectedSegmentId) || null}
+                  onSegmentUpdate={handleCaptionUpdate}
+                  captions={captions}
+                  onApplyToAll={handleApplyToAll}
+                  onTimeSeek={setCurrentTime}
+                  transcriptionStatus={transcriptionStatus}
+                  selectedSegmentId={selectedSegmentId}
+                  onSegmentSelect={setSelectedSegmentId}
+                  onSegmentDelete={handleCaptionDelete}
+                  currentTime={currentTime}
+                />
+              </Card>
+            </>
+          ) : (
+            /* Empty state - Full-width VideoPanel when no video is loaded */
+            <div style={{ 
+              flex: 1,
               display: 'flex',
               flexDirection: 'column',
-              overflow: 'hidden',
-            }}
-          >
-            <TabbedRightPanel
-              selectedSegment={captions.find(c => c.id === selectedSegmentId) || null}
-              onSegmentUpdate={handleCaptionUpdate}
-              captions={captions}
-              onApplyToAll={handleApplyToAll}
-              onTimeSeek={setCurrentTime}
-              transcriptionStatus={transcriptionStatus}
-              selectedSegmentId={selectedSegmentId}
-              onSegmentSelect={setSelectedSegmentId}
-              onSegmentDelete={handleCaptionDelete}
-              currentTime={currentTime}
-            />
-          </Card>
+              minHeight: 0,
+              padding: theme.spacing.lg,
+            }}>
+              <VideoPanel
+                videoFile={videoFile}
+                captions={captions}
+                currentTime={currentTime}
+                onTimeUpdate={setCurrentTime}
+                onTimeSeek={setCurrentTime}
+                onVideoSelect={handleVideoSelect}
+                onVideoDropped={handleVideoDropped}
+                selectedSegmentId={selectedSegmentId}
+                onCaptionUpdate={handleCaptionUpdate}
+                onPlayPause={handlePlayPause}
+                isPlaying={isPlaying}
+                onSegmentSelect={setSelectedSegmentId}
+              />
+            </div>
+          )}
         </div>
       </div>
 
