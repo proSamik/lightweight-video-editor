@@ -519,63 +519,139 @@ const AppContent: React.FC = () => {
   };
 
   const handleExport = async (exportSettings: ExportSettings) => {
-    if (!videoFile || captions.length === 0) return;
+    if (!videoFile) return;
 
     try {
       setIsLoading(true);
-      setLoadingProgress(0); // Reset progress
+      setLoadingProgress(0);
       setLoadingMessage('Choosing export location...');
       
-      // Create abort controller for cancellation
       const controller = new AbortController();
       setCancelController(controller);
 
-      const outputPath = await window.electronAPI.exportVideo(
-        `${videoFile.name.replace(/\.[^/.]+$/, "")}_with_captions.mp4`
-      );
+      // Generate filename based on export mode
+      let defaultFileName: string;
+      switch (exportSettings.exportMode) {
+        case 'newAudio':
+          defaultFileName = `${videoFile.name.replace(/\.[^/.]+$/, "")}_with_new_audio.mp4`;
+          break;
+        case 'subtitlesOnly':
+          defaultFileName = `${videoFile.name.replace(/\.[^/.]+$/, "")}_with_subtitles.mp4`;
+          break;
+        default:
+          defaultFileName = `${videoFile.name.replace(/\.[^/.]+$/, "")}_complete.mp4`;
+      }
+
+      const outputPath = await window.electronAPI.exportVideo(defaultFileName);
 
       if (!outputPath) {
         setIsLoading(false);
-        setLoadingProgress(undefined); // Clear progress
+        setLoadingProgress(undefined);
         return;
       }
 
-      // Check if any words were actually deleted (not just edited)
-      const hasWordDeletions = hasActualWordDeletions(originalCaptions, captions);
-      
-      if (hasWordDeletions) {
-        setLoadingMessage('Applying word deletions to video (this may take several minutes)...');
-        
-        // First, create a video with word deletions applied
-        const tempVideoPath = outputPath.replace('.mp4', '_temp.mp4');
-        await window.electronAPI.applyWordDeletions(
-          videoFile.path,
-          originalCaptions,
-          captions,
-          tempVideoPath
-        );
-        
-        setLoadingMessage('Rendering video with captions (this may take several minutes)...');
-        setLoadingProgress(0); // Reset for rendering
-        await window.electronAPI.renderVideoWithCaptions(
-          tempVideoPath,
-          captions,
-          outputPath,
-          exportSettings,
-          replacementAudioPath || undefined
-        );
-        
-        // Clean up temp file (note: this would need to be handled by the main process)
-      } else {
-        setLoadingMessage('Rendering video with captions (this may take several minutes)...');
-        setLoadingProgress(0); // Reset for rendering
-        await window.electronAPI.renderVideoWithCaptions(
-          videoFile.path,
-          captions,
-          outputPath,
-          exportSettings,
-          replacementAudioPath || undefined
-        );
+      // Handle different export modes
+      switch (exportSettings.exportMode) {
+        case 'newAudio':
+          // Export video with new audio only (no subtitles)
+          if (!replacementAudioPath) {
+            alert('No replacement audio available for this export mode.');
+            setIsLoading(false);
+            setLoadingProgress(undefined);
+            return;
+          }
+          setLoadingMessage('Exporting video with new audio...');
+          await window.electronAPI.exportVideoWithNewAudio(
+            videoFile.path,
+            replacementAudioPath,
+            outputPath
+          );
+          break;
+
+        case 'subtitlesOnly':
+          // Export video with original audio and subtitles
+          if (captions.length === 0) {
+            alert('No captions available for subtitle export.');
+            setIsLoading(false);
+            setLoadingProgress(undefined);
+            return;
+          }
+          setLoadingMessage('Rendering video with subtitles...');
+          setLoadingProgress(0);
+          
+          const hasWordDeletions = hasActualWordDeletions(originalCaptions, captions);
+          
+          if (hasWordDeletions) {
+            setLoadingMessage('Applying word deletions to video...');
+            const tempVideoPath = outputPath.replace('.mp4', '_temp.mp4');
+            await window.electronAPI.applyWordDeletions(
+              videoFile.path,
+              originalCaptions,
+              captions,
+              tempVideoPath
+            );
+            
+            setLoadingMessage('Rendering video with subtitles...');
+            setLoadingProgress(0);
+            await window.electronAPI.renderVideoWithCaptions(
+              tempVideoPath,
+              captions,
+              outputPath,
+              exportSettings
+              // Note: No replacement audio for subtitles-only mode
+            );
+          } else {
+            await window.electronAPI.renderVideoWithCaptions(
+              videoFile.path,
+              captions,
+              outputPath,
+              exportSettings
+              // Note: No replacement audio for subtitles-only mode
+            );
+          }
+          break;
+
+        default: // 'complete'
+          // Export complete video (with subtitles and audio replacement if available)
+          if (captions.length === 0) {
+            alert('No captions available for export.');
+            setIsLoading(false);
+            setLoadingProgress(undefined);
+            return;
+          }
+          
+          const hasWordDeletionsComplete = hasActualWordDeletions(originalCaptions, captions);
+          
+          if (hasWordDeletionsComplete) {
+            setLoadingMessage('Applying word deletions to video...');
+            const tempVideoPath = outputPath.replace('.mp4', '_temp.mp4');
+            await window.electronAPI.applyWordDeletions(
+              videoFile.path,
+              originalCaptions,
+              captions,
+              tempVideoPath
+            );
+            
+            setLoadingMessage('Rendering complete video...');
+            setLoadingProgress(0);
+            await window.electronAPI.renderVideoWithCaptions(
+              tempVideoPath,
+              captions,
+              outputPath,
+              exportSettings,
+              replacementAudioPath || undefined
+            );
+          } else {
+            setLoadingMessage('Rendering complete video...');
+            setLoadingProgress(0);
+            await window.electronAPI.renderVideoWithCaptions(
+              videoFile.path,
+              captions,
+              outputPath,
+              exportSettings,
+              replacementAudioPath || undefined
+            );
+          }
       }
 
       setIsLoading(false);
@@ -940,7 +1016,7 @@ const AppContent: React.FC = () => {
       setIsLoading(true);
       setLoadingMessage('Extracting audio...');
       
-      const audioPath = await window.electronAPI.exportAudio(videoFile.path, `${videoFile.name}_audio.mp3`);
+      const audioPath = await window.electronAPI.exportAudio(videoFile.path, `${videoFile.name.replace(/\.[^/.]+$/, "")}`);
       if (audioPath) {
         setExportedFilePath(audioPath);
         setShowSuccessModal(true);
@@ -1117,7 +1193,14 @@ const AppContent: React.FC = () => {
     <div style={{ 
       display: 'flex', 
       height: '100vh', 
-      backgroundColor: theme.colors.background,
+      background: `
+        linear-gradient(135deg, 
+          rgba(255, 255, 255, 0.8) 0%, 
+          rgba(249, 250, 251, 0.8) 50%, 
+          rgba(243, 244, 246, 0.8) 100%
+        )
+      `,
+      backdropFilter: 'blur(20px)',
       color: theme.colors.text,
       fontFamily: theme.typography.fontFamily,
       overflow: 'hidden'
@@ -1557,6 +1640,7 @@ const AppContent: React.FC = () => {
           setShowExportSettings(false);
           handleExport(settings);
         }}
+        replacementAudioPath={replacementAudioPath}
       />
 
       {/* SRT Export Success Modal */}
