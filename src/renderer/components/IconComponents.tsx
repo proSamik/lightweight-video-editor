@@ -31,8 +31,8 @@ export const NewProjectIcon: React.FC<{ size?: number }> = ({ size = 14 }) => (
 );
 
 // Save Project icon
-export const SaveProjectIcon: React.FC<{ size?: number }> = ({ size = 14 }) => (
-  <Save size={size} />
+export const SaveProjectIcon: React.FC<{ size?: number; color?: string }> = ({ size = 14, color = 'currentColor' }) => (
+  <Save size={size} color={color} />
 );
 
 // Save Project As icon (Save with plus)
