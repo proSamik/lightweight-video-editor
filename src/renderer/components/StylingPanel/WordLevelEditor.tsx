@@ -65,8 +65,8 @@ export const WordLevelEditor: React.FC<WordLevelEditorProps> = ({
     maxHeight: 400,
     overflowY: 'auto',
     overflowX: 'hidden',
-    backgroundColor: theme.colors.background,
-    border: `1px solid ${theme.colors.border}`,
+    backgroundColor: theme.colors.backgroundSecondary,
+    border: `1px solid ${theme.colors.primary}20`,
     borderRadius: borderRadius.lg,
     padding: spacing.sm,
     width: '100%',
@@ -76,10 +76,10 @@ export const WordLevelEditor: React.FC<WordLevelEditorProps> = ({
     padding: spacing.md,
     backgroundColor: theme.colors.background,
     borderRadius: borderRadius.md,
-    border: `1px solid ${theme.colors.border}`,
+    border: `1px solid ${theme.colors.primary}${isEdited ? '60' : '20'}`,
     transition: 'all 0.15s ease',
     marginBottom: spacing.sm,
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+    boxShadow: `0 2px 8px ${theme.colors.primary}${isEdited ? '15' : '05'}`,
     cursor: 'pointer',
     width: '100%',
     minWidth: 0,
@@ -90,16 +90,17 @@ export const WordLevelEditor: React.FC<WordLevelEditorProps> = ({
     minWidth: 40,
     width: 40,
     height: 32,
-    backgroundColor: theme.colors.surface,
-    color: theme.colors.text,
+    backgroundColor: theme.colors.primary,
+    color: theme.colors.primaryForeground,
     borderRadius: borderRadius.md,
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    border: `1px solid ${theme.colors.border}`,
+    border: `1px solid ${theme.colors.primary}`,
     flexShrink: 0,
+    boxShadow: `0 2px 4px ${theme.colors.primary}20`,
   };
 
   const timingStyles: React.CSSProperties = {
@@ -190,12 +191,14 @@ export const WordLevelEditor: React.FC<WordLevelEditorProps> = ({
                 key={index} 
                 style={wordItemStyles(isEdited)}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
-                  e.currentTarget.style.borderColor = theme.colors.borderHover;
+                  e.currentTarget.style.backgroundColor = theme.colors.sidebar.itemHover;
+                  e.currentTarget.style.borderColor = theme.colors.primary + '40';
+                  e.currentTarget.style.boxShadow = `0 4px 12px ${theme.colors.primary}20`;
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = theme.colors.background;
-                  e.currentTarget.style.borderColor = theme.colors.border;
+                  e.currentTarget.style.borderColor = theme.colors.primary + (isEdited ? '60' : '20');
+                  e.currentTarget.style.boxShadow = `0 2px 8px ${theme.colors.primary}${isEdited ? '15' : '05'}`;
                 }}
               >
                 <HStack align="center" gap="md" style={{ width: '100%', minWidth: 0 }}>
@@ -251,7 +254,7 @@ export const WordLevelEditor: React.FC<WordLevelEditorProps> = ({
                           }}
                           onDoubleClick={() => startEditing(index, word.word)}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+                            e.currentTarget.style.backgroundColor = theme.colors.sidebar.itemHover;
                           }}
                           onMouseLeave={(e) => {
                             e.currentTarget.style.backgroundColor = 'transparent';
@@ -313,16 +316,16 @@ export const WordLevelEditor: React.FC<WordLevelEditorProps> = ({
                   <div style={{
                     marginTop: spacing.sm,
                     padding: `${spacing.xs}px ${spacing.sm}px`,
-                    backgroundColor: theme.colors.backgroundSecondary,
+                    backgroundColor: theme.colors.primarySubtle,
                     borderRadius: borderRadius.sm,
                     fontSize: typography.fontSize.xs,
-                    color: theme.colors.textSecondary,
+                    color: theme.colors.primary,
                     display: 'flex',
                     alignItems: 'center',
                     gap: spacing.xs,
-                    border: `1px solid ${theme.colors.border}`,
+                    border: `1px solid ${theme.colors.primary}30`,
                   }}>
-                    <FiStar size={12} />
+                    <FiStar size={12} color={theme.colors.primary} />
                     <span>Enhanced highlighting</span>
                   </div>
                 )}
