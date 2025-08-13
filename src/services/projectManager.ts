@@ -279,6 +279,26 @@ export class ProjectManager {
     return this.projectsDir;
   }
 
+  /**
+   * Gets the directory path for a specific project's assets
+   */
+  public getProjectAssetsDirectory(projectFilePath: string): string {
+    const projectBaseName = path.basename(projectFilePath, '.lvep');
+    return path.join(path.dirname(projectFilePath), `${projectBaseName}_assets`);
+  }
+
+  /**
+   * Ensures the project assets directory exists
+   */
+  public ensureProjectAssetsDirectory(projectFilePath: string): string {
+    const assetsDir = this.getProjectAssetsDirectory(projectFilePath);
+    if (!fs.existsSync(assetsDir)) {
+      fs.mkdirSync(assetsDir, { recursive: true });
+      console.log(`Created project assets directory: ${assetsDir}`);
+    }
+    return assetsDir;
+  }
+
   public generateProjectFileName(videoFileName?: string): string {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const baseName = videoFileName 
