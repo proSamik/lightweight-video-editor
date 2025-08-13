@@ -559,24 +559,78 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: isDragOver ? theme.colors.surface : theme.colors.background,
+          backgroundColor: isDragOver ? theme.colors.primarySubtle : theme.colors.backgroundSecondary,
           margin: '20px',
-          borderRadius: '8px',
-          border: isDragOver ? `2px dashed ${theme.colors.primary}` : `2px dashed ${theme.colors.border}`,
+          borderRadius: theme.radius.lg,
+          border: isDragOver ? `2px dashed ${theme.colors.primary}` : `2px dashed ${theme.colors.primary}40`,
           cursor: 'pointer',
-          transition: 'all 0.2s ease'
+          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          boxShadow: isDragOver ? theme.shadows.lg : theme.shadows.sm,
+          position: 'relative',
+          overflow: 'hidden'
         }} 
         onClick={onVideoSelect}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
       >
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '48px', marginBottom: '20px' }}>📹</div>
-          <div style={{ fontSize: '18px', marginBottom: '10px' }}>
+        {/* Subtle gradient background for depth */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: `linear-gradient(135deg, ${theme.colors.primarySubtle}40, ${theme.colors.backgroundSecondary})`,
+          opacity: 0.6
+        }} />
+        
+        <div style={{ 
+          textAlign: 'center', 
+          position: 'relative',
+          zIndex: 1,
+          padding: '40px'
+        }}>
+          {/* Blue-tinted video icon */}
+          <div style={{ 
+            fontSize: '64px', 
+            marginBottom: '24px',
+            color: theme.colors.primary,
+            textShadow: `0 4px 8px ${theme.colors.primary}20`
+          }}>
+            📹
+          </div>
+          
+          <div style={{ 
+            fontSize: '20px', 
+            marginBottom: '12px',
+            color: theme.colors.text,
+            fontWeight: '600',
+            fontFamily: theme.typography.fontFamily
+          }}>
             Drop a video file here or click to select
           </div>
-          <div style={{ fontSize: '14px', color: theme.colors.textSecondary }}>
+          
+          <div style={{ 
+            fontSize: '15px', 
+            color: theme.colors.textSecondary,
+            marginBottom: '20px'
+          }}>
             Supports MP4, MOV, AVI
+          </div>
+          
+          {/* Blue accent button for visual appeal */}
+          <div style={{
+            display: 'inline-block',
+            padding: '8px 16px',
+            backgroundColor: theme.colors.primary,
+            color: theme.colors.primaryForeground,
+            borderRadius: theme.radius.md,
+            fontSize: '14px',
+            fontWeight: '500',
+            boxShadow: theme.shadows.sm,
+            transition: 'all 0.2s ease'
+          }}>
+            Choose Video File
           </div>
         </div>
       </div>
