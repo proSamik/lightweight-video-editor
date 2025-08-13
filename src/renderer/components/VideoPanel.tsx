@@ -47,6 +47,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   const [scaleFactor, setScaleFactor] = useState(1);
   const lastUpdateTimeRef = useRef<number>(0);
   const [isHoveringCaption, setIsHoveringCaption] = useState(false);
+  const tempDragPositionRef = useRef<{ x: number; y: number } | null>(null);
 
   // Helper function to check if mouse click is on rendered caption text
   const isClickOnCaption = (mouseX: number, mouseY: number, caption: CaptionSegment): boolean => {
@@ -184,14 +185,9 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     setIsDragging(false);
   };
 
-  // Global mouse move handler for dragging with throttling
+  // Global mouse move handler for dragging - real-time visual feedback
   const handleGlobalMouseMove = useCallback((e: MouseEvent) => {
-    if (!isDragging || !selectedSegmentId || !onCaptionUpdate) return;
-    
-    // Throttle updates to reduce lag (max 60fps)
-    const now = Date.now();
-    if (now - lastUpdateTimeRef.current < 16) return; // ~60fps
-    lastUpdateTimeRef.current = now;
+    if (!isDragging || !selectedSegmentId) return;
     
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -206,31 +202,36 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     const newXPercent = Math.max(0, Math.min(100, (mouseX / rect.width) * 100));
     const newYPercent = Math.max(0, Math.min(100, (mouseY / rect.height) * 100));
     
-    const currentCaption = captions.find(c => c.id === selectedSegmentId);
-    if (currentCaption) {
-      // Only update if position changed significantly (avoid micro-movements)
-      const currentX = currentCaption.style.position?.x || 50;
-      const currentY = currentCaption.style.position?.y || 50;
-      
-      if (Math.abs(currentX - newXPercent) > 0.5 || Math.abs(currentY - newYPercent) > 0.5) {
+    // Store temporary position for immediate visual feedback
+    tempDragPositionRef.current = { x: newXPercent, y: newYPercent };
+    
+    // Immediately re-render canvas with new position
+    renderCaptionsOnCanvasWithTempPosition();
+  }, [isDragging, selectedSegmentId]);
+
+  // Global mouse up handler
+  const handleGlobalMouseUp = useCallback(() => {
+    // Save the temporary position to actual caption data if we have one
+    if (tempDragPositionRef.current && selectedSegmentId && onCaptionUpdate) {
+      const currentCaption = captions.find(c => c.id === selectedSegmentId);
+      if (currentCaption) {
         onCaptionUpdate(selectedSegmentId, {
           style: {
             ...currentCaption.style,
             position: {
               ...currentCaption.style.position,
-              x: newXPercent,
-              y: newYPercent
+              x: tempDragPositionRef.current.x,
+              y: tempDragPositionRef.current.y
             }
           }
         });
       }
     }
-  }, [isDragging, selectedSegmentId, onCaptionUpdate, captions]);
-
-  // Global mouse up handler
-  const handleGlobalMouseUp = useCallback(() => {
+    
+    // Clear temp position and stop dragging
+    tempDragPositionRef.current = null;
     setIsDragging(false);
-  }, []);
+  }, [selectedSegmentId, onCaptionUpdate, captions]);
 
   // Set up global mouse event listeners for dragging
   useEffect(() => {
@@ -382,6 +383,46 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     }
   }, [canvasSize]);
 
+  // Render captions on canvas with temporary drag position for real-time feedback
+  const renderCaptionsOnCanvasWithTempPosition = useCallback(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    
+    if (!canvas || !ctx) return;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Get all current captions (for potential overlapping)
+    const currentCaptions = captions.filter(
+      caption => currentTime >= caption.startTime && currentTime <= caption.endTime
+    );
+
+    if (currentCaptions.length === 0) return;
+
+    // Render all captions with temp position override for the selected one
+    currentCaptions.forEach(caption => {
+      let renderCaption = caption;
+      
+      // If this is the selected caption being dragged, use temp position
+      if (caption.id === selectedSegmentId && tempDragPositionRef.current) {
+        renderCaption = {
+          ...caption,
+          style: {
+            ...caption.style,
+            position: {
+              ...caption.style.position,
+              x: tempDragPositionRef.current.x,
+              y: tempDragPositionRef.current.y
+            }
+          }
+        };
+      }
+      
+      renderCaptionOnCanvas(ctx, renderCaption, canvas.width, canvas.height, currentTime, scaleFactor);
+    });
+  }, [captions, currentTime, selectedSegmentId, scaleFactor]);
+
   // Render captions on canvas (same logic as export)
   const renderCaptionsOnCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -405,32 +446,20 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     });
   }, [captions, currentTime, selectedSegmentId, scaleFactor]);
 
-  // Force re-render when caption styles change
+  // Force re-render when caption styles change - optimized
   useEffect(() => {
-    // Check if fonts are loaded and force a re-render
-    const checkFontsAndRender = async () => {
-      // Wait for fonts to be available
-      if ('fonts' in document) {
-        try {
-          await document.fonts.ready;
-        } catch (e) {
-          console.log('Font loading check failed, continuing anyway');
-        }
-      }
-      
-      // Add a small delay to ensure font changes are applied
-      setTimeout(() => {
-        renderCaptionsOnCanvas();
-      }, 100);
-    };
-    
-    checkFontsAndRender();
-  }, [captions.map(c => JSON.stringify(c.style)).join('|')]); // Trigger when any style property changes
+    // Only re-render if not currently dragging to avoid constant updates during drag
+    if (!isDragging) {
+      renderCaptionsOnCanvas();
+    }
+  }, [captions.map(c => JSON.stringify(c.style)).join('|'), isDragging]); // Trigger when any style property changes
 
-  // Re-render when captions or time changes
+  // Re-render when captions or time changes - but not during dragging
   useEffect(() => {
-    renderCaptionsOnCanvas();
-  }, [renderCaptionsOnCanvas]);
+    if (!isDragging) {
+      renderCaptionsOnCanvas();
+    }
+  }, [renderCaptionsOnCanvas, isDragging]);
 
   // Handle play/pause functionality
   const handlePlayPause = useCallback(() => {
