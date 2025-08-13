@@ -171,52 +171,52 @@ interface Theme {
   };
 }
 
-// Light Theme - White & Blue (Trust & Clean)
+// Eye-Friendly Light Theme - Warm Off-White & Blue
 const lightTheme: Theme = {
   mode: 'light',
   colors: {
-    // Primary Blue Scale - Tailwind CSS Blue
+    // Primary Blue Scale - Tailwind CSS Blue (Trust & Professionalism)
     primary: '#3B82F6',           // Tailwind Blue-500
     primaryHover: '#2563EB',      // Tailwind Blue-600  
     primaryActive: '#1D4ED8',     // Tailwind Blue-700
-    primaryForeground: '#FFFFFF', // White
-    primarySubtle: '#EFF6FF',     // Tailwind Blue-50
+    primaryForeground: '#FFFFFF', // White text on blue
+    primarySubtle: '#EBF4FF',     // Warm blue-50 tint
     
-    // Secondary Blue Scale - Softer Trust
-    secondary: '#6B7280',         // Gray-500 with blue undertone
-    secondaryHover: '#4B5563',    // Gray-600
-    secondaryActive: '#374151',   // Gray-700
-    secondaryForeground: '#FFFFFF',
-    secondarySubtle: '#F8FAFC',   // Slate-50
+    // Secondary Blue Scale - Muted Blue for secondary actions
+    secondary: '#60A5FA',         // Tailwind Blue-400 (lighter)
+    secondaryHover: '#3B82F6',    // Tailwind Blue-500
+    secondaryActive: '#2563EB',   // Tailwind Blue-600
+    secondaryForeground: '#FFFFFF', // White text
+    secondarySubtle: '#DBEAFE',   // Blue-100 for subtle backgrounds
     
-    // Background System - Clean White Layers
-    background: '#FFFFFF',        // Pure white
-    backgroundSecondary: '#F8FAFC', // Slate-50
-    backgroundTertiary: '#F1F5F9', // Slate-100
-    surface: '#FFFFFF',
-    surfaceHover: '#F8FAFC',
-    surfaceActive: '#F1F5F9',
-    surfaceElevated: '#FFFFFF',
+    // Background System - Gradient (Eye Strain Prevention)
+    background: '#ECEAE8',        // Custom warm gray background
+    backgroundSecondary: '#E8E5E3', // Slightly deeper warm gray
+    backgroundTertiary: '#E3E0DE', // Deeper warm gray for panels
+    surface: '#ECEAE8',           // Main surface color matches background
+    surfaceHover: '#E8E5E3',      // Light warm hover
+    surfaceActive: '#E3E0DE',     // Warm active state
+    surfaceElevated: '#FFFFFF',   // Pure white only for modals/elevated elements
     
-    // Glass Effects - Tailwind CSS Blue
+    // Glass Effects - Figma-Style Subtle Mist
     glass: {
-      background: 'rgba(255, 255, 255, 0.8)',
-      border: 'rgba(59, 130, 246, 0.15)',    // Tailwind Blue-500 with opacity
-      shadow: '0 8px 32px rgba(59, 130, 246, 0.12)', // Tailwind Blue shadow
+      background: 'rgba(242, 240, 239, 0.95)', // Subtle Mist glass effect
+      border: 'rgba(59, 130, 246, 0.15)',      // Soft blue border
+      shadow: '0 8px 32px rgba(59, 130, 246, 0.08)', // Very soft blue shadow
     },
     
-    // Text Hierarchy
-    text: '#0F172A',              // Slate-900
-    textSecondary: '#475569',     // Slate-600
-    textMuted: '#94A3B8',         // Slate-400
-    textInverse: '#FFFFFF',
-    textOnPrimary: '#FFFFFF',
+    // Text Hierarchy - Blue-Gray Palette (Canva-Inspired)
+    text: '#1E293B',              // Dark blue-gray (professional, easy on eyes)
+    textSecondary: '#475569',     // Medium blue-gray  
+    textMuted: '#94A3B8',         // Light blue-gray
+    textInverse: '#FAFBFC',       // Subtle off-white
+    textOnPrimary: '#FFFFFF',     // White on blue
     
-    // Border System
-    border: '#E2E8F0',            // Slate-200
-    borderHover: '#CBD5E1',       // Slate-300
-    borderFocus: '#3B82F6',       // Blue-500
-    borderSubtle: '#F1F5F9',      // Slate-100
+    // Border System - Blue-Gray Palette  
+    border: '#E2E8F0',            // Light blue-gray border
+    borderHover: '#CBD5E1',       // Medium blue-gray hover
+    borderFocus: '#3B82F6',       // Blue focus (trust signal)
+    borderSubtle: '#F1F5F9',      // Very light blue-gray
     
     // Accent Colors - Tailwind CSS Blue
     accent: '#3B82F6',            // Tailwind Blue-500
@@ -245,45 +245,45 @@ const lightTheme: Theme = {
     infoForeground: '#FFFFFF',
     infoSubtle: '#EFF6FF',        // Tailwind Blue-50
     
-    // Component-specific
+    // Component-specific - Blue-Heavy Design (Canva-Inspired)
     button: {
       ghost: 'transparent',
-      ghostHover: '#F8FAFC',      // Slate-50
+      ghostHover: '#F0F4F8',      // Light blue-gray hover
       outline: 'transparent',
-      outlineHover: '#EFF6FF',    // Blue-50
+      outlineHover: '#DBEAFE',    // Blue-100 emphasis
       destructive: '#EF4444',     // Red-500
       destructiveHover: '#DC2626', // Red-600
     },
     
     input: {
-      background: '#FFFFFF',
-      backgroundFocus: '#FFFFFF',
-      placeholder: '#94A3B8',     // Slate-400
-      border: '#E2E8F0',          // Slate-200
-      borderFocus: '#3B82F6',     // Blue-500
+      background: '#F2F0EF',      // Subtle Mist background
+      backgroundFocus: '#EBF4FF', // Soft blue focus background
+      placeholder: '#94A3B8',     // Blue-gray placeholder
+      border: '#E2E8F0',          // Light blue-gray border
+      borderFocus: '#3B82F6',     // Blue focus for trust
     },
     
     modal: {
-      overlay: 'rgba(15, 23, 42, 0.5)', // Slate-900 with opacity
-      background: '#FFFFFF',
-      border: '#E2E8F0',          // Slate-200
-      shadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25)',
+      overlay: 'rgba(30, 41, 59, 0.6)', // Blue-gray overlay
+      background: '#FFFFFF',      // Pure white for modals (highest contrast)
+      border: '#E2E8F0',          // Blue-gray border
+      shadow: '0 25px 50px -12px rgba(59, 130, 246, 0.15)', // Blue shadow
     },
     
     sidebar: {
-      background: '#F8FAFC',      // Slate-50
-      border: '#E2E8F0',          // Slate-200
-      itemHover: '#EFF6FF',       // Blue-50
-      itemActive: '#DBEAFE',      // Blue-100
+      background: '#EDEAE8',      // Deeper Subtle Mist for styling panel
+      border: '#E2E8F0',          // Blue-gray border
+      itemHover: '#EBF4FF',       // Blue hover for emphasis
+      itemActive: '#DBEAFE',      // Strong blue active state
     },
     
     timeline: {
-      background: '#F8FAFC',      // Slate-50
-      track: '#E2E8F0',           // Slate-200
-      segment: '#3B82F6',         // Tailwind Blue-500
-      segmentHover: '#2563EB',    // Tailwind Blue-600
-      segmentActive: '#1D4ED8',   // Tailwind Blue-700
-      playhead: '#EF4444',        // Red-500
+      background: '#EDEAE8',      // Deeper Subtle Mist for timeline
+      track: '#E7E3E1',           // Even deeper warm gray track
+      segment: '#3B82F6',         // Primary blue segments
+      segmentHover: '#2563EB',    // Darker blue hover
+      segmentActive: '#1D4ED8',   // Active blue state
+      playhead: '#EF4444',        // Red playhead for contrast
     },
   },
   
@@ -338,178 +338,11 @@ const lightTheme: Theme = {
   },
 };
 
-// Dark Theme - Black & Blue (Professional & Trustworthy)
-const darkTheme: Theme = {
-  mode: 'dark',
-  colors: {
-    // Primary Blue Scale - Tailwind CSS Blue for Dark Mode
-    primary: '#60A5FA',           // Tailwind Blue-400 (vibrant for dark)
-    primaryHover: '#3B82F6',      // Tailwind Blue-500
-    primaryActive: '#2563EB',     // Tailwind Blue-600
-    primaryForeground: '#0F172A', // Slate-900
-    primarySubtle: '#1E3A8A',     // Tailwind Blue-900
-    
-    // Secondary Blue Scale
-    secondary: '#64748B',         // Slate-500
-    secondaryHover: '#94A3B8',    // Slate-400
-    secondaryActive: '#CBD5E1',   // Slate-300
-    secondaryForeground: '#0F172A',
-    secondarySubtle: '#1E293B',   // Slate-800
-    
-    // Background System - Modern Blue-Tinted Dark
-    background: '#0C1426',        // Deep blue-black (custom)
-    backgroundSecondary: '#1E293B', // Blue-slate-800 
-    backgroundTertiary: '#1E3A8A', // Tailwind Blue-900
-    surface: '#172554',           // Tailwind Blue-950
-    surfaceHover: '#1E3A8A',      // Tailwind Blue-900
-    surfaceActive: '#1D4ED8',     // Tailwind Blue-700
-    surfaceElevated: '#1E3A8A',   // Tailwind Blue-900
-    
-    // Glass Effects - Blue-Tinted Modern
-    glass: {
-      background: 'rgba(23, 37, 84, 0.8)',  // Blue-950 with opacity
-      border: 'rgba(96, 165, 250, 0.3)',    // Tailwind Blue-400 with opacity
-      shadow: '0 8px 32px rgba(96, 165, 250, 0.15)', // Enhanced blue glow
-    },
-    
-    // Text Hierarchy
-    text: '#F8FAFC',              // Slate-50
-    textSecondary: '#CBD5E1',     // Slate-300
-    textMuted: '#64748B',         // Slate-500
-    textInverse: '#0F172A',       // Slate-900
-    textOnPrimary: '#0F172A',     // Slate-900
-    
-    // Border System - Blue-Tinted
-    border: '#1E3A8A',            // Tailwind Blue-900
-    borderHover: '#1D4ED8',       // Tailwind Blue-700
-    borderFocus: '#60A5FA',       // Tailwind Blue-400
-    borderSubtle: '#172554',      // Tailwind Blue-950
-    
-    // Accent Colors - Tailwind CSS Blue
-    accent: '#60A5FA',            // Tailwind Blue-400
-    accentHover: '#3B82F6',       // Tailwind Blue-500
-    accentForeground: '#0F172A',
-    accentSubtle: '#1E3A8A',      // Tailwind Blue-900
-    
-    // State Colors
-    success: '#34D399',           // Emerald-400
-    successHover: '#10B981',      // Emerald-500
-    successForeground: '#0F172A',
-    successSubtle: '#064E3B',     // Emerald-900
-    
-    warning: '#FBBF24',           // Amber-400
-    warningHover: '#F59E0B',      // Amber-500
-    warningForeground: '#0F172A',
-    warningSubtle: '#451A03',     // Amber-900
-    
-    error: '#F87171',             // Red-400
-    errorHover: '#EF4444',        // Red-500
-    errorForeground: '#0F172A',
-    errorSubtle: '#450A0A',       // Red-900
-    
-    info: '#60A5FA',              // Tailwind Blue-400
-    infoHover: '#3B82F6',         // Tailwind Blue-500
-    infoForeground: '#0F172A',
-    infoSubtle: '#1E3A8A',        // Tailwind Blue-900
-    
-    // Component-specific
-    button: {
-      ghost: 'transparent',
-      ghostHover: '#1E293B',      // Slate-800
-      outline: 'transparent',
-      outlineHover: '#1E293B',    // Slate-800
-      destructive: '#F87171',     // Red-400
-      destructiveHover: '#EF4444', // Red-500
-    },
-    
-    input: {
-      background: '#172554',      // Tailwind Blue-950
-      backgroundFocus: '#1E3A8A', // Tailwind Blue-900
-      placeholder: '#64748B',     // Slate-500
-      border: '#1E3A8A',          // Tailwind Blue-900
-      borderFocus: '#60A5FA',     // Tailwind Blue-400
-    },
-    
-    modal: {
-      overlay: 'rgba(12, 20, 38, 0.9)', // Blue-tinted overlay
-      background: '#172554',      // Tailwind Blue-950
-      border: '#1E3A8A',          // Tailwind Blue-900
-      shadow: '0 25px 50px -12px rgba(96, 165, 250, 0.3)', // Blue shadow
-    },
-    
-    sidebar: {
-      background: '#172554',      // Tailwind Blue-950
-      border: '#1E3A8A',          // Tailwind Blue-900
-      itemHover: '#1E3A8A',       // Tailwind Blue-900
-      itemActive: '#1D4ED8',      // Tailwind Blue-700
-    },
-    
-    timeline: {
-      background: '#172554',      // Tailwind Blue-950
-      track: '#1E3A8A',           // Tailwind Blue-900
-      segment: '#60A5FA',         // Tailwind Blue-400
-      segmentHover: '#3B82F6',    // Tailwind Blue-500
-      segmentActive: '#2563EB',   // Tailwind Blue-600
-      playhead: '#F87171',        // Red-400
-    },
-  },
-  
-  spacing: {
-    xs: '4px',
-    sm: '8px',
-    md: '16px',
-    lg: '24px',
-    xl: '32px',
-    xxl: '48px',
-  },
-  
-  radius: {
-    none: '0px',
-    sm: '6px',
-    md: '8px',
-    lg: '12px',
-    xl: '16px',
-    full: '9999px',
-  },
-  
-  shadows: {
-    sm: '0 1px 2px rgba(0, 0, 0, 0.1)',
-    md: '0 4px 6px rgba(0, 0, 0, 0.2)',
-    lg: '0 10px 15px rgba(0, 0, 0, 0.3)',
-    xl: '0 20px 25px rgba(0, 0, 0, 0.4)',
-    glass: '0 8px 32px rgba(0, 0, 0, 0.3)',
-  },
-  
-  typography: {
-    fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-    fontSize: {
-      xs: '12px',
-      sm: '14px',
-      base: '16px',
-      lg: '18px',
-      xl: '20px',
-      xxl: '24px',
-      xxxl: '32px',
-    },
-    fontWeight: {
-      normal: '400',
-      medium: '500',
-      semibold: '600',
-      bold: '700',
-    },
-    lineHeight: {
-      tight: '1.25',
-      normal: '1.5',
-      relaxed: '1.75',
-    },
-  },
-};
+// Single theme - no dark mode needed
 
-// Theme context interface
+// Theme context interface - Simplified for single theme
 interface ThemeContextType {
   theme: Theme;
-  toggleTheme: () => void;
-  setTheme: (mode: 'light' | 'dark') => void;
 }
 
 // Create context
@@ -521,28 +354,17 @@ interface ThemeProviderProps {
 }
 
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    // Try to get saved theme from localStorage
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme === 'light' || savedTheme === 'dark') {
-      return savedTheme === 'light' ? lightTheme : darkTheme;
-    }
-    // Default to light theme (professional trust)
-    return lightTheme;
-  });
+  // Always use the single light theme
+  const theme = lightTheme;
 
-  // Function to set theme
-  const setTheme = (mode: 'light' | 'dark') => {
-    const newTheme = mode === 'light' ? lightTheme : darkTheme;
-    setThemeState(newTheme);
-    localStorage.setItem('theme', mode);
-    
-    // Apply theme to document body for global CSS variables
-    document.body.setAttribute('data-theme', mode);
+  // Apply theme CSS variables on mount
+  useEffect(() => {
+    // Apply theme to document body
+    document.body.setAttribute('data-theme', 'light');
     
     // Set CSS custom properties for liquid design
     const root = document.documentElement;
-    Object.entries(newTheme.colors).forEach(([key, value]) => {
+    Object.entries(theme.colors).forEach(([key, value]) => {
       if (typeof value === 'string') {
         root.style.setProperty(`--color-${key}`, value);
       } else if (typeof value === 'object') {
@@ -553,36 +375,23 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     });
     
     // Set spacing variables
-    Object.entries(newTheme.spacing).forEach(([key, value]) => {
+    Object.entries(theme.spacing).forEach(([key, value]) => {
       root.style.setProperty(`--spacing-${key}`, value);
     });
     
     // Set radius variables
-    Object.entries(newTheme.radius).forEach(([key, value]) => {
+    Object.entries(theme.radius).forEach(([key, value]) => {
       root.style.setProperty(`--radius-${key}`, value);
     });
     
     // Set shadow variables
-    Object.entries(newTheme.shadows).forEach(([key, value]) => {
+    Object.entries(theme.shadows).forEach(([key, value]) => {
       root.style.setProperty(`--shadow-${key}`, value);
     });
-  };
-
-  // Function to toggle theme
-  const toggleTheme = () => {
-    const newMode = theme.mode === 'light' ? 'dark' : 'light';
-    setTheme(newMode);
-  };
-
-  // Apply theme to document on mount and theme change
-  useEffect(() => {
-    setTheme(theme.mode);
-  }, [theme.mode]);
+  }, []);
 
   const value: ThemeContextType = {
     theme,
-    toggleTheme,
-    setTheme,
   };
 
   return (
@@ -603,4 +412,4 @@ export const useTheme = (): ThemeContextType => {
 
 // Export theme types and constants
 export type { Theme };
-export { lightTheme, darkTheme };
+export { lightTheme };
