@@ -139,4 +139,16 @@ export const ExportVideoIcon: React.FC<{ size?: number }> = ({ size = 14 }) => (
       right: -2
     }} />
   </div>
+);
+
+// Export Video with New Audio icon
+export const ExportVideoWithNewAudioIcon: React.FC<{ size?: number }> = ({ size = 14 }) => (
+  <div style={{ position: 'relative', display: 'inline-flex' }}>
+    <Video size={size} />
+    <Music size={size * 0.6} style={{ 
+      position: 'absolute', 
+      top: -2, 
+      right: -2
+    }} />
+  </div>
 ); 
