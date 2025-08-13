@@ -119,6 +119,7 @@ export interface ProjectData {
   captions: CaptionSegment[];
   timeline: TimelineSelection[];
   replacementAudioPath?: string | null;
+  extractedAudioPath?: string | null; // Path to extracted audio file for waveform and transcription
   lastModified: number;
   description?: string;
   title?: string;
