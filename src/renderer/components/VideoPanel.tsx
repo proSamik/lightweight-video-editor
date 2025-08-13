@@ -16,6 +16,8 @@ interface VideoPanelProps {
   onPlayPause?: () => void;
   isPlaying?: boolean;
   onSegmentSelect?: (segmentId: string) => void;
+  replacementAudioPath?: string | null;
+  isAudioPreviewEnabled?: boolean;
 }
 
 const VideoPanel: React.FC<VideoPanelProps> = ({
@@ -31,10 +33,13 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   onPlayPause,
   isPlaying,
   onSegmentSelect,
+  replacementAudioPath,
+  isAudioPreviewEnabled = true,
 }) => {
   const { theme } = useTheme();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const replacementAudioRef = useRef<HTMLAudioElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -537,6 +542,145 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     }
   }, [handlePlayPause, onPlayPause]);
 
+  // Ensure video audio is always enabled when no replacement audio
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (!replacementAudioPath) {
+      // No replacement audio - ensure video audio is on
+      video.volume = 1;
+      console.log('No replacement audio - video volume set to 1');
+    }
+  }, [replacementAudioPath]);
+
+  // Handle replacement audio setup (only when audio path changes)
+  useEffect(() => {
+    const video = videoRef.current;
+    const replacementAudio = replacementAudioRef.current;
+
+    if (!replacementAudioPath || !replacementAudio || !video) return;
+
+    // Set up replacement audio
+    replacementAudio.src = `file://${replacementAudioPath}`;
+    replacementAudio.preload = 'auto';
+    
+    // Load the audio and set initial volume states
+    replacementAudio.load();
+    
+    // Set initial volumes based on current state
+    if (isAudioPreviewEnabled) {
+      video.volume = 0;
+      replacementAudio.volume = 1;
+    } else {
+      video.volume = 1;
+      replacementAudio.volume = 0;
+    }
+
+    console.log('Audio setup:', {
+      replacementAudioPath,
+      isAudioPreviewEnabled,
+      videoVolume: video.volume,
+      audioVolume: replacementAudio.volume
+    });
+
+  }, [replacementAudioPath, isAudioPreviewEnabled]);
+
+  // Handle video-audio synchronization with current state access
+  useEffect(() => {
+    const video = videoRef.current;
+    const replacementAudio = replacementAudioRef.current;
+
+    if (!video) return;
+
+    let syncTimeoutId: NodeJS.Timeout | null = null;
+
+    // Debounced sync to avoid frequent corrections
+    const syncAudio = () => {
+      if (!replacementAudio || !replacementAudioPath || !isAudioPreviewEnabled) return;
+      
+      if (syncTimeoutId) return; // Skip if already syncing
+      
+      syncTimeoutId = setTimeout(() => {
+        if (replacementAudio && Math.abs(replacementAudio.currentTime - video.currentTime) > 0.2) {
+          replacementAudio.currentTime = video.currentTime;
+        }
+        syncTimeoutId = null;
+      }, 100);
+    };
+
+    const handleVideoPlay = () => {
+      console.log('Video play event:', { isAudioPreviewEnabled, replacementAudioPath });
+      if (replacementAudio && isAudioPreviewEnabled && replacementAudioPath) {
+        replacementAudio.currentTime = video.currentTime;
+        replacementAudio.play().catch((error) => {
+          console.error('Failed to play replacement audio on video play:', error);
+        });
+      }
+    };
+
+    const handleVideoPause = () => {
+      if (replacementAudio) {
+        replacementAudio.pause();
+      }
+    };
+
+    const handleVideoSeeked = () => {
+      if (replacementAudio && replacementAudioPath) {
+        replacementAudio.currentTime = video.currentTime;
+      }
+    };
+
+    // Add event listeners
+    video.addEventListener('play', handleVideoPlay);
+    video.addEventListener('pause', handleVideoPause);
+    video.addEventListener('seeked', handleVideoSeeked);
+    video.addEventListener('timeupdate', syncAudio);
+
+    return () => {
+      video.removeEventListener('play', handleVideoPlay);
+      video.removeEventListener('pause', handleVideoPause);
+      video.removeEventListener('seeked', handleVideoSeeked);
+      video.removeEventListener('timeupdate', syncAudio);
+      if (syncTimeoutId) {
+        clearTimeout(syncTimeoutId);
+      }
+    };
+  }, [isAudioPreviewEnabled, replacementAudioPath]); // Include dependencies for current state access
+
+  // Handle audio preview toggle - simplified for debugging
+  useEffect(() => {
+    const video = videoRef.current;
+    const replacementAudio = replacementAudioRef.current;
+
+    if (!video || !replacementAudio || !replacementAudioPath) return;
+
+    console.log('Audio toggle:', {
+      isAudioPreviewEnabled,
+      videoPaused: video.paused,
+      audioReadyState: replacementAudio.readyState
+    });
+
+    if (isAudioPreviewEnabled) {
+      // Use replacement audio
+      video.volume = 0;
+      replacementAudio.volume = 1;
+      
+      // Sync and play if video is playing
+      if (!video.paused) {
+        replacementAudio.currentTime = video.currentTime;
+        replacementAudio.play().catch((error) => {
+          console.error('Failed to play replacement audio:', error);
+        });
+      }
+    } else {
+      // Use original video audio
+      video.volume = 1;
+      replacementAudio.volume = 0;
+      replacementAudio.pause();
+    }
+  }, [isAudioPreviewEnabled, replacementAudioPath]);
+
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -690,6 +834,15 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
             setTimeout(() => renderCaptionsOnCanvas(), 50);
           }}
         />
+
+        {/* Replacement Audio Element */}
+        {replacementAudioPath && (
+          <audio
+            ref={replacementAudioRef}
+            preload="auto"
+            style={{ display: 'none' }}
+          />
+        )}
         
         {/* Canvas Overlay - Renders captions exactly like export */}
         <canvas
