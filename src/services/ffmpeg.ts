@@ -164,24 +164,14 @@ export class FFmpegService {
   public async extractAudioToFile(videoPath: string, outputPath: string): Promise<string> {
     return new Promise((resolve, reject) => {
       const fileExtension = path.extname(outputPath).toLowerCase();
-      let audioCodec = 'mp3';
-      let format = 'mp3';
+      let audioCodec = 'wav';
+      let format = 'wav';
       
       // Set codec and format based on output file extension
       switch (fileExtension) {
         case '.wav':
           audioCodec = 'pcm_s16le';
           format = 'wav';
-          break;
-        case '.aac':
-        case '.m4a':
-          audioCodec = 'aac';
-          format = 'aac';
-          break;
-        case '.mp3':
-        default:
-          audioCodec = 'mp3';
-          format = 'mp3';
           break;
       }
       
