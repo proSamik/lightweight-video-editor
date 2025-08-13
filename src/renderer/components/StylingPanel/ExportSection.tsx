@@ -9,13 +9,15 @@ import {
   typography,
 } from '../ui';
 import { ExportSettings, CaptionSegment } from '../../../types';
-import { ExportSrtIcon } from '../IconComponents';
+import { ExportSrtIcon, ExportVideoWithNewAudioIcon } from '../IconComponents';
 
 interface ExportSectionProps {
   videoFile?: { path: string; name: string } | null;
   captions?: CaptionSegment[];
   onExport?: (settings: ExportSettings) => void;
   onShowExportSettings: () => void;
+  onVideoWithNewAudioExport?: () => void;
+  replacementAudioPath?: string | null;
 }
 
 export const ExportSection: React.FC<ExportSectionProps> = ({
@@ -23,6 +25,8 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   captions,
   onExport,
   onShowExportSettings,
+  onVideoWithNewAudioExport,
+  replacementAudioPath,
 }) => {
   const { theme } = useTheme();
 
@@ -170,6 +174,20 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
           >
             Export SRT Subtitle File
           </Button>
+
+          {/* Export Video with New Audio (only show if replacement audio is loaded) */}
+          {replacementAudioPath && (
+            <Button
+              variant="outline"
+              size="md"
+              leftIcon={<ExportVideoWithNewAudioIcon />}
+              onClick={onVideoWithNewAudioExport}
+              disabled={!hasVideo}
+              fullWidth
+            >
+              Export Video with New Audio
+            </Button>
+          )}
         </Stack>
 
         {/* Help text */}
