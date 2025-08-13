@@ -203,8 +203,19 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
         icon={<FiCpu size={24} color="white" />}
         maxWidth="900px"
       >
-      {/* Modal Content */}
-      <div style={{ padding: '32px' }}>
+      <div style={{ 
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        minHeight: '600px'
+      }}>
+        {/* Modal Content */}
+        <div style={{ 
+          padding: '32px',
+          flex: 1,
+          overflowY: 'auto',
+          minHeight: 0
+        }}>
 
         {error && (
           <div style={{
@@ -593,8 +604,18 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
           )}
         </div>
 
+        </div>
+
         {/* Action Buttons */}
-        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+        <div style={{ 
+          display: 'flex', 
+          gap: '10px', 
+          justifyContent: 'flex-end',
+          padding: '20px 32px',
+          flexShrink: 0,
+          backgroundColor: theme.colors.modal.background,
+          borderTop: `1px solid ${theme.colors.border}`
+        }}>
           <Button
             onClick={onClose}
             variant="secondary"
