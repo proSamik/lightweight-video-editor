@@ -251,7 +251,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
     <div style={{ 
       width: '100%', 
       height: `${TIMELINE_HEIGHT}px`,
-      backgroundColor: theme.colors.background,
+      background: theme.colors.background,
       border: `1px solid ${theme.colors.border}`,
       borderRadius: '4px',
       overflow: 'hidden',
@@ -267,7 +267,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: theme.colors.surface
+        background: theme.colors.surface
       }}>
         {/* Time Display */}
         <div style={{ 
@@ -387,7 +387,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
               style={{
                 width: '80px',
                 height: '20px',
-                backgroundColor: theme.colors.surface,
+                background: theme.colors.surface,
                 outline: 'none',
                 cursor: 'pointer',
                 borderRadius: '4px',
@@ -616,7 +616,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
         style={{
           height: `${TIMELINE_HEIGHT - 32}px`,
           position: 'relative',
-          backgroundColor: theme.colors.background,
+          background: theme.colors.background,
           overflowX: 'auto',
           overflowY: 'hidden',
         }}
@@ -627,7 +627,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
             height: '95%',
             position: 'relative',
             cursor: isDragging ? 'grabbing' : 'pointer',
-            backgroundColor: theme.colors.background,
+            background: theme.colors.background,
             width: `${Math.max(100 * zoomLevel, 100)}%`, // Minimum 100% width, scales with zoom
             minWidth: '100%',
             marginLeft: '10px',
@@ -660,10 +660,19 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
               zIndex: 10
             }}
           >
-            {captions.map((segment) => {
+            {captions.map((segment, index) => {
               const left = (segment.startTime / actualDuration) * 100;
               const width = ((segment.endTime - segment.startTime) / actualDuration) * 100;
               const isSelected = segment.id === selectedSegmentId;
+              
+              // Use consistent blue border color for all segments
+              const segmentBorderColor = isSelected 
+                ? theme.colors.primary 
+                : theme.colors.secondary;
+              
+              const segmentBackgroundColor = isSelected 
+                ? theme.colors.secondary 
+                : theme.colors.surface;
               
               return (
                 <div
@@ -673,9 +682,9 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                     left: `${left}%`,
                     width: `${width}%`,
                     height: '100%',
-                    backgroundColor: isSelected ? theme.colors.secondary : theme.colors.surface,
-                    border: `1px solid ${isSelected ? theme.colors.primaryHover : theme.colors.border}`,
-                    borderRadius: '2px',
+                    background: segmentBackgroundColor,
+                    border: `2px solid ${segmentBorderColor}`,
+                    borderRadius: '4px',
                     padding: '4px 6px',
                     fontSize: '11px',
                     color: isSelected ? theme.colors.primaryForeground : theme.colors.text,
@@ -683,7 +692,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                     overflow: 'hidden',
                     display: 'flex',
                     alignItems: 'center',
-                    transition: 'opacity 0.15s ease',
+                    transition: 'all 0.2s ease',
                     minWidth: '2px'
                   }}
                   onClick={() => handleSegmentClick(segment)}
@@ -724,7 +733,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
             position: 'fixed',
             left: `${contextMenu.x}px`,
             top: `${contextMenu.y}px`,
-            backgroundColor: theme.colors.surface,
+            background: theme.colors.surface,
             border: `1px solid ${theme.colors.border}`,
             borderRadius: '4px',
             padding: '10px',
@@ -780,7 +789,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
         >
           <div
             style={{
-              backgroundColor: theme.colors.background,
+              background: theme.colors.background,
               border: `1px solid ${theme.colors.border}`,
               borderRadius: '8px',
               padding: '24px',
@@ -800,7 +809,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                 onClick={() => setDeleteConfirm(null)}
                 style={{
                   padding: '8px 16px',
-                  backgroundColor: theme.colors.surface,
+                  background: theme.colors.surface,
                   color: theme.colors.text,
                   border: `1px solid ${theme.colors.border}`,
                   borderRadius: '4px',
