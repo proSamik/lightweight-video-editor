@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AISettings, AIModel } from '../../types';
 import { useTheme } from '../contexts/ThemeContext';
-import { Button, IconButton } from './ui';
+import { Button, IconButton, LiquidModal } from './ui';
 import { 
   FiX, 
   FiSettings
@@ -141,55 +141,14 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
   };
 
   return (
-    <div style={modalStyle} onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div style={contentStyle}>
-        {/* Modal Header */}
-        <div style={{
-          padding: '24px 32px',
-          borderBottom: `1px solid ${theme.colors.border}`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          background: theme.colors.modal.background
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{
-              width: '40px',
-              height: '40px',
-              backgroundColor: theme.colors.primary,
-              borderRadius: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <FiSettings size={20} color={theme.colors.primaryForeground} />
-            </div>
-            <div>
-              <h2 style={{ 
-                margin: 0, 
-                fontSize: '24px', 
-                fontWeight: '600', 
-                lineHeight: '1.2'
-              }}>
-                AI Settings
-              </h2>
-              <p style={{
-                margin: '2px 0 0 0',
-                fontSize: '14px',
-                color: theme.colors.textSecondary
-              }}>
-                Configure AI providers and custom prompts
-              </p>
-            </div>
-          </div>
-          <IconButton
-            icon={<FiX size={18} />}
-            onClick={onClose}
-            variant="ghost"
-            size="sm"
-            aria-label="Close modal"
-          />
-        </div>
+    <LiquidModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="AI Settings"
+      subtitle="Configure AI providers and custom prompts"
+      icon={<FiSettings size={24} color="white" />}
+      maxWidth="600px"
+    >
 
         {/* Modal Content */}
         <div style={{ padding: '32px', background: theme.colors.modal.background }}>
@@ -549,8 +508,7 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
             Save Settings
           </Button>
         </div>
-      </div>
-    </div>
+    </LiquidModal>
   );
 };
 
