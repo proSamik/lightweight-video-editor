@@ -248,9 +248,9 @@ const lightTheme: Theme = {
     // Component-specific - Blue-Heavy Design (Canva-Inspired)
     button: {
       ghost: 'transparent',
-      ghostHover: '#F0F4F8',      // Light blue-gray hover
+      ghostHover: 'linear-gradient(135deg, #F0F4F8 0%, #E2E8F0 100%)',      // Light blue-gray gradient hover
       outline: 'transparent',
-      outlineHover: '#DBEAFE',    // Blue-100 emphasis
+      outlineHover: 'linear-gradient(135deg, #DBEAFE 0%, #C7D2FE 100%)',    // Blue gradient emphasis
       destructive: '#EF4444',     // Red-500
       destructiveHover: '#DC2626', // Red-600
     },
