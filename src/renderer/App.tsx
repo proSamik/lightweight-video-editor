@@ -38,6 +38,7 @@ const AppContent: React.FC = () => {
   const { theme } = useTheme();
   const [videoFile, setVideoFile] = useState<VideoFile | null>(null);
   const [replacementAudioPath, setReplacementAudioPath] = useState<string | null>(null);
+  const [extractedAudioPath, setExtractedAudioPath] = useState<string | null>(null);
   const [captions, setCaptions] = useState<CaptionSegment[]>([]);
   const [originalCaptions, setOriginalCaptions] = useState<CaptionSegment[]>([]);
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
@@ -282,7 +283,20 @@ const AppContent: React.FC = () => {
       // Start background transcription without blocking UI
       setTranscriptionStatus({ isTranscribing: true, progress: 0, message: 'Extracting audio...' });
       
-      const audioPath = await window.electronAPI.extractAudio(videoPath);
+      // Get current project path - if not saved yet, we'll save after extraction
+      let projectPath = currentProjectInfo.projectPath;
+      
+      let audioPath: string;
+      
+      if (projectPath) {
+        // Extract high-quality audio for the project (this will be saved for waveforms)
+        audioPath = await window.electronAPI.extractAudioForProject(videoPath, projectPath);
+        // Store the extracted audio path for later use with waveforms
+        setExtractedAudioPath(audioPath);
+      } else {
+        // Fallback to temporary audio extraction if no project is saved yet
+        audioPath = await window.electronAPI.extractAudio(videoPath);
+      }
       
       setTranscriptionStatus({ isTranscribing: true, progress: 20, message: 'Transcribing audio (this may take a few minutes)...' });
       
@@ -347,6 +361,21 @@ const AppContent: React.FC = () => {
       
       setCaptions(captionSegments);
       setOriginalCaptions([...captionSegments]); // Save original captions for comparison
+      
+      // If we extracted audio for a project, save the project to persist the audio path
+      if (projectPath) {
+        try {
+          setTranscriptionStatus({ isTranscribing: true, progress: 97, message: 'Saving project...' });
+          // The project data will be updated with the extractedAudioPath state which was set above
+          const projectData = getCurrentProjectData();
+          await window.electronAPI.saveProject(projectData);
+          await loadCurrentProjectInfo(); // Refresh project info
+          console.log('Project saved with extracted audio path');
+        } catch (error) {
+          console.warn('Failed to auto-save project with extracted audio:', error);
+          // Don't fail the transcription for this
+        }
+      }
       
       // Small delay to show completion before hiding
       setTimeout(() => {
@@ -578,6 +607,7 @@ const AppContent: React.FC = () => {
       captions,
       timeline: [], // Empty for now, could be used for timeline selections
       replacementAudioPath,
+      extractedAudioPath, // Include the extracted audio path for waveforms
       lastModified: Date.now(),
       description: generatedContent?.description,
       title: generatedContent?.titles?.[0]?.title,
@@ -760,8 +790,33 @@ const AppContent: React.FC = () => {
     setCaptions(projectData.captions);
     setOriginalCaptions([...projectData.captions]);
     setReplacementAudioPath(projectData.replacementAudioPath || null);
+    setExtractedAudioPath(projectData.extractedAudioPath || null); // Restore extracted audio path for waveforms
     setSelectedSegmentId(null);
     setCurrentTime(0);
+
+    // If no extracted audio exists but we have captions and a video file, 
+    // extract audio for better waveform performance
+    if (!projectData.extractedAudioPath && projectData.videoFile && projectData.captions.length > 0) {
+      const currentProjectPath = await window.electronAPI.getCurrentProjectInfo();
+      if (currentProjectPath.projectPath) {
+        console.log('No extracted audio found for existing project, extracting audio for waveforms...');
+        try {
+          const extractedPath = await window.electronAPI.extractAudioForProject(
+            projectData.videoFile.path, 
+            currentProjectPath.projectPath
+          );
+          setExtractedAudioPath(extractedPath);
+          
+          // Auto-save the project with the new extracted audio path
+          const updatedProjectData = { ...projectData, extractedAudioPath: extractedPath };
+          await window.electronAPI.saveProject(updatedProjectData);
+          console.log('Extracted audio for existing project:', extractedPath);
+        } catch (error) {
+          console.warn('Failed to extract audio for existing project:', error);
+          // Don't fail the project loading for this
+        }
+      }
+    }
 
     // Restore AI generated content
     if (projectData.description || projectData.aiGeneratedTitles || projectData.tweets || projectData.thumbnails) {
