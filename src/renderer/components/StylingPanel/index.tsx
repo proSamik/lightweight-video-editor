@@ -310,7 +310,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
               Styling Controls
             </h3>
             <Button
-              variant="outline"
+              variant="primary"
               size="sm"
               onClick={() => onApplyToAll && onApplyToAll(selectedSegment.style)}
               disabled={!onApplyToAll}
