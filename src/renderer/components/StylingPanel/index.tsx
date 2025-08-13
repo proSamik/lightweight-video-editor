@@ -181,15 +181,16 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
     }
   };
 
-  // Main panel styles
+  // Main panel styles with blue accents
   const panelStyles: React.CSSProperties = {
     height: '100%',
-    backgroundColor: theme.colors.background,
+    backgroundColor: theme.colors.sidebar.background,
     borderRadius: borderRadius.lg,
-    border: `1px solid ${theme.colors.border}`,
+    border: `1px solid ${theme.colors.borderFocus}20`,
     overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',
+    boxShadow: theme.shadows.sm,
   };
 
   const headerStyles: React.CSSProperties = {
@@ -202,6 +203,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
     flex: 1,
     padding: spacing['2xl'],
     overflowY: 'auto',
+    backgroundColor: theme.colors.sidebar.background,
   };
 
   const emptyStateStyles: React.CSSProperties = {
@@ -235,19 +237,21 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
           
           <div style={emptyStateStyles}>
             <div style={{
-              width: 64,
-              height: 64,
+              width: 80,
+              height: 80,
               borderRadius: '50%',
-              backgroundColor: theme.colors.surfaceHover,
+              backgroundColor: theme.colors.primary,
+              background: `linear-gradient(135deg, ${theme.colors.primary}, ${theme.colors.secondary})`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              marginBottom: spacing.md,
+              marginBottom: spacing.lg,
+              boxShadow: `0 8px 24px ${theme.colors.primary}30`,
             }}>
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
                 <path 
                   d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" 
-                  stroke={theme.colors.textMuted} 
+                  stroke="white" 
                   strokeWidth="2" 
                   strokeLinecap="round" 
                   strokeLinejoin="round"
@@ -256,10 +260,10 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
             </div>
             <h4 style={{ 
               margin: 0, 
-              fontSize: typography.fontSize.lg,
-              fontWeight: typography.fontWeight.medium,
+              fontSize: typography.fontSize.xl,
+              fontWeight: typography.fontWeight.semibold,
               color: theme.colors.text,
-              marginBottom: spacing.xs,
+              marginBottom: spacing.sm,
             }}>
               No Caption Selected
             </h4>
@@ -267,10 +271,25 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
               margin: 0, 
               fontSize: typography.fontSize.base,
               lineHeight: typography.lineHeight.relaxed,
-              maxWidth: 280,
+              maxWidth: 320,
+              color: theme.colors.textSecondary,
             }}>
               Select a caption segment from the timeline to edit its style and content
             </p>
+            
+            {/* Blue accent decoration */}
+            <div style={{
+              marginTop: spacing.xl,
+              padding: `${spacing.md}px ${spacing.lg}px`,
+              backgroundColor: theme.colors.primarySubtle,
+              borderRadius: borderRadius.md,
+              border: `1px solid ${theme.colors.primary}20`,
+              fontSize: typography.fontSize.sm,
+              color: theme.colors.primary,
+              fontWeight: typography.fontWeight.medium,
+            }}>
+              💡 Double-click any timeline segment to begin editing
+            </div>
           </div>
         </div>
       </div>
@@ -314,10 +333,11 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
             {selectedSegment.words && selectedSegment.words.length > 0 && (
               <div style={{
                 padding: `${spacing.lg}px`,
-                backgroundColor: theme.colors.surface,
+                backgroundColor: theme.colors.background,
                 borderRadius: borderRadius.lg,
                 border: `1px solid ${theme.colors.border}`,
-                margin: `0 -${spacing.md}px`
+                margin: `0 -${spacing.md}px`,
+                boxShadow: theme.shadows.sm
               }}>
                 <WordLevelEditor
                   words={selectedSegment.words}
