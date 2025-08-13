@@ -137,7 +137,7 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
     maxHeight: '90vh',
     overflowY: 'auto',
     color: theme.colors.text,
-    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+    boxShadow: theme.colors.modal.shadow,
   };
 
   return (
@@ -149,7 +149,8 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
           borderBottom: `1px solid ${theme.colors.border}`,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between'
+          justifyContent: 'space-between',
+          background: theme.colors.modal.background
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{
@@ -191,7 +192,7 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
         </div>
 
         {/* Modal Content */}
-        <div style={{ padding: '32px' }}>
+        <div style={{ padding: '32px', background: theme.colors.modal.background }}>
 
         {/* Provider Selection */}
         <div style={{ marginBottom: '32px' }}>
@@ -217,7 +218,7 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
             style={{
               width: '100%',
               padding: '12px 16px',
-              backgroundColor: theme.colors.input.background,
+              backgroundColor: theme.colors.modal.background,
               color: theme.colors.text,
               border: `1px solid ${theme.colors.border}`,
               borderRadius: '8px',
@@ -227,11 +228,11 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
             }}
             onFocus={(e) => {
               e.currentTarget.style.borderColor = theme.colors.borderFocus;
-              e.currentTarget.style.backgroundColor = theme.colors.input.backgroundFocus;
+              e.currentTarget.style.backgroundColor = theme.colors.modal.background;
             }}
             onBlur={(e) => {
               e.currentTarget.style.borderColor = theme.colors.border;
-              e.currentTarget.style.backgroundColor = theme.colors.input.background;
+              e.currentTarget.style.backgroundColor = theme.colors.modal.background;
             }}
           >
             <option value="anthropic">Anthropic (Claude)</option>
@@ -262,7 +263,7 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
               style={{
                 width: '100%',
                 padding: '10px',
-                backgroundColor: theme.colors.background,
+                backgroundColor: theme.colors.modal.background,
                 color: theme.colors.text,
                 border: `1px solid ${theme.colors.border}`,
                 borderRadius: '4px',
@@ -296,7 +297,7 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
               style={{
                 width: '100%',
                 padding: '10px',
-                backgroundColor: theme.colors.background,
+                backgroundColor: theme.colors.modal.background,
                 color: theme.colors.text,
                 border: `1px solid ${theme.colors.border}`,
                 borderRadius: '4px',
@@ -330,7 +331,7 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
               style={{
                 width: '100%',
                 padding: '10px',
-                backgroundColor: theme.colors.background,
+                backgroundColor: theme.colors.modal.background,
                 color: theme.colors.text,
                 border: `1px solid ${theme.colors.border}`,
                 borderRadius: '4px',
@@ -361,7 +362,7 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
                 style={{
                   width: '100%',
                   padding: '10px',
-                  backgroundColor: theme.colors.background,
+                  backgroundColor: theme.colors.modal.background,
                   color: theme.colors.text,
                   border: `1px solid ${theme.colors.border}`,
                   borderRadius: '4px',
@@ -381,7 +382,7 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
             ) : (
               <div style={{
                 padding: '10px',
-                backgroundColor: theme.colors.background,
+                backgroundColor: theme.colors.modal.background,
                 border: `1px solid ${theme.colors.border}`,
                 borderRadius: '4px',
                 fontSize: '12px',
@@ -442,7 +443,7 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
             style={{
               width: '100%',
               padding: '10px',
-              backgroundColor: theme.colors.background,
+              backgroundColor: theme.colors.modal.background,
               color: theme.colors.text,
               border: `1px solid ${theme.colors.border}`,
               borderRadius: '4px',
@@ -467,7 +468,7 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
             style={{
               width: '100%',
               padding: '10px',
-              backgroundColor: theme.colors.background,
+              backgroundColor: theme.colors.modal.background,
               color: theme.colors.text,
               border: `1px solid ${theme.colors.border}`,
               borderRadius: '4px',
@@ -492,7 +493,7 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
             style={{
               width: '100%',
               padding: '10px',
-              backgroundColor: theme.colors.background,
+              backgroundColor: theme.colors.modal.background,
               color: theme.colors.text,
               border: `1px solid ${theme.colors.border}`,
               borderRadius: '4px',
@@ -517,7 +518,7 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
             style={{
               width: '100%',
               padding: '10px',
-              backgroundColor: theme.colors.background,
+              backgroundColor: theme.colors.modal.background,
               color: theme.colors.text,
               border: `1px solid ${theme.colors.border}`,
               borderRadius: '4px',
