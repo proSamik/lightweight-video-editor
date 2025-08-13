@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { SaveProjectIcon } from './IconComponents';
 import { ProjectData } from '../../types';
-import { FiX, FiPlay, FiTrash2, FiCalendar, FiVideo, FiEdit3, FiCheck, FiX as FiXIcon } from 'react-icons/fi';
+import { LiquidModal } from './ui';
+import { FiX, FiPlay, FiTrash2, FiCalendar, FiVideo, FiEdit3, FiCheck, FiFolder } from 'react-icons/fi';
 
 interface ProjectManagerProps {
   isOpen: boolean;
@@ -134,77 +135,14 @@ const ProjectManagerModal: React.FC<ProjectManagerProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: theme.colors.modal.overlay,
-      backdropFilter: 'blur(4px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000,
-      padding: '20px'
-    }}>
-      <div style={{
-        backgroundColor: theme.colors.modal.background,
-        borderRadius: '12px',
-        padding: '0',
-        minWidth: '700px',
-        maxWidth: '900px',
-        maxHeight: '85vh',
-        border: `1px solid ${theme.colors.modal.border}`,
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-      }}>
-        {/* Header */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '24px 32px',
-          borderBottom: `1px solid ${theme.colors.border}`,
-          backgroundColor: theme.colors.background
-        }}>
-          <h2 style={{ 
-            margin: 0, 
-            fontSize: '20px', 
-            fontWeight: '600',
-            color: theme.colors.text 
-          }}>
-            Project Manager
-          </h2>
-          <button
-            onClick={onClose}
-            style={{
-              padding: '8px',
-              backgroundColor: 'transparent',
-              border: `1px solid ${theme.colors.border}`,
-              borderRadius: '6px',
-              color: theme.colors.textSecondary,
-              cursor: 'pointer',
-              fontSize: '14px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.15s ease'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
-              e.currentTarget.style.color = theme.colors.text;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-              e.currentTarget.style.color = theme.colors.textSecondary;
-            }}
-          >
-            <FiX size={16} />
-          </button>
-        </div>
+    <LiquidModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Project Manager"
+      subtitle="Manage your video editing projects"
+      icon={<SaveProjectIcon size={24} />}
+      maxWidth="900px"
+    >
 
         {/* Tabs */}
         <div style={{
@@ -399,7 +337,7 @@ const ProjectManagerModal: React.FC<ProjectManagerProps> = ({
                                 justifyContent: 'center'
                               }}
                             >
-                              <FiXIcon size={14} />
+                              <FiX size={14} />
                             </button>
                           </div>
                         ) : (
@@ -646,8 +584,7 @@ const ProjectManagerModal: React.FC<ProjectManagerProps> = ({
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </LiquidModal>
   );
 };
 
