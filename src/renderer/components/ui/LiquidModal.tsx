@@ -81,20 +81,21 @@ const LiquidModal: React.FC<LiquidModalProps> = ({
           width: '100%',
           maxWidth,
           maxHeight: '90vh',
-          overflowY: 'auto',
           boxShadow: `
             0 32px 64px rgba(0, 0, 0, 0.12),
             0 8px 32px rgba(59, 130, 246, 0.08),
             inset 0 1px 0 rgba(255, 255, 255, 0.4)
           `,
           position: 'relative',
-          overflow: 'hidden',
           backdropFilter: 'blur(20px)',
           animation: 'liquidSlideUp 0.4s ease-out',
-          color: theme.colors.text
+          color: theme.colors.text,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden'
         }}>
           
-          {/* Modal Header */}
+          {/* Modal Header - Fixed at top */}
           <div style={{
             padding: '24px 32px',
             borderBottom: `1px solid rgba(255, 255, 255, 0.1)`,
@@ -102,7 +103,10 @@ const LiquidModal: React.FC<LiquidModalProps> = ({
             alignItems: 'center',
             justifyContent: 'space-between',
             background: `linear-gradient(145deg, ${theme.colors.modal.background} 0%, rgba(255, 255, 255, 0.9) 100%)`,
-            position: 'relative'
+            position: 'sticky',
+            top: 0,
+            zIndex: 10,
+            flexShrink: 0
           }}>
             
             {/* Title Section */}
@@ -120,7 +124,8 @@ const LiquidModal: React.FC<LiquidModalProps> = ({
                     0 8px 32px rgba(59, 130, 246, 0.25),
                     inset 0 2px 4px rgba(255, 255, 255, 0.3)
                   `,
-                  flexShrink: 0
+                  flexShrink: 0,
+                  color: 'white'
                 }}>
                   {icon}
                 </div>
@@ -131,10 +136,7 @@ const LiquidModal: React.FC<LiquidModalProps> = ({
                   margin: '0 0 4px 0',
                   fontSize: '24px',
                   fontWeight: '800',
-                  background: `linear-gradient(135deg, ${theme.colors.text} 0%, #374151 100%)`,
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  backgroundClip: 'text',
+                  color: theme.colors.text,
                   lineHeight: '1.2',
                   letterSpacing: '-0.5px'
                 }}>
@@ -170,11 +172,12 @@ const LiquidModal: React.FC<LiquidModalProps> = ({
             )}
           </div>
           
-          {/* Modal Content */}
+          {/* Modal Content - Scrollable */}
           <div style={{
             background: `linear-gradient(145deg, ${theme.colors.modal.background} 0%, rgba(255, 255, 255, 0.95) 100%)`,
             flex: 1,
-            overflow: 'auto'
+            overflowY: 'auto',
+            minHeight: 0
           }}>
             {children}
           </div>
