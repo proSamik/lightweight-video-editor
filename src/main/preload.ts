@@ -15,6 +15,8 @@ const electronAPI = {
   testWhisperInstallation: () => ipcRenderer.invoke('test-whisper-installation'),
   renderVideoWithCaptions: (videoPath: string, captionsData: any[], outputPath: string, exportSettings?: any, replacementAudioPath?: string) => 
     ipcRenderer.invoke('render-video-with-captions', videoPath, captionsData, outputPath, exportSettings, replacementAudioPath),
+  exportVideoWithNewAudio: (videoPath: string, newAudioPath: string, outputPath: string) =>
+    ipcRenderer.invoke('export-video-with-new-audio', videoPath, newAudioPath, outputPath),
   handleFileDrop: (filePath: string) => ipcRenderer.invoke('handle-file-drop', filePath),
   onFileDropped: (callback: (filePath: string) => void) => {
     ipcRenderer.on('file-dropped', (_event, filePath) => callback(filePath));
