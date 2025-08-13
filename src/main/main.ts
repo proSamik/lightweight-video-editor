@@ -296,19 +296,11 @@ ipcMain.handle('select-audio-file', async () => {
 
 ipcMain.handle('export-audio', async (_event, videoPath: string, outputName?: string) => {
   const result = await dialog.showSaveDialog(mainWindow, {
-    defaultPath: outputName || 'extracted_audio.mp3',
+    defaultPath: outputName || 'extracted_audio.wav',
     filters: [
-      {
-        name: 'MP3 Audio',
-        extensions: ['mp3'],
-      },
       {
         name: 'WAV Audio',
         extensions: ['wav'],
-      },
-      {
-        name: 'All Audio Files',
-        extensions: ['mp3', 'wav', 'aac', 'm4a'],
       },
     ],
   });
