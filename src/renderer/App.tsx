@@ -37,6 +37,7 @@ const AppContent: React.FC = () => {
   const { theme } = useTheme();
   const [videoFile, setVideoFile] = useState<VideoFile | null>(null);
   const [replacementAudioPath, setReplacementAudioPath] = useState<string | null>(null);
+  const [isAudioPreviewEnabled, setIsAudioPreviewEnabled] = useState(true);
   const [extractedAudioPath, setExtractedAudioPath] = useState<string | null>(null);
   const [captions, setCaptions] = useState<CaptionSegment[]>([]);
   const [originalCaptions, setOriginalCaptions] = useState<CaptionSegment[]>([]);
@@ -1497,6 +1498,8 @@ const AppContent: React.FC = () => {
                   onPlayPause={handlePlayPause}
                   isPlaying={isPlaying}
                   onSegmentSelect={setSelectedSegmentId}
+                  replacementAudioPath={replacementAudioPath}
+                  isAudioPreviewEnabled={isAudioPreviewEnabled}
                 />
                 
                 {/* Unified Timeline - Only show when video is loaded */}
@@ -1516,6 +1519,8 @@ const AppContent: React.FC = () => {
                   onRedo={redo}
                   canUndo={historyIndex > 0}
                   canRedo={historyIndex < history.length - 1}
+                  replacementAudioPath={replacementAudioPath}
+                  onAudioPreviewToggle={setIsAudioPreviewEnabled}
                 />
               </Card>
 
@@ -1569,6 +1574,8 @@ const AppContent: React.FC = () => {
                 onPlayPause={handlePlayPause}
                 isPlaying={isPlaying}
                 onSegmentSelect={setSelectedSegmentId}
+                replacementAudioPath={replacementAudioPath}
+                isAudioPreviewEnabled={isAudioPreviewEnabled}
               />
             </div>
           )}
