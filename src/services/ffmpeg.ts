@@ -199,6 +199,42 @@ export class FFmpegService {
     });
   }
 
+  /**
+   * Extracts high-quality audio for project storage and waveform generation
+   * This creates a persistent audio file that can be used for both transcription and waveforms
+   */
+  public async extractAudioForProject(videoPath: string, projectDir: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      // Ensure the project directory exists
+      if (!fs.existsSync(projectDir)) {
+        fs.mkdirSync(projectDir, { recursive: true });
+      }
+      
+      // Create audio filename based on video file
+      const videoBaseName = path.basename(videoPath, path.extname(videoPath));
+      const audioFileName = `${videoBaseName}_extracted.wav`;
+      const audioPath = path.join(projectDir, audioFileName);
+      
+      console.log(`Extracting audio for project: ${videoPath} -> ${audioPath}`);
+      
+      ffmpeg(videoPath)
+        .audioCodec('pcm_s16le') // High quality uncompressed audio for best waveform quality
+        .audioChannels(2) // Keep stereo for better waveform visualization
+        .audioFrequency(44100) // Standard sample rate for good quality
+        .format('wav')
+        .output(audioPath)
+        .on('end', () => {
+          console.log(`Audio extracted successfully: ${audioPath}`);
+          resolve(audioPath);
+        })
+        .on('error', (err: any) => {
+          console.error('Error extracting audio for project:', err);
+          reject(err);
+        })
+        .run();
+    });
+  }
+
   public async exportVideoWithNewAudio(
     videoPath: string,
     newAudioPath: string,
