@@ -25,7 +25,8 @@ import {
   MusicExportIcon,
   CloseIcon,
   ExportSrtIcon,
-  ExportVideoIcon
+  ExportVideoIcon,
+  ExportVideoWithNewAudioIcon
 } from './components/IconComponents';
 
 interface AppState {
@@ -711,6 +712,43 @@ const AppContent: React.FC = () => {
       await window.electronAPI.showItemInFolder(exportedSrtPath);
     } catch (error) {
       console.error('Failed to show SRT in finder:', error);
+    }
+  };
+
+  const handleExportVideoWithNewAudio = async () => {
+    if (!videoFile || !replacementAudioPath) {
+      alert('Video file and replacement audio are required for this export.');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setLoadingMessage('Exporting video with new audio...');
+      setLoadingProgress(0);
+
+      // Create output path in same directory as video file
+      const videoDir = videoFile.path.substring(0, videoFile.path.lastIndexOf('/'));
+      const videoName = videoFile.name.replace(/\.[^/.]+$/, '');
+      const outputPath = `${videoDir}/${videoName}_with_new_audio.mp4`;
+
+      // Use the new FFmpeg service method
+      await window.electronAPI.exportVideoWithNewAudio(
+        videoFile.path,
+        replacementAudioPath,
+        outputPath
+      );
+
+      setIsLoading(false);
+      setLoadingProgress(undefined);
+      
+      // Show success modal
+      setExportedFilePath(outputPath);
+      setShowSuccessModal(true);
+    } catch (error) {
+      console.error('Export with new audio failed:', error);
+      setIsLoading(false);
+      setLoadingProgress(undefined);
+      alert(`Export failed: ${error}`);
     }
   };
 
@@ -1447,6 +1485,37 @@ const AppContent: React.FC = () => {
             >
               <ExportVideoIcon size={16} />
             </button>
+            {replacementAudioPath && (
+              <button
+                onClick={handleExportVideoWithNewAudio}
+                disabled={!videoFile}
+                style={{
+                  padding: '8px',
+                  backgroundColor: 'transparent',
+                  color: videoFile ? theme.colors.text : theme.colors.textMuted,
+                  border: `1px solid ${theme.colors.border}`,
+                  borderRadius: '6px',
+                  cursor: videoFile ? 'pointer' : 'not-allowed',
+                  fontSize: '11px',
+                  opacity: videoFile ? 1 : 0.5,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  if (videoFile) {
+                    e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+                title="Export Video with New Audio (No Subtitles)"
+              >
+                <ExportVideoWithNewAudioIcon size={16} />
+              </button>
+            )}
           </div>
         </div>
       </div>
