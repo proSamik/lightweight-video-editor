@@ -97,6 +97,7 @@ export enum ColorOption {
 export interface ExportSettings {
   framerate: 30 | 60;
   quality: 'fast' | 'balanced' | 'high';
+  exportMode: 'complete' | 'newAudio' | 'subtitlesOnly';
 }
 
 export interface SearchResult {
