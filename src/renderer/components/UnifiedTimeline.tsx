@@ -11,7 +11,7 @@ import {
   FiTrash2,
   FiMaximize2
 } from 'react-icons/fi';
-import WaveSurfer from 'wavesurfer.js';
+
 
 interface UnifiedTimelineProps {
   captions: CaptionSegment[];
@@ -32,8 +32,9 @@ interface UnifiedTimelineProps {
 }
 
 /**
- * UnifiedTimeline component - A comprehensive timeline interface for video editing
- * Features: audio waveform visualization, caption segments, playback controls, and timeline scrubbing
+ * UnifiedTimeline component - Clean architecture with proper parent-child relationship
+ * Parent controls all scroll, zoom, and interaction behavior
+ * Timeline component with scroll, zoom, and interaction controls
  */
 const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   captions,
@@ -42,9 +43,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   onSegmentSelect,
   onTimeSeek,
   onSegmentDelete,
-  onCaptionUpdate,
   videoFile,
-  onReTranscribeSegment,
   onPlayPause,
   isPlaying = false,
   onUndo,
@@ -54,22 +53,16 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
 }) => {
   const { theme } = useTheme();
   const timelineRef = useRef<HTMLDivElement>(null);
-  const waveformRef = useRef<HTMLDivElement>(null);
-  const wavesurferRef = useRef<WaveSurfer | null>(null);
   const timelineContainerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [dragStartX, setDragStartX] = useState(0);
-  const [hoveredSegmentId, setHoveredSegmentId] = useState<string | null>(null);
+
   const [contextMenu, setContextMenu] = useState<{x: number, y: number, segmentId: string} | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{segmentId: string, text: string} | null>(null);
-  const [isWaveformLoading, setIsWaveformLoading] = useState(false);
-  const [zoomLevel, setZoomLevel] = useState(1); // 1 = fit to window, >1 = zoomed in
+  const [zoomLevel, setZoomLevel] = useState(0);
 
   // Timeline dimensions
-  const TIMELINE_HEIGHT = 180;
-const WAVEFORM_HEIGHT = 100;
-  const CAPTION_TRACK_HEIGHT = 40;
-  const SCRUBBER_HEIGHT = 20;
+  const TIMELINE_HEIGHT = 160;
+  const CAPTION_TRACK_HEIGHT = 140;
 
   // Use video duration if available, otherwise fallback to caption duration
   const actualDuration = videoFile?.duration 
@@ -77,9 +70,6 @@ const WAVEFORM_HEIGHT = 100;
     : captions.length > 0 
       ? Math.max(...captions.map(c => c.endTime))
       : 60000; // Default 1 minute
-      
-  // Apply zoom level to create virtual timeline width
-  const totalDuration = actualDuration * zoomLevel;
 
   /**
    * Format time display in MM:SS.ms format
@@ -104,7 +94,7 @@ const WAVEFORM_HEIGHT = 100;
     const seekTime = percentage * actualDuration; // Use actual duration for seeking
     
     setIsDragging(true);
-    setDragStartX(clickX);
+
     onTimeSeek(seekTime);
   };
 
@@ -120,7 +110,7 @@ const WAVEFORM_HEIGHT = 100;
     const seekTime = percentage * actualDuration; // Use actual duration for seeking
     
     onTimeSeek(seekTime);
-  }, [isDragging, totalDuration, onTimeSeek]);
+  }, [isDragging, actualDuration, onTimeSeek]);
 
   /**
    * Handle timeline mouse up to stop dragging
@@ -147,46 +137,33 @@ const WAVEFORM_HEIGHT = 100;
    */
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger shortcuts if user is typing in an input field
-      const target = e.target as HTMLElement;
-      const isInputField = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.contentEditable === 'true';
+      if (selectedSegmentId) {
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+          e.preventDefault();
+          onSegmentDelete(selectedSegmentId);
+        }
+      }
       
-      if (isInputField) {
-        return;
+      if (e.key === ' ') {
+        e.preventDefault();
+        onPlayPause?.();
       }
 
-      if (e.key === 'Escape') {
-        setContextMenu(null);
-      } else if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (selectedSegmentId) {
-          const segment = captions.find(c => c.id === selectedSegmentId);
-          if (segment) {
-            setDeleteConfirm({
-              segmentId: selectedSegmentId,
-              text: segment.text
-            });
-          }
-        }
-      } else if (e.key === ' ' || e.code === 'Space') {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
         e.preventDefault();
-        if (onPlayPause) {
-          onPlayPause();
-        }
-      } else if (e.key === 'z' && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
-        e.preventDefault();
-        if (onUndo && canUndo) {
-          onUndo();
-        }
-      } else if (e.key === 'z' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
-        e.preventDefault();
-        if (onRedo && canRedo) {
-          onRedo();
+        if (e.shiftKey) {
+          if (canRedo) onRedo?.();
+        } else {
+          if (canUndo) onUndo?.();
         }
       }
     };
 
-    const handleClick = () => {
-      setContextMenu(null);
+    const handleClick = (e: MouseEvent) => {
+      // Close context menu on outside click
+      if (contextMenu) {
+        setContextMenu(null);
+      }
     };
 
     document.addEventListener('keydown', handleKeyDown);
@@ -196,142 +173,34 @@ const WAVEFORM_HEIGHT = 100;
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('click', handleClick);
     };
-  }, [selectedSegmentId, onSegmentDelete, onPlayPause, onUndo, onRedo, canUndo, canRedo]);
+  }, [selectedSegmentId, onSegmentDelete, onPlayPause, onUndo, onRedo, canUndo, canRedo, contextMenu]);
 
   /**
-   * Initialize WaveSurfer for audio waveform generation
+   * Update container width when timeline container changes
    */
   useEffect(() => {
-    // Clean up existing WaveSurfer instance if videoFile changes
-    if (wavesurferRef.current) {
-      wavesurferRef.current.destroy();
-      wavesurferRef.current = null;
-    }
-
-    if (videoFile && waveformRef.current) {
-      setIsWaveformLoading(true);
-      
-      // Initialize WaveSurfer
-      const wavesurfer = WaveSurfer.create({
-        container: waveformRef.current,
-        waveColor: theme.colors.primary,
-        progressColor: theme.colors.accent,
-        cursorColor: 'transparent',
-        barWidth: 2,
-        barGap: 1,
-        barRadius: 2,
-        height: WAVEFORM_HEIGHT,
-        normalize: true,
-        fillParent: true,
-        hideScrollbar: true,
-        interact: false, // Disable interaction since we handle timeline scrubbing
-      });
-
-      wavesurferRef.current = wavesurfer;
-
-      // Load audio from video file using Electron API
-      const loadWaveform = async () => {
-        try {
-          // Try to get audio buffer first as it's more reliable for local files
-          console.log('Loading waveform from audio buffer...');
-          const audioBuffer = await window.electronAPI.getAudioBuffer(videoFile.path);
-          if (audioBuffer) {
-            // Convert buffer to blob for WaveSurfer
-            const blob = new Blob([audioBuffer], { type: 'audio/wav' });
-            wavesurfer.loadBlob(blob);
-            return;
-          }
-          
-          // Fallback to file URL method
-          console.log('Audio buffer failed, trying file URL...');
-          const fileUrl = await window.electronAPI.getFileUrl(videoFile.path);
-          if (fileUrl) {
-            console.log('Loading waveform from URL:', fileUrl);
-            // Create proper file:// URL for local files
-            const localFileUrl = fileUrl.startsWith('file://') ? fileUrl : `file://${fileUrl}`;
-            wavesurfer.load(localFileUrl);
-          } else {
-            throw new Error('Failed to get file URL for waveform');
-          }
-        } catch (error) {
-          console.error('Error loading waveform:', error);
-          console.error('Video file path:', videoFile.path);
-          console.error('This could be due to file format, permissions, or codec issues');
-          setIsWaveformLoading(false);
-          
-          // Show a user-friendly message that waveform couldn't be loaded but timeline still works
-          console.log('Waveform visualization unavailable - timeline will work without waveform');
+    if (timelineContainerRef.current) {
+      const updateWidth = () => {
+        if (timelineContainerRef.current) {
+          // setContainerWidth(timelineContainerRef.current.clientWidth);
         }
       };
       
-      loadWaveform();
-
-      // Handle waveform ready event
-      wavesurfer.on('ready', () => {
-        setIsWaveformLoading(false);
-      });
-
-      // Handle errors gracefully
-      wavesurfer.on('error', (err) => {
-        console.warn('WaveSurfer could not load waveform:', err.message || err);
-        console.log('Timeline will continue to work without waveform visualization');
-        setIsWaveformLoading(false);
-        
-        // Clear the wavesurfer instance to prevent further errors
-        if (wavesurferRef.current) {
-          try {
-            wavesurferRef.current.destroy();
-          } catch (destroyErr) {
-            // Ignore destroy errors
-          }
-          wavesurferRef.current = null;
-        }
-      });
-
-      return () => {
-        if (wavesurferRef.current) {
-          wavesurferRef.current.destroy();
-          wavesurferRef.current = null;
-        }
-        setIsWaveformLoading(false);
-      };
+      updateWidth(); // Initial update
+      
+      const resizeObserver = new ResizeObserver(updateWidth);
+      resizeObserver.observe(timelineContainerRef.current);
+      
+      return () => resizeObserver.disconnect();
     }
-    
-    // Return empty cleanup function if conditions are not met
-    return () => {};
-  }, [videoFile?.path]); // Only depend on video file path, not theme colors
+    // No cleanup needed if no container
+    return undefined;
+  }, []);
 
   /**
-   * Update WaveSurfer colors when theme changes (without re-initializing)
+   * Auto-scroll timeline to keep playhead visible when zoomed
    */
   useEffect(() => {
-    if (wavesurferRef.current) {
-      // Update colors without re-initializing
-      wavesurferRef.current.setOptions({
-        waveColor: theme.colors.primary,
-        progressColor: theme.colors.accent,
-      });
-    }
-  }, [theme.colors.primary, theme.colors.accent]);
-
-  /**
-   * Update waveform progress based on current time and auto-scroll timeline
-   */
-  useEffect(() => {
-    if (wavesurferRef.current && actualDuration > 0 && !isWaveformLoading) {
-      try {
-        const duration = wavesurferRef.current.getDuration();
-        if (duration > 0) {
-          const progress = currentTime / actualDuration;
-          wavesurferRef.current.setTime(progress * duration);
-        }
-      } catch (error) {
-        // Silently handle wavesurfer errors - audio might not be loaded yet
-        console.debug('Wavesurfer setTime error (audio may not be loaded):', error);
-      }
-    }
-
-    // Auto-scroll timeline to keep playhead visible when zoomed
     if (timelineContainerRef.current && timelineRef.current && zoomLevel > 1) {
       const container = timelineContainerRef.current;
       const timeline = timelineRef.current;
@@ -360,22 +229,7 @@ const WAVEFORM_HEIGHT = 100;
         });
       }
     }
-  }, [currentTime, actualDuration, isWaveformLoading, zoomLevel]);
-  
-  /**
-   * Update waveform zoom when zoom level changes
-   */
-  useEffect(() => {
-    if (wavesurferRef.current && !isWaveformLoading) {
-      try {
-        // Force waveform to redraw with new zoom level
-        wavesurferRef.current.zoom(zoomLevel * 100); // WaveSurfer zoom takes pixels per second
-      } catch (error) {
-        // Silently handle wavesurfer errors - audio might not be loaded yet
-        console.debug('Wavesurfer zoom error (audio may not be loaded):', error);
-      }
-    }
-  }, [zoomLevel, isWaveformLoading]);
+  }, [currentTime, actualDuration, zoomLevel]);
 
   /**
    * Handle segment double click to select and seek to middle
@@ -385,55 +239,47 @@ const WAVEFORM_HEIGHT = 100;
     const middleTime = segment.startTime + ((segment.endTime - segment.startTime) / 2);
     onTimeSeek(middleTime);
   };
-  
+
   /**
-   * Handle segment single click to select and seek to middle
+   * Handle segment click to select
    */
   const handleSegmentClick = (segment: CaptionSegment) => {
     onSegmentSelect(segment.id);
-    const middleTime = segment.startTime + ((segment.endTime - segment.startTime) / 2);
-    onTimeSeek(middleTime);
   };
 
-
-
   return (
-    <div style={{
+    <div style={{ 
+      width: '100%', 
       height: `${TIMELINE_HEIGHT}px`,
       backgroundColor: theme.colors.background,
-      borderTop: `1px solid ${theme.colors.border}`,
-      position: 'relative',
+      border: `1px solid ${theme.colors.border}`,
+      borderRadius: '4px',
       overflow: 'hidden',
+      display: 'flex',
+      flexDirection: 'column',
+      paddingBottom: '10px'
     }}>
-      <style>
-        {`
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-        `}
-      </style>
-      {/* Timeline Header with Controls */}
-      <div style={{
+      {/* Timeline Controls */}
+      <div style={{ 
         height: '32px',
-        backgroundColor: theme.colors.background,
+        padding: '4px 8px',
+        borderBottom: `1px solid ${theme.colors.border}`,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '0 12px',
-        fontSize: '12px',
-        color: theme.colors.textSecondary,
-        borderBottom: `1px solid ${theme.colors.border}`
+        backgroundColor: theme.colors.surface
       }}>
-        {/* Left side - Time Display */}
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <span style={{ color: theme.colors.textSecondary, fontFamily: 'monospace' }}>
-            {formatTime(currentTime)} / {formatTime(actualDuration)}
-          </span>
+        {/* Time Display */}
+        <div style={{ 
+          fontSize: '11px', 
+          color: theme.colors.textSecondary,
+          fontWeight: '500'
+        }}>
+          {formatTime(currentTime)} / {formatTime(actualDuration)}
         </div>
 
-        {/* Center - Playback Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        {/* Control Buttons */}
+        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
           {/* Skip Backward */}
           <button
             onClick={() => onTimeSeek(Math.max(0, currentTime - 5000))}
@@ -534,7 +380,7 @@ const WAVEFORM_HEIGHT = 100;
             <input
               type="range"
               min="0.1"
-              max="20"
+              max="100"
               step="0.1"
               value={zoomLevel}
               onChange={(e) => setZoomLevel(parseFloat(e.target.value))}
@@ -546,10 +392,10 @@ const WAVEFORM_HEIGHT = 100;
                 cursor: 'pointer',
                 borderRadius: '4px',
               }}
-              title={`Zoom: ${Math.round(zoomLevel * 100)}%`}
+              title={`Zoom: ${Math.round((zoomLevel - 0.1) / (100 - 0.1) * 100)}/100`}
             />
             <span style={{ minWidth: '32px', fontSize: '10px' }}>
-              {Math.round(zoomLevel * 100)}%
+              {Math.round((zoomLevel - 0.1) / (100 - 0.1) * 100)}
             </span>
           </div>
           
@@ -560,6 +406,7 @@ const WAVEFORM_HEIGHT = 100;
             backgroundColor: theme.colors.border,
             margin: '0 4px'
           }} />
+
           {/* Undo/Redo Controls */}
           <button
             onClick={onUndo}
@@ -583,10 +430,8 @@ const WAVEFORM_HEIGHT = 100;
               }
             }}
             onMouseLeave={(e) => {
-              if (canUndo) {
-                e.currentTarget.style.backgroundColor = 'transparent';
-                e.currentTarget.style.color = theme.colors.textSecondary;
-              }
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = canUndo ? theme.colors.textSecondary : theme.colors.textMuted;
             }}
             title="Undo (Ctrl+Z)"
           >
@@ -615,10 +460,8 @@ const WAVEFORM_HEIGHT = 100;
               }
             }}
             onMouseLeave={(e) => {
-              if (canRedo) {
-                e.currentTarget.style.backgroundColor = 'transparent';
-                e.currentTarget.style.color = theme.colors.textSecondary;
-              }
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = canRedo ? theme.colors.textSecondary : theme.colors.textMuted;
             }}
             title="Redo (Ctrl+Shift+Z)"
           >
@@ -636,7 +479,6 @@ const WAVEFORM_HEIGHT = 100;
           {/* Fullscreen Button */}
           <button
             onClick={() => {
-              // Request fullscreen for the video preview container
               const videoPreviewContainer = document.querySelector('[data-video-preview]');
               if (videoPreviewContainer) {
                 if (document.fullscreenElement) {
@@ -682,13 +524,12 @@ const WAVEFORM_HEIGHT = 100;
           backgroundColor: theme.colors.background,
           overflowX: 'auto',
           overflowY: 'hidden',
-          paddingBottom: '8px',
         }}
       >
         <div 
           ref={timelineRef}
           style={{
-            height: '100%',
+            height: '95%',
             position: 'relative',
             cursor: isDragging ? 'grabbing' : 'pointer',
             backgroundColor: theme.colors.background,
@@ -698,150 +539,85 @@ const WAVEFORM_HEIGHT = 100;
           }}
           onMouseDown={handleTimelineMouseDown}
         >
-          {/* Waveform Background - Only show when video file is available */}
-          {videoFile && (
-            <div 
-              ref={waveformRef}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: `${WAVEFORM_HEIGHT}px`,
-                backgroundColor: theme.colors.background
-              }}
-            />
-          )}
           
-          {/* Loading indicator overlay */}
-          {videoFile && isWaveformLoading && (
-            <div style={{
+          {/* Current Time Indicator */}
+          <div
+            style={{
               position: 'absolute',
+              left: `${(currentTime / actualDuration) * 100}%`,
               top: 0,
-              left: 0,
-              width: '100%',
-              height: `${WAVEFORM_HEIGHT}px`,
-              backgroundColor: theme.colors.background,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 10
-            }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                color: theme.colors.textSecondary,
-                fontSize: '12px'
-              }}>
-                <div style={{
-                  width: '16px',
-                  height: '16px',
-                  border: `2px solid ${theme.colors.border}`,
-                  borderTop: `2px solid ${theme.colors.primary}`,
-                  borderRadius: '50%',
-                  animation: 'spin 1s linear infinite'
-                }} />
-                <span>Generating waveform...</span>
-              </div>
-            </div>
-          )}
-
-          {/* Scrubber/Playhead */}
-          <div style={{
-            position: 'absolute',
-            left: `${(currentTime / actualDuration) * 100}%`,  // Use actual duration for playhead position
-            top: 0,
-            bottom: 0,
-            width: '2px',
-            backgroundColor: theme.colors.error,
-            zIndex: 10,
-            pointerEvents: 'none',
-            boxShadow: '0 0 4px rgba(255, 68, 68, 0.5)'
-          }}>
-            {/* Playhead handle */}
-            <div style={{
-              position: 'absolute',
-              top: '-4px',
-              left: '-6px',
-              width: '14px',
-              height: '14px',
+              bottom: 0,
+              width: '2px',
               backgroundColor: theme.colors.error,
-              border: `2px solid ${theme.colors.text}`,
-              borderRadius: '50%',
-              cursor: 'grab'
-            }} />
-          </div>
-        
-        {/* Caption Segments */}
-        <div style={{
-          position: 'absolute',
-          top: `${WAVEFORM_HEIGHT + 8}px`,
-          left: 0,
-          right: 0,
-          height: `${CAPTION_TRACK_HEIGHT}px`,
-          pointerEvents: 'none'
-        }}>
-          {captions.map((segment) => {
-            const startPercent = (segment.startTime / actualDuration) * 100;
-            const widthPercent = ((segment.endTime - segment.startTime) / actualDuration) * 100;
-            const isSelected = segment.id === selectedSegmentId;
-            const isHovered = segment.id === hoveredSegmentId;
-            
-            return (
-              <div
-                key={segment.id}
-                style={{
-                  position: 'absolute',
-                  left: `${startPercent}%`,
-                  width: `${widthPercent}%`,
-                  height: '100%',
-                  backgroundColor: isSelected 
-                    ? theme.colors.primary 
-                    : isHovered 
-                      ? theme.colors.primaryHover 
-                      : theme.colors.surface,
-                  border: isSelected 
-                    ? `2px solid ${theme.colors.accent}` 
-                    : `1px solid ${theme.colors.border}`,
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  pointerEvents: 'all',
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: '0 4px',
-                  overflow: 'hidden',
-                  transition: 'all 0.2s ease',
-                  minWidth: '2px'
-                }}
-                onClick={() => handleSegmentClick(segment)}
-                onDoubleClick={() => handleSegmentDoubleClick(segment)}
-                onMouseEnter={() => setHoveredSegmentId(segment.id)}
-                onMouseLeave={() => setHoveredSegmentId(null)}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  setContextMenu({
-                    x: e.clientX,
-                    y: e.clientY,
-                    segmentId: segment.id
-                  });
-                }}
-                title={`${segment.text} (${formatTime(segment.startTime)} - ${formatTime(segment.endTime)})`}
-              >
-                <span style={{
-                  fontSize: '11px',
-                  color: isSelected ? theme.colors.primaryForeground : theme.colors.text,
-                  fontWeight: isSelected ? '600' : '400',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  lineHeight: '1.2'
-                }}>
-                  {segment.text}
-                </span>
-              </div>
-            );
-          })}
+              zIndex: 100,
+              pointerEvents: 'none'
+            }}
+          />
+
+          {/* Caption Segments */}
+          <div
+            style={{
+              position: 'absolute',
+              top: '8px',
+              left: 0,
+              right: 0,
+              height: `${CAPTION_TRACK_HEIGHT}px`,
+              zIndex: 10
+            }}
+          >
+            {captions.map((segment) => {
+              const left = (segment.startTime / actualDuration) * 100;
+              const width = ((segment.endTime - segment.startTime) / actualDuration) * 100;
+              const isSelected = segment.id === selectedSegmentId;
+              
+              return (
+                <div
+                  key={segment.id}
+                  style={{
+                    position: 'absolute',
+                    left: `${left}%`,
+                    width: `${width}%`,
+                    height: '100%',
+                    backgroundColor: isSelected ? theme.colors.secondary : theme.colors.surface,
+                    border: `1px solid ${isSelected ? theme.colors.primaryHover : theme.colors.border}`,
+                    borderRadius: '2px',
+                    padding: '4px 6px',
+                    fontSize: '11px',
+                    color: isSelected ? theme.colors.primaryForeground : theme.colors.text,
+                    cursor: 'pointer',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    alignItems: 'center',
+                    transition: 'opacity 0.15s ease',
+                    minWidth: '2px'
+                  }}
+                  onClick={() => handleSegmentClick(segment)}
+                  onDoubleClick={() => handleSegmentDoubleClick(segment)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setContextMenu({
+                      x: e.clientX,
+                      y: e.clientY,
+                      segmentId: segment.id
+                    });
+                  }}
+                  title={segment.text}
+                >
+                  <span style={{ 
+                    whiteSpace: 'normal', 
+                    overflow: 'hidden', 
+                    textOverflow: 'ellipsis',
+                    lineHeight: '1.2',
+                    fontSize: '11px',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 3,
+                    WebkitBoxOrient: 'vertical'
+                  }}>
+                    {segment.text}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -851,14 +627,13 @@ const WAVEFORM_HEIGHT = 100;
         <div
           style={{
             position: 'fixed',
-            left: contextMenu.x,
-            top: contextMenu.y,
-            backgroundColor: theme.colors.background,
+            left: `${contextMenu.x}px`,
+            top: `${contextMenu.y}px`,
+            backgroundColor: theme.colors.surface,
             border: `1px solid ${theme.colors.border}`,
             borderRadius: '4px',
-            padding: '4px 0',
+            padding: '10px',
             zIndex: 1000,
-            minWidth: '120px',
             boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
           }}
           onClick={(e) => e.stopPropagation()}
@@ -867,8 +642,9 @@ const WAVEFORM_HEIGHT = 100;
             style={{
               padding: '8px 12px',
               cursor: 'pointer',
-              fontSize: '12px',
               color: theme.colors.error,
+              fontSize: '12px',
+              borderRadius: '2px',
               display: 'flex',
               alignItems: 'center',
               gap: '8px'
@@ -880,18 +656,81 @@ const WAVEFORM_HEIGHT = 100;
                   segmentId: contextMenu.segmentId,
                   text: segment.text
                 });
+                setContextMenu(null);
               }
-              setContextMenu(null);
-            }}
-            onMouseEnter={(e) => {
-              (e.target as HTMLElement).style.backgroundColor = theme.colors.surfaceHover;
-            }}
-            onMouseLeave={(e) => {
-              (e.target as HTMLElement).style.backgroundColor = 'transparent';
             }}
           >
-            <FiTrash2 size={14} />
+            <FiTrash2 size={12} />
             Delete Segment
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation */}
+      {deleteConfirm && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2000
+          }}
+          onClick={() => setDeleteConfirm(null)}
+        >
+          <div
+            style={{
+              backgroundColor: theme.colors.background,
+              border: `1px solid ${theme.colors.border}`,
+              borderRadius: '8px',
+              padding: '24px',
+              maxWidth: '400px',
+              margin: '20px'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ margin: '0 0 16px 0', color: theme.colors.text }}>
+              Delete Caption Segment?
+            </h3>
+            <p style={{ margin: '0 0 20px 0', color: theme.colors.textSecondary }}>
+              "{deleteConfirm.text}"
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: theme.colors.surface,
+                  color: theme.colors.text,
+                  border: `1px solid ${theme.colors.border}`,
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  onSegmentDelete(deleteConfirm.segmentId);
+                  setDeleteConfirm(null);
+                }}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: theme.colors.error,
+                  color: theme.colors.errorForeground,
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                Delete
+              </button>
+            </div>
           </div>
         </div>
       )}
