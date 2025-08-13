@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { CaptionSegment, GeneratedContent } from '../../types';
-import { Button, IconButton } from './ui';
+import { Button, LiquidModal } from './ui';
 import { 
   FiCheckCircle, 
-  FiX, 
   FiFileText, 
   FiEdit3, 
   FiCopy, 
@@ -13,7 +12,8 @@ import {
   FiAlertTriangle,
   FiYoutube,
   FiTwitter,
-  FiImage
+  FiImage,
+  FiCpu
 } from 'react-icons/fi';
 
 interface AIContentModalProps {
@@ -193,77 +193,18 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
     }
   };
 
-  if (!isOpen) return null;
-
-  const modalStyle: React.CSSProperties = {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: theme.colors.modal.overlay,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000,
-    backdropFilter: 'blur(8px)',
-  };
-
-  const contentStyle: React.CSSProperties = {
-    backgroundColor: theme.colors.modal.background,
-    borderRadius: '12px',
-    border: `1px solid ${theme.colors.modal.border}`,
-    padding: '0',
-    width: '900px',
-    maxWidth: '95vw',
-    maxHeight: '90vh',
-    overflowY: 'auto',
-    color: theme.colors.text,
-    boxShadow: theme.colors.modal.shadow,
-  };
-
   return (
-    <div style={modalStyle} onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div style={contentStyle}>
-        {/* Modal Header */}
-        <div style={{
-          padding: '24px 32px',
-          borderBottom: `1px solid ${theme.colors.border}`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          background: theme.colors.modal.background
-        }}>
-          <div>
-            <h2 style={{ 
-              margin: 0, 
-              fontSize: '24px', 
-              fontWeight: '600', 
-              color: theme.colors.text,
-              lineHeight: '1.2'
-            }}>
-              AI Content Generation
-            </h2>
-            <p style={{
-              margin: '4px 0 0 0',
-              fontSize: '14px',
-              color: theme.colors.textSecondary,
-              fontWeight: '400'
-            }}>
-              Generate YouTube descriptions, titles, and more with AI
-            </p>
-          </div>
-          <IconButton
-            icon={<FiX size={18} />}
-            onClick={onClose}
-            variant="ghost"
-            size="sm"
-            aria-label="Close modal"
-          />
-        </div>
-
-        {/* Modal Content */}
-        <div style={{ padding: '32px', background: theme.colors.modal.background }}>
+    <>
+      <LiquidModal
+        isOpen={isOpen}
+        onClose={onClose}
+        title="AI Content Generation"
+        subtitle="Generate YouTube descriptions, titles, and more with AI"
+        icon={<FiCpu size={24} color="white" />}
+        maxWidth="900px"
+      >
+      {/* Modal Content */}
+      <div style={{ padding: '32px' }}>
 
         {error && (
           <div style={{
@@ -670,71 +611,71 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
           </Button>
         </div>
       </div>
+      </LiquidModal>
 
-      {/* SRT Export Success Modal */}
-        {showSrtSuccess && (
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: theme.colors.modal.overlay,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1001
-          }}>
-            <div style={{
-              backgroundColor: theme.colors.modal.background,
-              borderRadius: '8px',
-              padding: '30px',
-              width: '400px',
-              maxWidth: '90vw',
-              color: theme.colors.text,
-              textAlign: 'center'
-            }}>
-              <div style={{ marginBottom: '20px' }}>
-                <FiCheckCircle size={48} color={theme.colors.text} />
-              </div>
-              <h3 style={{ margin: '0 0 15px 0', fontSize: '18px', fontWeight: 'bold' }}>
-                SRT Export Successful!
-              </h3>
-              <p style={{ margin: '0 0 20px 0', fontSize: '14px', color: theme.colors.textSecondary }}>
-                Your subtitle file has been saved successfully.
-              </p>
-              <div style={{
-                backgroundColor: theme.colors.modal.background,
-                padding: '10px',
-                borderRadius: '4px',
-                marginBottom: '20px',
-                fontSize: '12px',
-                wordBreak: 'break-all',
-                color: theme.colors.textSecondary
-              }}>
-                {exportedSrtPath}
-              </div>
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-                <Button
-                  onClick={() => setShowSrtSuccess(false)}
-                  variant="secondary"
-                  size="md"
-                >
-                  Close
-                </Button>
-                <Button
-                  onClick={handleShowSrtInFinder}
-                  variant="primary"
-                  size="md"
-                >
-                  Show in Finder
-                </Button>
-              </div>
-            </div>
+    {/* SRT Export Success Modal */}
+    {showSrtSuccess && (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: theme.colors.modal.overlay,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1001
+      }}>
+        <div style={{
+          backgroundColor: theme.colors.modal.background,
+          borderRadius: '8px',
+          padding: '30px',
+          width: '400px',
+          maxWidth: '90vw',
+          color: theme.colors.text,
+          textAlign: 'center'
+        }}>
+          <div style={{ marginBottom: '20px' }}>
+            <FiCheckCircle size={48} color={theme.colors.text} />
           </div>
-        )}
+          <h3 style={{ margin: '0 0 15px 0', fontSize: '18px', fontWeight: 'bold' }}>
+            SRT Export Successful!
+          </h3>
+          <p style={{ margin: '0 0 20px 0', fontSize: '14px', color: theme.colors.textSecondary }}>
+            Your subtitle file has been saved successfully.
+          </p>
+          <div style={{
+            backgroundColor: theme.colors.modal.background,
+            padding: '10px',
+            borderRadius: '4px',
+            marginBottom: '20px',
+            fontSize: '12px',
+            wordBreak: 'break-all',
+            color: theme.colors.textSecondary
+          }}>
+            {exportedSrtPath}
+          </div>
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+            <Button
+              onClick={() => setShowSrtSuccess(false)}
+              variant="secondary"
+              size="md"
+            >
+              Close
+            </Button>
+            <Button
+              onClick={handleShowSrtInFinder}
+              variant="primary"
+              size="md"
+            >
+              Show in Finder
+            </Button>
+          </div>
+        </div>
       </div>
-    </div>
+    )}
+    </>
   );
 };
 
