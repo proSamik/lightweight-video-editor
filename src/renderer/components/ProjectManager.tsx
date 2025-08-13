@@ -140,15 +140,21 @@ const ProjectManagerModal: React.FC<ProjectManagerProps> = ({
       onClose={onClose}
       title="Project Manager"
       subtitle="Manage your video editing projects"
-      icon={<SaveProjectIcon size={24} />}
+      icon={<SaveProjectIcon size={24} color="white" />}
       maxWidth="900px"
     >
-
+      <div style={{ 
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        minHeight: '400px'
+      }}>
         {/* Tabs */}
         <div style={{
           display: 'flex',
           borderBottom: `1px solid ${theme.colors.border}`,
-          backgroundColor: theme.colors.background
+          backgroundColor: theme.colors.modal.background,
+          flexShrink: 0
         }}>
           <button
             onClick={() => setActiveTab('recent')}
@@ -209,9 +215,10 @@ const ProjectManagerModal: React.FC<ProjectManagerProps> = ({
         {/* Tab Content */}
         <div style={{ 
           flex: 1, 
-          overflow: 'auto', 
+          overflowY: 'auto', 
           padding: '24px',
-          backgroundColor: theme.colors.background
+          backgroundColor: theme.colors.modal.background,
+          minHeight: 0
         }}>
           {activeTab === 'recent' && (
             <div>
@@ -258,7 +265,7 @@ const ProjectManagerModal: React.FC<ProjectManagerProps> = ({
                         justifyContent: 'space-between',
                         alignItems: 'center',
                         padding: '20px',
-                        backgroundColor: theme.colors.background,
+                        backgroundColor: theme.colors.modal.background,
                         borderRadius: '8px',
                         border: `1px solid ${theme.colors.border}`,
                         transition: 'all 0.15s ease',
@@ -270,7 +277,7 @@ const ProjectManagerModal: React.FC<ProjectManagerProps> = ({
                         e.currentTarget.style.boxShadow = `0 4px 12px ${theme.colors.primary}15`;
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = theme.colors.background;
+                        e.currentTarget.style.backgroundColor = theme.colors.modal.background;
                         e.currentTarget.style.borderColor = theme.colors.border;
                         e.currentTarget.style.boxShadow = 'none';
                       }}
@@ -488,7 +495,7 @@ const ProjectManagerModal: React.FC<ProjectManagerProps> = ({
                       Current Project
                     </h3>
                     <div style={{
-                      backgroundColor: theme.colors.background,
+                      backgroundColor: theme.colors.modal.background,
                       padding: '20px',
                       borderRadius: '8px',
                       border: `1px solid ${theme.colors.border}`,
@@ -584,6 +591,7 @@ const ProjectManagerModal: React.FC<ProjectManagerProps> = ({
             </div>
           )}
         </div>
+      </div>
     </LiquidModal>
   );
 };
