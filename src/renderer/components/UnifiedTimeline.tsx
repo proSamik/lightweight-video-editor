@@ -232,33 +232,35 @@ const WAVEFORM_HEIGHT = 100;
       // Load audio from video file using Electron API
       const loadWaveform = async () => {
         try {
-          // First try loading via file URL
+          // Try to get audio buffer first as it's more reliable for local files
+          console.log('Loading waveform from audio buffer...');
+          const audioBuffer = await window.electronAPI.getAudioBuffer(videoFile.path);
+          if (audioBuffer) {
+            // Convert buffer to blob for WaveSurfer
+            const blob = new Blob([audioBuffer], { type: 'audio/wav' });
+            wavesurfer.loadBlob(blob);
+            return;
+          }
+          
+          // Fallback to file URL method
+          console.log('Audio buffer failed, trying file URL...');
           const fileUrl = await window.electronAPI.getFileUrl(videoFile.path);
           if (fileUrl) {
             console.log('Loading waveform from URL:', fileUrl);
-            wavesurfer.load(fileUrl);
+            // Create proper file:// URL for local files
+            const localFileUrl = fileUrl.startsWith('file://') ? fileUrl : `file://${fileUrl}`;
+            wavesurfer.load(localFileUrl);
           } else {
-            console.error('Failed to get file URL for waveform');
-            setIsWaveformLoading(false);
+            throw new Error('Failed to get file URL for waveform');
           }
         } catch (error) {
           console.error('Error loading waveform:', error);
-          // Try fallback with audio buffer
-          try {
-            console.log('Trying audio buffer fallback...');
-            const audioBuffer = await window.electronAPI.getAudioBuffer(videoFile.path);
-            if (audioBuffer) {
-              // Convert buffer to blob for WaveSurfer
-              const blob = new Blob([audioBuffer]);
-              wavesurfer.loadBlob(blob);
-            } else {
-              console.error('Failed to get audio buffer');
-              setIsWaveformLoading(false);
-            }
-          } catch (bufferError) {
-            console.error('Audio buffer fallback failed:', bufferError);
-            setIsWaveformLoading(false);
-          }
+          console.error('Video file path:', videoFile.path);
+          console.error('This could be due to file format, permissions, or codec issues');
+          setIsWaveformLoading(false);
+          
+          // Show a user-friendly message that waveform couldn't be loaded but timeline still works
+          console.log('Waveform visualization unavailable - timeline will work without waveform');
         }
       };
       
@@ -269,12 +271,21 @@ const WAVEFORM_HEIGHT = 100;
         setIsWaveformLoading(false);
       });
 
-      // Handle errors
+      // Handle errors gracefully
       wavesurfer.on('error', (err) => {
-        console.error('WaveSurfer error:', err);
-        console.error('Video file path:', videoFile.path);
-        console.error('Failed to load waveform - this could be due to file format, permissions, or codec issues');
+        console.warn('WaveSurfer could not load waveform:', err.message || err);
+        console.log('Timeline will continue to work without waveform visualization');
         setIsWaveformLoading(false);
+        
+        // Clear the wavesurfer instance to prevent further errors
+        if (wavesurferRef.current) {
+          try {
+            wavesurferRef.current.destroy();
+          } catch (destroyErr) {
+            // Ignore destroy errors
+          }
+          wavesurferRef.current = null;
+        }
       });
 
       return () => {
