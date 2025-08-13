@@ -75,6 +75,8 @@ export type {
   AlertDialogProps,
 } from './Modal';
 
+export { default as LiquidModal } from './LiquidModal';
+
 // =============================================================================
 // LAYOUT COMPONENTS
 // =============================================================================
