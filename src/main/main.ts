@@ -368,6 +368,21 @@ ipcMain.handle('extract-audio', async (_event, videoPath: string) => {
   }
 });
 
+ipcMain.handle('extract-audio-for-project', async (_event, videoPath: string, projectPath: string) => {
+  try {
+    const ffmpegService = FFmpegService.getInstance();
+    const projectManager = ProjectManager.getInstance();
+    
+    // Ensure the project assets directory exists
+    const assetsDir = projectManager.ensureProjectAssetsDirectory(projectPath);
+    
+    // Extract audio to the project assets directory
+    return await ffmpegService.extractAudioForProject(videoPath, assetsDir);
+  } catch (error) {
+    throw new Error(`Failed to extract audio for project: ${error}`);
+  }
+});
+
 ipcMain.handle('transcribe-audio', async (event, audioPath: string) => {
   try {
     const whisperService = WhisperService.getInstance();
