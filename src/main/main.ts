@@ -233,6 +233,23 @@ ipcMain.handle('get-audio-buffer', async (_event, filePath: string) => {
       return null;
     }
     
+    // Check file size first - Node.js has 2GB limit for buffers
+    const stats = fs.statSync(filePath);
+    const fileSizeInBytes = stats.size;
+    const maxSizeInBytes = 2 * 1024 * 1024 * 1024 - 1; // 2GB - 1 byte
+    
+    if (fileSizeInBytes > maxSizeInBytes) {
+      console.warn(`File too large for audio buffer (${(fileSizeInBytes / (1024 * 1024 * 1024)).toFixed(1)}GB). Waveform will be skipped.`);
+      return null;
+    }
+    
+    // Also skip very large files that might cause memory issues (>500MB)
+    const reasonableSizeLimit = 500 * 1024 * 1024; // 500MB
+    if (fileSizeInBytes > reasonableSizeLimit) {
+      console.warn(`File size (${(fileSizeInBytes / (1024 * 1024)).toFixed(1)}MB) exceeds reasonable limit for waveform generation. Skipping.`);
+      return null;
+    }
+    
     // Read file as buffer
     const buffer = fs.readFileSync(filePath);
     return buffer;
@@ -414,6 +431,24 @@ ipcMain.handle('render-video-with-captions', async (event, videoPath: string, ca
     } 
   } catch (error) {
     throw new Error(`Failed to render video: ${error}`);
+  }
+});
+
+ipcMain.handle('export-video-with-new-audio', async (event, videoPath: string, newAudioPath: string, outputPath: string) => {
+  try {
+    const ffmpegService = FFmpegService.getInstance();
+    
+    return await ffmpegService.exportVideoWithNewAudio(
+      videoPath,
+      newAudioPath,
+      outputPath,
+      (progress: number) => {
+        // Send progress updates to renderer
+        event.sender.send('rendering-progress', progress);
+      }
+    );
+  } catch (error) {
+    throw new Error(`Failed to export video with new audio: ${error}`);
   }
 });
 
