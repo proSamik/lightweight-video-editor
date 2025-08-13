@@ -15,6 +15,12 @@ export { Button, IconButton } from './Button';
 export type { ButtonProps, IconButtonProps, ButtonVariant, ButtonSize } from './Button';
 
 // =============================================================================
+// CARD COMPONENTS
+// =============================================================================
+export { Card } from './Card';
+export type { CardProps } from './Card';
+
+// =============================================================================
 // INPUT COMPONENTS
 // =============================================================================
 export { Input, Textarea, Select } from './Input';

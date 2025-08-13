@@ -10,7 +10,7 @@ import LoadingScreen from './components/LoadingScreen';
 import AISettingsModal from './components/AISettingsModal';
 import AIContentModal from './components/AIContentModal';
 import ExportSettingsModal from './components/ExportSettings';
-import { Button } from './components/ui';
+import { Button, Card } from './components/ui';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import ThemeToggle from './components/ThemeToggle';
 import {
@@ -1119,62 +1119,55 @@ const AppContent: React.FC = () => {
       display: 'flex', 
       height: '100vh', 
       backgroundColor: theme.colors.background,
-      color: theme.colors.text
+      color: theme.colors.text,
+      fontFamily: theme.typography.fontFamily,
+      overflow: 'hidden'
     }}>
       <ThemeToggle />
-      {/* Window Drag Region */}
+      
+      {/* Liquid Glass Drag Region */}
       <div 
         style={{
           position: 'absolute',
           top: 0,
           left: 0,
-          right: '80px', // Exclude right area where ThemeToggle is positioned
-          height: '80px', // Increased height for better dragging
+          right: '80px',
+          height: '72px',
           WebkitAppRegion: 'drag',
           zIndex: 50,
-          pointerEvents: 'none', // Allow clicks to pass through to buttons
-          borderBottom: `1px solid ${theme.colors.border}`, // Visual indicator line
-          background: `linear-gradient(180deg, ${theme.colors.surface}20 0%, ${theme.colors.surface}10 100%)`, // Subtle gradient
-          cursor: 'grab'
+          pointerEvents: 'none',
+          background: `linear-gradient(180deg, ${theme.colors.glass.background} 0%, transparent 100%)`,
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          borderBottom: `1px solid ${theme.colors.glass.border}`,
         }}
         className="drag-region"
       />
 
-      {/* Drag Region Indicator - Top Center
+      {/* Arc-Inspired Top Menu Bar */}
       <div style={{
         position: 'absolute',
-        top: '8px', // Much closer to the top
-        left: '50%',
-        transform: 'translateX(-50%)',
-        fontSize: '10px',
-        color: 'rgba(255, 255, 255, 0.4)',
-        pointerEvents: 'none',
-        zIndex: 51,
-        letterSpacing: '1px',
-        fontWeight: '500'
-      }}>
-      </div> */}
-      
-      {/* Top Menu Bar */}
-      <div style={{
-        position: 'absolute',
-        top: '30px', // Moved down to give space for drag indicator
-        left: '80px', // Leave space for traffic lights
-        right: '140px',
+        top: '16px',
+        left: '80px',
+        right: '100px',
         zIndex: 100,
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        WebkitAppRegion: 'no-drag' // Make buttons clickable
+        WebkitAppRegion: 'no-drag',
+        padding: `0 ${theme.spacing.md}`,
       }}>
-        {/* Project Info */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          fontSize: '14px',
-          color: theme.colors.textSecondary
-        }}>
+        {/* Project Info Card */}
+        <Card 
+          variant="glass" 
+          padding="sm"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: theme.spacing.sm,
+            minWidth: '200px',
+          }}
+        >
           {isEditingProjectName ? (
             <input
               type="text"
@@ -1190,412 +1183,224 @@ const AppContent: React.FC = () => {
               }}
               autoFocus
               style={{
-                fontWeight: 'bold',
-                fontSize: '14px',
+                fontWeight: theme.typography.fontWeight.semibold,
+                fontSize: theme.typography.fontSize.sm,
                 backgroundColor: theme.colors.input.background,
                 color: theme.colors.text,
-                border: `1px solid ${theme.colors.borderFocus}`,
-                borderRadius: '4px',
-                padding: '4px 8px',
+                border: `1px solid ${theme.colors.input.borderFocus}`,
+                borderRadius: theme.radius.sm,
+                padding: `${theme.spacing.xs} ${theme.spacing.sm}`,
                 outline: 'none',
-                minWidth: '200px'
+                minWidth: '200px',
+                fontFamily: theme.typography.fontFamily,
               }}
             />
           ) : (
-            <span 
-              style={{ 
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                padding: '4px 8px',
-                borderRadius: '4px',
-                transition: 'background-color 0.2s'
-              }}
-              onClick={handleStartRename}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
-              title="Click to rename project"
-            >
-              {currentProjectInfo.projectName}
-              {currentProjectInfo.isModified && <span style={{ color: theme.colors.warning }}> •</span>}
-            </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <span 
+                style={{ 
+                  fontWeight: theme.typography.fontWeight.semibold,
+                  fontSize: theme.typography.fontSize.sm,
+                  cursor: 'pointer',
+                  padding: `${theme.spacing.xs} ${theme.spacing.sm}`,
+                  borderRadius: theme.radius.sm,
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: theme.spacing.xs,
+                }}
+                onClick={handleStartRename}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+                title="Click to rename project"
+              >
+                {currentProjectInfo.projectName}
+                {currentProjectInfo.isModified && (
+                  <span style={{ 
+                    color: theme.colors.primary,
+                    fontSize: '8px',
+                    fontWeight: theme.typography.fontWeight.bold 
+                  }}>
+                    ●
+                  </span>
+                )}
+              </span>
+              {currentProjectInfo.projectPath && (
+                <span style={{ 
+                  fontSize: theme.typography.fontSize.xs, 
+                  color: theme.colors.textMuted,
+                  paddingLeft: theme.spacing.sm,
+                }}>
+                  {currentProjectInfo.projectPath.split('/').pop()}
+                </span>
+              )}
+            </div>
           )}
-          {currentProjectInfo.projectPath && (
-            <span style={{ fontSize: '12px', opacity: 0.7 }}>
-              ({currentProjectInfo.projectPath.split('/').pop()})
-            </span>
-          )}
-        </div>
+        </Card>
 
-        {/* Action Buttons */}
+        {/* Action Buttons - Liquid Design */}
         <div style={{
           display: 'flex',
-          gap: '6px',
-          flexWrap: 'wrap'
+          gap: theme.spacing.sm,
+          alignItems: 'center',
         }}>
           {/* Primary Actions Group */}
-          <div style={{ display: 'flex', gap: '4px' }}>
-            <button
+          <Card variant="glass" padding="sm" style={{ display: 'flex', gap: theme.spacing.xs }}>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setShowProjectManager(true)}
-              style={{
-                padding: '8px',
-                backgroundColor: 'transparent',
-                color: theme.colors.text,
-                border: `1px solid ${theme.colors.border}`,
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '11px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
               title="Project Manager (Ctrl/Cmd+O)"
             >
               <ProjectManagerIcon size={16} />
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={handleNewProject}
-              style={{
-                padding: '8px',
-                backgroundColor: 'transparent',
-                color: theme.colors.text,
-                border: `1px solid ${theme.colors.border}`,
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '11px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
               title="New Project (Ctrl/Cmd+N)"
             >
               <NewProjectIcon size={16} />
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
               onClick={handleSaveProject}
-              style={{
-                padding: '8px',
-                backgroundColor: 'transparent',
-                color: theme.colors.text,
-                border: `1px solid ${theme.colors.border}`,
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '11px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
               title="Save Project (Ctrl/Cmd+S)"
             >
               <SaveProjectIcon size={16} />
-            </button>
-          </div>
+            </Button>
+          </Card>
           
           {/* Secondary Actions */}
-          <div style={{ display: 'flex', gap: '4px' }}>
-            <button
+          <Card variant="glass" padding="sm" style={{ display: 'flex', gap: theme.spacing.xs }}>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={handleSaveProjectAs}
-              style={{
-                padding: '8px',
-                backgroundColor: 'transparent',
-                color: theme.colors.text,
-                border: `1px solid ${theme.colors.border}`,
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '11px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
               title="Save Project As (Ctrl/Cmd+Shift+S)"
             >
               <SaveProjectAsIcon size={16} />
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setShowAISettings(true)}
-              style={{
-                padding: '8px',
-                backgroundColor: 'transparent',
-                color: theme.colors.text,
-                border: `1px solid ${theme.colors.border}`,
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '11px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
               title="AI Settings (Ctrl/Cmd+,)"
             >
               <SettingsIcon size={16} />
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => captions.length > 0 && setShowAIContent(true)}
               disabled={captions.length === 0}
-              style={{
-                padding: '8px',
-                backgroundColor: 'transparent',
-                color: captions.length > 0 ? theme.colors.text : theme.colors.textMuted,
-                border: `1px solid ${theme.colors.border}`,
-                borderRadius: '6px',
-                cursor: captions.length > 0 ? 'pointer' : 'not-allowed',
-                fontSize: '11px',
-                opacity: captions.length > 0 ? 1 : 0.5,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={(e) => {
-                if (captions.length > 0) {
-                  e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
               title="Generate AI Content (Ctrl/Cmd+G)"
             >
               <BotIcon size={16} />
-            </button>
-          </div>
+            </Button>
+          </Card>
           
           {/* Audio Actions */}
-          <div style={{ display: 'flex', gap: '4px' }}>
-            <button
+          <Card variant="glass" padding="sm" style={{ display: 'flex', gap: theme.spacing.xs, alignItems: 'center' }}>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={handleAudioImport}
               disabled={!videoFile}
-              style={{
-                padding: '8px',
-                backgroundColor: 'transparent',
-                color: videoFile ? theme.colors.text : theme.colors.textMuted,
-                border: `1px solid ${theme.colors.border}`,
-                borderRadius: '6px',
-                cursor: videoFile ? 'pointer' : 'not-allowed',
-                fontSize: '11px',
-                opacity: videoFile ? 1 : 0.5,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={(e) => {
-                if (videoFile) {
-                  e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
               title={replacementAudioPath ? `Audio Replacement Set: ${replacementAudioPath.split('/').pop()}` : "Replace Video Audio Track"}
             >
               {replacementAudioPath ? <MusicWithCheckIcon size={16} /> : <MusicIcon size={16} />}
-            </button>
+            </Button>
             {replacementAudioPath && (
-              <button
+              <Button
+                variant="destructive"
+                size="sm"
                 onClick={() => setReplacementAudioPath(null)}
-                style={{
-                  padding: '8px',
-                  backgroundColor: 'transparent',
-                  color: theme.colors.error,
-                  border: `1px solid ${theme.colors.error}`,
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '11px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'all 0.15s ease',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = theme.colors.error;
-                  e.currentTarget.style.color = theme.colors.errorForeground;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.color = theme.colors.error;
-                }}
                 title="Clear audio replacement"
               >
                 <CloseIcon size={16} />
-              </button>
+              </Button>
             )}
-            <button
+            <Button
+              variant="success"
+              size="sm"
               onClick={handleAudioExport}
               disabled={!videoFile}
-              style={{
-                padding: '6px 10px',
-                backgroundColor: videoFile ? theme.colors.success : theme.colors.secondary,
-                color: theme.colors.text,
-                border: videoFile ? `1px solid ${theme.colors.success}` : `1px solid ${theme.colors.border}`,
-                borderRadius: '4px',
-                cursor: videoFile ? 'pointer' : 'not-allowed',
-                fontSize: '11px',
-                opacity: videoFile ? 1 : 0.6,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}
               title="Export Audio from Video"
             >
               <MusicExportIcon size={14} />
-            </button>
-          </div>
+            </Button>
+          </Card>
 
           {/* Export Actions */}
-          <div style={{ display: 'flex', gap: '4px' }}>
-            <button
+          <Card variant="glass" padding="sm" style={{ display: 'flex', gap: theme.spacing.xs }}>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={handleSrtExport}
               disabled={!captions || captions.length === 0}
-              style={{
-                padding: '8px',
-                backgroundColor: 'transparent',
-                color: (captions && captions.length > 0) ? theme.colors.text : theme.colors.textMuted,
-                border: `1px solid ${theme.colors.border}`,
-                borderRadius: '6px',
-                cursor: (captions && captions.length > 0) ? 'pointer' : 'not-allowed',
-                fontSize: '11px',
-                opacity: (captions && captions.length > 0) ? 1 : 0.5,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={(e) => {
-                if (captions && captions.length > 0) {
-                  e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
               title="Export SRT Subtitle File"
             >
               <ExportSrtIcon size={16} />
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
               onClick={handleShowExportSettings}
               disabled={!videoFile || !captions || captions.length === 0}
-              style={{
-                padding: '8px',
-                backgroundColor: 'transparent',
-                color: (videoFile && captions && captions.length > 0) ? theme.colors.text : theme.colors.textMuted,
-                border: `1px solid ${theme.colors.border}`,
-                borderRadius: '6px',
-                cursor: (videoFile && captions && captions.length > 0) ? 'pointer' : 'not-allowed',
-                fontSize: '11px',
-                opacity: (videoFile && captions && captions.length > 0) ? 1 : 0.5,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={(e) => {
-                if (videoFile && captions && captions.length > 0) {
-                  e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
               title="Export Video with Captions"
             >
               <ExportVideoIcon size={16} />
-            </button>
+            </Button>
             {replacementAudioPath && (
-              <button
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={handleExportVideoWithNewAudio}
                 disabled={!videoFile}
-                style={{
-                  padding: '8px',
-                  backgroundColor: 'transparent',
-                  color: videoFile ? theme.colors.text : theme.colors.textMuted,
-                  border: `1px solid ${theme.colors.border}`,
-                  borderRadius: '6px',
-                  cursor: videoFile ? 'pointer' : 'not-allowed',
-                  fontSize: '11px',
-                  opacity: videoFile ? 1 : 0.5,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'all 0.15s ease',
-                }}
-                onMouseEnter={(e) => {
-                  if (videoFile) {
-                    e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
                 title="Export Video with New Audio (No Subtitles)"
               >
                 <ExportVideoWithNewAudioIcon size={16} />
-              </button>
+              </Button>
             )}
-          </div>
+          </Card>
         </div>
       </div>
 
-      {/* Main Content Area */}
+      {/* Main Content Area - Liquid Layout */}
       <div style={{ 
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
-        paddingTop: '80px' // Account for increased drag region
+        paddingTop: '88px', // Account for new header height
+        backgroundColor: theme.colors.background,
+        overflow: 'hidden',
       }}>
         {/* Content Panel */}
         <div style={{ 
           flex: 1,
           display: 'flex',
-          minHeight: 0 // Important for proper flex sizing
+          minHeight: 0,
+          gap: theme.spacing.sm,
+          padding: theme.spacing.sm,
         }}>
           {/* Left Panel - Video Preview with Timeline */}
-          <div style={{ 
-            flex: '1 1 70%', 
-            display: 'flex', 
-            flexDirection: 'column',
-            borderRight: `1px solid ${theme.colors.border}`,
-            minHeight: 0
-          }}>
+          <Card 
+            variant="default" 
+            padding="none"
+            style={{ 
+              flex: '1 1 70%', 
+              display: 'flex', 
+              flexDirection: 'column',
+              minHeight: 0,
+              overflow: 'hidden',
+            }}
+          >
             <VideoPanel
               videoFile={videoFile}
               captions={captions}
@@ -1629,17 +1434,22 @@ const AppContent: React.FC = () => {
               canUndo={historyIndex > 0}
               canRedo={historyIndex < history.length - 1}
             />
-          </div>
+          </Card>
 
           {/* Right Panel - Tabbed Controls */}
-          <div style={{ 
-            flex: '1 1 30%', 
-            minWidth: '300px',
-            maxWidth: '400px',
-            minHeight: 0,
-            display: 'flex',
-            flexDirection: 'column'
-          }}>
+          <Card 
+            variant="default" 
+            padding="none"
+            style={{ 
+              flex: '1 1 30%', 
+              minWidth: '300px',
+              maxWidth: '400px',
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+          >
             <TabbedRightPanel
               selectedSegment={captions.find(c => c.id === selectedSegmentId) || null}
               onSegmentUpdate={handleCaptionUpdate}
@@ -1652,7 +1462,7 @@ const AppContent: React.FC = () => {
               onSegmentDelete={handleCaptionDelete}
               currentTime={currentTime}
             />
-          </div>
+          </Card>
         </div>
       </div>
 
@@ -1731,42 +1541,63 @@ const AppContent: React.FC = () => {
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.9)',
+          backgroundColor: theme.colors.modal.overlay,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 1001
+          zIndex: 1001,
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
         }}>
-          <div style={{
-            backgroundColor: theme.colors.surface,
-            borderRadius: '8px',
-            padding: '30px',
-            width: '400px',
-            maxWidth: '90vw',
-            color: theme.colors.text,
-            textAlign: 'center'
-          }}>
-            <div style={{ marginBottom: '20px' }}>
+          <Card 
+            variant="glass" 
+            padding="lg"
+            style={{
+              width: '400px',
+              maxWidth: '90vw',
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ 
+              marginBottom: theme.spacing.lg,
+              color: theme.colors.success,
+            }}>
               <ExportSrtIcon size={48} />
             </div>
-            <h3 style={{ margin: '0 0 15px 0', fontSize: '18px', fontWeight: 'bold' }}>
+            <h3 style={{ 
+              margin: `0 0 ${theme.spacing.md} 0`, 
+              fontSize: theme.typography.fontSize.xl, 
+              fontWeight: theme.typography.fontWeight.semibold,
+              color: theme.colors.text,
+            }}>
               SRT Export Successful!
             </h3>
-            <p style={{ margin: '0 0 20px 0', fontSize: '14px', color: theme.colors.textSecondary }}>
+            <p style={{ 
+              margin: `0 0 ${theme.spacing.lg} 0`, 
+              fontSize: theme.typography.fontSize.sm, 
+              color: theme.colors.textSecondary,
+              lineHeight: theme.typography.lineHeight.relaxed,
+            }}>
               Your subtitle file has been saved successfully.
             </p>
-            <div style={{
-              backgroundColor: theme.colors.background,
-              padding: '10px',
-              borderRadius: '4px',
-              marginBottom: '20px',
-              fontSize: '12px',
-              wordBreak: 'break-all',
-              color: theme.colors.textSecondary
-            }}>
+            <Card
+              variant="elevated"
+              padding="sm"
+              style={{
+                marginBottom: theme.spacing.lg,
+                fontSize: theme.typography.fontSize.xs,
+                wordBreak: 'break-all',
+                color: theme.colors.textMuted,
+                backgroundColor: theme.colors.backgroundSecondary,
+              }}
+            >
               {exportedSrtPath}
-            </div>
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+            </Card>
+            <div style={{ 
+              display: 'flex', 
+              gap: theme.spacing.sm, 
+              justifyContent: 'center' 
+            }}>
               <Button
                 onClick={() => setShowSrtSuccess(false)}
                 variant="secondary"
@@ -1782,7 +1613,7 @@ const AppContent: React.FC = () => {
                 Show in Finder
               </Button>
             </div>
-          </div>
+          </Card>
         </div>
       )}
     </div>
