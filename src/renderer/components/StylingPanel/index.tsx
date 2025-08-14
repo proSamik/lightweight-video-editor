@@ -14,7 +14,6 @@ import {
 
 // Import sub-components
 import { TranscriptionStatus } from './TranscriptionStatus';
-import { TextEditor } from './TextEditor';
 import { WordLevelEditor } from './WordLevelEditor';
 import { StyleControls } from './StyleControls';
 
@@ -48,50 +47,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
     }
   };
 
-  // Handle text updates with word-level timing preservation
-  const handleTextUpdate = (newText: string) => {
-    if (!selectedSegment) return;
 
-    if (selectedSegment.words && selectedSegment.words.length > 0) {
-      const newWords = newText.split(' ').filter(word => word.trim() !== '');
-      const originalWords = selectedSegment.words;
-      
-      // Create updated word timing by mapping new words to original timing
-      const updatedWords = newWords.map((word, index) => {
-        const originalWord = originalWords[index];
-        const isEdited = originalWord ? originalWord.word !== word : true;
-        
-        if (originalWord) {
-          return {
-            ...originalWord,
-            word: word,
-            end: isEdited ? 
-              Math.max(originalWord.end, originalWord.start + 500) : 
-              originalWord.end
-          };
-        } else {
-          const segmentDuration = selectedSegment.endTime - selectedSegment.startTime;
-          const wordDuration = segmentDuration / newWords.length;
-          const wordStart = selectedSegment.startTime + (index * wordDuration);
-          
-          return {
-            word: word,
-            start: wordStart,
-            end: Math.min(wordStart + Math.max(wordDuration, 500), selectedSegment.endTime)
-          };
-        }
-      });
-      
-      onSegmentUpdate(selectedSegment.id, {
-        text: newText,
-        words: updatedWords
-      });
-    } else {
-      onSegmentUpdate(selectedSegment.id, {
-        text: newText
-      });
-    }
-  };
 
   // Handle word-level operations
   const handleWordUpdate = (wordIndex: number, newWord: string) => {
@@ -323,12 +279,6 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
         <div style={contentStyles}>
           <Stack gap="2xl">
             <TranscriptionStatus transcriptionStatus={transcriptionStatus} />
-            
-            <TextEditor
-              text={selectedSegment.text}
-              words={selectedSegment.words}
-              onTextUpdate={handleTextUpdate}
-            />
             
             {selectedSegment.words && selectedSegment.words.length > 0 && (
               <div style={{
