@@ -3,6 +3,7 @@ import { VideoFile, CaptionSegment } from '../../types';
 import { useTheme } from '../contexts/ThemeContext';
 import { FiEye } from 'react-icons/fi';
 import { Video } from 'lucide-react';
+import CaptionStyleModal from './CaptionStyleModal';
 
 interface VideoPanelProps {
   videoFile: VideoFile | null;
@@ -45,11 +46,10 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [isResizing, setIsResizing] = useState(false);
   const [isTimelineDragging, setIsTimelineDragging] = useState(false);
-  const [showContextMenu, setShowContextMenu] = useState(false);
-  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
-  const [contextMenuSegmentId, setContextMenuSegmentId] = useState<string | null>(null);
+  const [showCaptionStyleModal, setShowCaptionStyleModal] = useState(false);
+  const [selectedCaptionForStyling, setSelectedCaptionForStyling] = useState<CaptionSegment | null>(null);
+  const [modalPosition, setModalPosition] = useState({ x: 100, y: 100 });
   const [scaleFactor, setScaleFactor] = useState(1);
   const lastUpdateTimeRef = useRef<number>(0);
   const [isHoveringCaption, setIsHoveringCaption] = useState(false);
@@ -180,9 +180,9 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     );
     
     if (currentCaption) {
-      setContextMenuPosition({ x: e.clientX, y: e.clientY });
-      setContextMenuSegmentId(currentCaption.id);
-      setShowContextMenu(true);
+      setSelectedCaptionForStyling(currentCaption);
+      setModalPosition({ x: e.clientX, y: e.clientY });
+      setShowCaptionStyleModal(true);
     }
   };
 
@@ -252,19 +252,19 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     };
   }, [isDragging, handleGlobalMouseMove, handleGlobalMouseUp]);
 
-  // Close context menu when clicking elsewhere or pressing ESC
+  // Close modal when clicking elsewhere or pressing ESC
   useEffect(() => {
     const handleClickOutside = () => {
-      setShowContextMenu(false);
+      setShowCaptionStyleModal(false);
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setShowContextMenu(false);
+        setShowCaptionStyleModal(false);
       }
     };
 
-    if (showContextMenu) {
+    if (showCaptionStyleModal) {
       document.addEventListener('click', handleClickOutside);
       document.addEventListener('keydown', handleKeyDown);
     }
@@ -273,7 +273,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
       document.removeEventListener('click', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [showContextMenu]);
+  }, [showCaptionStyleModal]);
 
   // Mini timeline handlers for fullscreen mode
   const handleTimelineMouseDown = (e: React.MouseEvent) => {
@@ -935,331 +935,18 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
         )}
 
 
-        {/* Enhanced Context Menu for Caption Styling */}
-        {showContextMenu && contextMenuSegmentId && (() => {
-          const currentCaption = captions.find(c => c.id === contextMenuSegmentId);
-          if (!currentCaption) return null;
-
-          const updateCaptionStyle = (updates: Partial<typeof currentCaption.style>) => {
-            if (onCaptionUpdate && contextMenuSegmentId) {
-              onCaptionUpdate(contextMenuSegmentId, {
-                style: { ...currentCaption.style, ...updates }
-              });
+        {/* Caption Style Modal */}
+        <CaptionStyleModal
+          isOpen={showCaptionStyleModal}
+          onClose={() => setShowCaptionStyleModal(false)}
+          caption={selectedCaptionForStyling}
+          onUpdate={(updates) => {
+            if (onCaptionUpdate && selectedCaptionForStyling) {
+              onCaptionUpdate(selectedCaptionForStyling.id, updates);
             }
-          };
-
-          // Smart positioning to avoid overflow
-          const menuWidth = 320;
-          const menuHeight = 500; // Approximate height
-          const windowWidth = window.innerWidth;
-          const windowHeight = window.innerHeight;
-          
-          let left = contextMenuPosition.x;
-          let top = contextMenuPosition.y;
-          
-          // Adjust horizontal position if menu would overflow right edge
-          if (left + menuWidth > windowWidth) {
-            left = contextMenuPosition.x - menuWidth;
-          }
-          
-          // Adjust vertical position if menu would overflow bottom edge
-          if (top + menuHeight > windowHeight) {
-            top = contextMenuPosition.y - menuHeight;
-          }
-          
-          // Ensure menu doesn't go above top edge
-          if (top < 10) {
-            top = 10;
-          }
-          
-          // Ensure menu doesn't go beyond left edge
-          if (left < 10) {
-            left = 10;
-          }
-
-          return (
-            <div
-              style={{
-                position: 'fixed',
-                left: `${left}px`,
-                top: `${top}px`,
-                backgroundColor: '#2a2a2a',
-                border: '1px solid #444',
-                borderRadius: '6px',
-                padding: '12px',
-                minWidth: '280px',
-                maxWidth: '320px',
-                maxHeight: '80vh',
-                overflowY: 'auto',
-                zIndex: 10000,
-                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)',
-                fontSize: '13px'
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Header */}
-              <div style={{ marginBottom: '12px', color: '#ccc', fontSize: '14px', fontWeight: 'bold' }}>
-                Caption Settings
-              </div>
-
-              {/* Z-Axis Rotation Slider */}
-              <div style={{ marginBottom: '16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <label style={{ color: '#fff', fontSize: '12px' }}>Z-Axis Rotation</label>
-                  <span style={{ color: '#aaa', fontSize: '11px' }}>{currentCaption.style.position.z || 0}°</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="360"
-                  value={currentCaption.style.position.z || 0}
-                  onChange={(e) => {
-                    updateCaptionStyle({
-                      position: { ...currentCaption.style.position, z: parseInt(e.target.value) }
-                    });
-                  }}
-                  style={{
-                    width: '100%',
-                    height: '4px',
-                    background: '#444',
-                    outline: 'none',
-                    borderRadius: '2px'
-                  }}
-                />
-              </div>
-
-              {/* Render Mode */}
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ color: '#fff', fontSize: '12px', display: 'block', marginBottom: '8px' }}>Render Mode</label>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  {['horizontal', 'progressive'].map(mode => (
-                    <button
-                      key={mode}
-                      onClick={() => updateCaptionStyle({ renderMode: mode as 'horizontal' | 'progressive' })}
-                      style={{
-                        flex: 1,
-                        padding: '6px 12px',
-                        backgroundColor: currentCaption.style.renderMode === mode ? '#0066cc' : '#404040',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '11px',
-                        textTransform: 'capitalize'
-                      }}
-                    >
-                      {mode}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Text Alignment (only for progressive mode) */}
-              {currentCaption.style.renderMode === 'progressive' && (
-                <div style={{ marginBottom: '16px' }}>
-                  <label style={{ color: '#fff', fontSize: '12px', display: 'block', marginBottom: '8px' }}>Text Alignment</label>
-                  <div style={{ display: 'flex', gap: '4px' }}>
-                    {['left', 'center', 'right'].map(align => (
-                      <button
-                        key={align}
-                        onClick={() => updateCaptionStyle({ textAlign: align as 'left' | 'center' | 'right' })}
-                        style={{
-                          flex: 1,
-                          padding: '6px 8px',
-                          backgroundColor: currentCaption.style.textAlign === align ? '#0066cc' : '#404040',
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '11px',
-                          textTransform: 'capitalize'
-                        }}
-                      >
-                        {align}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Font Family */}
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ color: '#fff', fontSize: '12px', display: 'block', marginBottom: '8px' }}>Font Family</label>
-                <select
-                  value={currentCaption.style.font}
-                  onChange={(e) => updateCaptionStyle({ font: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '6px 8px',
-                    backgroundColor: '#404040',
-                    color: '#fff',
-                    border: '1px solid #555',
-                    borderRadius: '4px',
-                    fontSize: '11px'
-                  }}
-                >
-                  <option value="Segoe UI">Segoe UI (Microsoft System)</option>
-                  <option value="Inter">Inter (Modern & Readable)</option>
-                  <option value="Roboto">Roboto (Google System)</option>
-                  <option value="Open Sans">Open Sans (Clean & Friendly)</option>
-                  <option value="Source Sans Pro">Source Sans Pro (Adobe)</option>
-                  <option value="Noto Sans">Noto Sans (Universal)</option>
-                  <option value="SF Pro Display">SF Pro Display (Apple)</option>
-                  <option value="Ubuntu">Ubuntu (Modern)</option>
-                  <option value="Montserrat">Montserrat (Stylish & Modern)</option>
-                  <option value="Poppins">Poppins (Clean & Geometric)</option>
-                  <option value="Raleway">Raleway (Elegant & Light)</option>
-                  <option value="Lato">Lato (Friendly & Readable)</option>
-                  <option value="Nunito">Nunito (Rounded & Friendly)</option>
-                  <option value="Quicksand">Quicksand (Modern & Rounded)</option>
-                  <option value="Arial">Arial (Classic)</option>
-                  <option value="Helvetica">Helvetica (Classic)</option>
-                </select>
-              </div>
-
-              {/* Color Pickers */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-                <div>
-                  <label style={{ color: '#fff', fontSize: '12px', display: 'block', marginBottom: '6px' }}>Text Color</label>
-                  <input
-                    type="color"
-                    value={currentCaption.style.textColor}
-                    onChange={(e) => updateCaptionStyle({ textColor: e.target.value })}
-                    style={{ width: '100%', height: '32px', border: 'none', borderRadius: '4px' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ color: '#fff', fontSize: '12px', display: 'block', marginBottom: '6px' }}>Highlight Color</label>
-                  <input
-                    type="color"
-                    value={currentCaption.style.highlighterColor}
-                    onChange={(e) => updateCaptionStyle({ highlighterColor: e.target.value })}
-                    style={{ width: '100%', height: '32px', border: 'none', borderRadius: '4px' }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label style={{ color: '#fff', fontSize: '12px', display: 'block', marginBottom: '6px' }}>Background Color</label>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <input
-                    type="color"
-                    value={currentCaption.style.backgroundColor === 'transparent' ? '#000000' : currentCaption.style.backgroundColor}
-                    onChange={(e) => updateCaptionStyle({ backgroundColor: e.target.value })}
-                    style={{ flex: 1, height: '32px', border: 'none', borderRadius: '4px' }}
-                  />
-                  <button
-                    onClick={() => updateCaptionStyle({ backgroundColor: 'transparent' })}
-                    style={{
-                      padding: '6px 10px',
-                      backgroundColor: currentCaption.style.backgroundColor === 'transparent' ? '#0066cc' : '#404040',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '10px'
-                    }}
-                  >
-                    Transparent
-                  </button>
-                </div>
-              </div>
-
-              {/* Stroke Controls */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-                <div>
-                  <label style={{ color: '#fff', fontSize: '12px', display: 'block', marginBottom: '6px' }}>Stroke Color</label>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <input
-                      type="color"
-                      value={currentCaption.style.strokeColor || '#000000'}
-                      onChange={(e) => updateCaptionStyle({ strokeColor: e.target.value })}
-                      style={{ flex: 1, height: '32px', border: 'none', borderRadius: '4px' }}
-                    />
-                    <button
-                      onClick={() => updateCaptionStyle({ strokeColor: 'transparent' })}
-                      style={{
-                        padding: '6px 10px',
-                        backgroundColor: (currentCaption.style.strokeColor || '#000000') === 'transparent' ? '#0066cc' : '#404040',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '10px'
-                      }}
-                    >
-                      Transparent
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <label style={{ color: '#fff', fontSize: '12px', display: 'block', marginBottom: '6px' }}>Stroke Width</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <input
-                      type="range"
-                      min="0"
-                      max="10"
-                      step="0.5"
-                      value={currentCaption.style.strokeWidth || 0}
-                      onChange={(e) => updateCaptionStyle({ strokeWidth: parseFloat(e.target.value) })}
-                      style={{
-                        flex: 1,
-                        height: '4px',
-                        background: '#444',
-                        outline: 'none',
-                        borderRadius: '2px'
-                      }}
-                    />
-                    <span style={{ color: '#aaa', fontSize: '11px', minWidth: '30px' }}>
-                      {currentCaption.style.strokeWidth || 0}px
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Text Transform */}
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ color: '#fff', fontSize: '12px', display: 'block', marginBottom: '8px' }}>Text Transform</label>
-                <select
-                  value={currentCaption.style.textTransform || 'none'}
-                  onChange={(e) => updateCaptionStyle({ textTransform: e.target.value as 'none' | 'capitalize' | 'uppercase' | 'lowercase' })}
-                  style={{
-                    width: '100%',
-                    padding: '6px 8px',
-                    backgroundColor: '#404040',
-                    color: '#fff',
-                    border: '1px solid #555',
-                    borderRadius: '4px',
-                    fontSize: '11px'
-                  }}
-                >
-                  <option value="none">None</option>
-                  <option value="capitalize">Capitalize</option>
-                  <option value="uppercase">Uppercase</option>
-                  <option value="lowercase">Lowercase</option>
-                </select>
-              </div>
-
-              {/* Close Button */}
-              <div style={{ marginTop: '16px', textAlign: 'right' }}>
-                <button
-                  onClick={() => setShowContextMenu(false)}
-                  style={{
-                    padding: '8px 16px',
-                    backgroundColor: '#666',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '12px'
-                  }}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          );
-        })()}
+          }}
+          position={modalPosition}
+        />
       </div>
 
 
