@@ -4,17 +4,50 @@ import { useTheme } from '../contexts/ThemeContext';
 interface TranscriptionSettingsProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (settings: { maxCharsPerLine: number; maxWordsPerLine: number }) => void;
+  onConfirm: (settings: { maxCharsPerLine: number; maxWordsPerLine: number; whisperModel: string }) => void;
+  videoDuration?: number;
 }
 
 const TranscriptionSettings: React.FC<TranscriptionSettingsProps> = ({
   isOpen,
   onClose,
-  onConfirm
+  onConfirm,
+  videoDuration = 0
 }) => {
   const { theme } = useTheme();
   const [maxCharsPerLine, setMaxCharsPerLine] = useState(16);
   const [maxWordsPerLine, setMaxWordsPerLine] = useState(5);
+  const [whisperModel, setWhisperModel] = useState('base');
+
+  const whisperModels = [
+    { value: 'tiny', label: 'Tiny' },
+    { value: 'base', label: 'Base' },
+    { value: 'small', label: 'Small' },
+    { value: 'medium', label: 'Medium' },
+    { value: 'large', label: 'Large' }
+  ];
+
+  const getEstimatedTime = (model: string, duration: number) => {
+    if (!duration) return 'Unknown';
+    
+    const durationMinutes = duration / 60;
+    let multiplier = 1;
+    
+    switch (model) {
+      case 'tiny': multiplier = 0.1; break;
+      case 'base': multiplier = 0.2; break;
+      case 'small': multiplier = 0.4; break;
+      case 'medium': multiplier = 0.7; break;
+      case 'large': multiplier = 1.0; break;
+    }
+    
+    const estimatedMinutes = durationMinutes * multiplier;
+    if (estimatedMinutes < 1) {
+      return `~${Math.ceil(estimatedMinutes * 60)}s`;
+    } else {
+      return `~${Math.ceil(estimatedMinutes)}m`;
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -29,7 +62,7 @@ const TranscriptionSettings: React.FC<TranscriptionSettingsProps> = ({
       return;
     }
     
-    onConfirm({ maxCharsPerLine, maxWordsPerLine });
+    onConfirm({ maxCharsPerLine, maxWordsPerLine, whisperModel });
     onClose();
   };
 
@@ -182,12 +215,91 @@ const TranscriptionSettings: React.FC<TranscriptionSettingsProps> = ({
           </div>
         </div>
 
+        <div style={{ marginBottom: '32px' }}>
+          <label style={{ 
+            display: 'block', 
+            marginBottom: '12px', 
+            fontSize: theme.typography.fontSize.base,
+            fontWeight: theme.typography.fontWeight.medium,
+            color: theme.colors.text,
+            fontFamily: theme.typography.fontFamily
+          }}>
+            Whisper Model
+          </label>
+          
+          <div style={{
+            padding: theme.spacing.md,
+            backgroundColor: theme.colors.primarySubtle,
+            borderRadius: theme.radius.lg,
+            border: `1px solid ${theme.colors.primary}20`,
+            marginBottom: theme.spacing.sm
+          }}>
+            <select
+              value={whisperModel}
+              onChange={(e) => setWhisperModel(e.target.value)}
+              style={{
+                width: '100%',
+                padding: `${theme.spacing.sm}px ${theme.spacing.md}px`,
+                backgroundColor: theme.colors.modal.background,
+                color: theme.colors.text,
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: theme.radius.md,
+                fontSize: theme.typography.fontSize.base,
+                fontFamily: theme.typography.fontFamily,
+                cursor: 'pointer',
+                outline: 'none'
+              }}
+            >
+              {whisperModels.map((model) => (
+                <option key={model.value} value={model.value}>
+                  {model.label}
+                </option>
+              ))}
+            </select>
+            
+            <div style={{
+              marginTop: theme.spacing.sm,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div style={{
+                fontSize: theme.typography.fontSize.sm,
+                color: theme.colors.primary
+              }}>
+                Estimated time: <strong style={{ color: theme.colors.primary }}>
+                  {getEstimatedTime(whisperModel, videoDuration)}
+                </strong>
+              </div>
+              <div style={{
+                fontSize: theme.typography.fontSize.sm,
+                color: theme.colors.textSecondary,
+                fontStyle: 'italic'
+              }}>
+                {whisperModel === 'tiny' && 'Fastest, lower accuracy'}
+                {whisperModel === 'base' && 'Good balance of speed and accuracy'}
+                {whisperModel === 'small' && 'Better accuracy, slower'}
+                {whisperModel === 'medium' && 'High accuracy, much slower'}
+                {whisperModel === 'large' && 'Best accuracy, slowest'}
+              </div>
+            </div>
+          </div>
+          
+          <div style={{ 
+            fontSize: theme.typography.fontSize.sm, 
+            color: theme.colors.textSecondary,
+            fontStyle: 'italic'
+          }}>
+            Larger models provide better accuracy but take longer to process
+          </div>
+        </div>
+
         <div style={{ 
           display: 'flex', 
           gap: theme.spacing.md, 
           justifyContent: 'flex-end',
           paddingTop: theme.spacing.lg,
-          borderTop: `1px solid ${theme.colors.border}`
+          borderTop: `1px solid ${theme.colors.primary}20`
         }}>
           <button
             onClick={onClose}
@@ -195,7 +307,7 @@ const TranscriptionSettings: React.FC<TranscriptionSettingsProps> = ({
               padding: `${theme.spacing.md}px ${theme.spacing.xl}px`,
               backgroundColor: theme.colors.button.ghost,
               color: theme.colors.textSecondary,
-              border: `1px solid ${theme.colors.border}`,
+              border: `1px solid ${theme.colors.primary}20`,
               borderRadius: theme.radius.md,
               cursor: 'pointer',
               fontSize: theme.typography.fontSize.base,
@@ -219,7 +331,7 @@ const TranscriptionSettings: React.FC<TranscriptionSettingsProps> = ({
             style={{
               padding: `${theme.spacing.md}px ${theme.spacing.xl}px`,
               backgroundColor: theme.colors.primary,
-              color: theme.colors.primaryForeground,
+              color: theme.colors.modal.background,
               border: 'none',
               borderRadius: theme.radius.md,
               cursor: 'pointer',
@@ -230,7 +342,7 @@ const TranscriptionSettings: React.FC<TranscriptionSettingsProps> = ({
               boxShadow: `0 2px 8px ${theme.colors.primary}30`
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = theme.colors.primaryHover;
+              e.currentTarget.style.backgroundColor = theme.colors.button.ghostHover;
               e.currentTarget.style.boxShadow = `0 4px 12px ${theme.colors.primary}40`;
               e.currentTarget.style.transform = 'translateY(-1px)';
             }}
