@@ -18,7 +18,6 @@ import {
   ProjectManagerIcon,
   NewProjectIcon,
   SaveProjectIcon,
-  SaveProjectAsIcon,
   SettingsIcon,
   BotIcon,
   MusicIcon,
@@ -27,7 +26,6 @@ import {
   CloseIcon,
   ExportSrtIcon,
   ExportVideoIcon,
-  ExportVideoWithNewAudioIcon
 } from './components/IconComponents';
 
 interface AppState {
