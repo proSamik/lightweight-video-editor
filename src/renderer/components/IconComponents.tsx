@@ -17,6 +17,7 @@ import {
   Upload,
   FileDown
 } from 'lucide-react';
+import { FaXTwitter, FaYoutube } from 'react-icons/fa6';
 
 /**
  * Icon components to replace emojis throughout the application
@@ -168,5 +169,24 @@ export const AudioImportIcon: React.FC<{ size?: number }> = ({ size = 14 }) => (
       color: 'currentColor',
       opacity: 0.8
     }} />
+  </div>
+); 
+
+// Social Media Icons for AI Content Generation
+// X (Twitter) icon
+export const TwitterIcon: React.FC<{ size?: number }> = ({ size = 14 }) => (
+  <FaXTwitter size={size} />
+);
+
+// YouTube icon
+export const YoutubeIcon: React.FC<{ size?: number }> = ({ size = 14 }) => (
+  <FaYoutube size={size} />
+);
+
+// Combined Social Media icon (X + YouTube)
+export const SocialMediaIcon: React.FC<{ size?: number }> = ({ size = 14 }) => (
+  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+    <FaXTwitter size={size * 1} style={{ color: '#000000' }} />
+    <FaYoutube size={size * 1} style={{ color: '#FF0000' }} />
   </div>
 ); 
