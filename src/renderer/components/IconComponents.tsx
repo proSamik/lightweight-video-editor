@@ -12,7 +12,10 @@ import {
   PartyPopper,
   Folder,
   Video,
-  Download
+  Download,
+  Plus,
+  Upload,
+  FileDown
 } from 'lucide-react';
 
 /**
@@ -25,9 +28,9 @@ export const ProjectManagerIcon: React.FC<{ size?: number }> = ({ size = 14 }) =
   <FolderOpen size={size} />
 );
 
-// New Project icon
+// New Project icon - changed to Plus
 export const NewProjectIcon: React.FC<{ size?: number }> = ({ size = 14 }) => (
-  <FileText size={size} />
+  <Plus size={size} />
 );
 
 // Save Project icon
@@ -96,15 +99,16 @@ export const MusicWithCheckIcon: React.FC<{ size?: number }> = ({ size = 14 }) =
   </div>
 );
 
-// Music export icon (music with arrow)
+// Music export icon (download with small music overlay)
 export const MusicExportIcon: React.FC<{ size?: number }> = ({ size = 14 }) => (
   <div style={{ position: 'relative', display: 'inline-flex' }}>
-    <Music2 size={size} />
-    <ExternalLink size={size * 0.6} style={{ 
+    <Download size={size} />
+    <Music2 size={size * 0.5} style={{ 
       position: 'absolute', 
-      top: -2, 
-      right: -2,
-      transform: 'rotate(45deg)'
+      top: -1, 
+      right: -1,
+      color: 'currentColor',
+      opacity: 0.8
     }} />
   </div>
 );
@@ -124,9 +128,9 @@ export const ShowInFinderIcon: React.FC<{ size?: number }> = ({ size = 14 }) => 
   <Folder size={size} />
 );
 
-// Export SRT icon
+// Export SRT icon - changed to be more descriptive
 export const ExportSrtIcon: React.FC<{ size?: number }> = ({ size = 14 }) => (
-  <FileText size={size} />
+  <FileDown size={size} />
 );
 
 // Export Video icon
@@ -149,6 +153,20 @@ export const ExportVideoWithNewAudioIcon: React.FC<{ size?: number }> = ({ size 
       position: 'absolute', 
       top: -2, 
       right: -2
+    }} />
+  </div>
+); 
+
+// Audio Import icon (upload with small music overlay)
+export const AudioImportIcon: React.FC<{ size?: number }> = ({ size = 14 }) => (
+  <div style={{ position: 'relative', display: 'inline-flex' }}>
+    <Upload size={size} />
+    <Music size={size * 0.5} style={{ 
+      position: 'absolute', 
+      top: -1, 
+      right: -1,
+      color: 'currentColor',
+      opacity: 0.8
     }} />
   </div>
 ); 
