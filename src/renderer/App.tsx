@@ -27,6 +27,7 @@ import {
   ExportSrtIcon,
   ExportVideoIcon,
   AudioImportIcon,
+  SocialMediaIcon,
 } from './components/IconComponents';
 
 interface AppState {
@@ -1426,9 +1427,9 @@ const AppContent: React.FC = () => {
               title="Generate AI Content (Ctrl/Cmd+G)"
               style={{ padding: '2px 6px' }}
             >
-              <BotIcon size={14} />
+              <SocialMediaIcon size={14} />
               <span style={{ fontSize: '10px' }}>
-                Generate
+                AI Content
               </span>
             </Button>
             <Button
