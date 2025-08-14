@@ -90,7 +90,43 @@ const electronAPI = {
     ipcRenderer.invoke('get-audio-buffer', filePath),
   // Extract audio for project (persistent audio file)
   extractAudioForProject: (videoPath: string, projectPath: string) =>
-    ipcRenderer.invoke('extract-audio-for-project', videoPath, projectPath)
+    ipcRenderer.invoke('extract-audio-for-project', videoPath, projectPath),
+  
+  // Update-related APIs
+  checkForUpdates: () => 
+    ipcRenderer.invoke('check-for-updates'),
+  downloadUpdate: () =>
+    ipcRenderer.invoke('download-update'),
+  installUpdate: () =>
+    ipcRenderer.invoke('install-update'),
+  getUpdateStatus: () =>
+    ipcRenderer.invoke('get-update-status'),
+  
+  // Update event listeners
+  onUpdateAvailable: (callback: (updateInfo: any) => void) => {
+    ipcRenderer.on('update-available', (_, updateInfo) => callback(updateInfo));
+  },
+  onUpdateDownloaded: (callback: (updateInfo: any) => void) => {
+    ipcRenderer.on('update-downloaded', (_, updateInfo) => callback(updateInfo));
+  },
+  onUpdateDownloadProgress: (callback: (progress: any) => void) => {
+    ipcRenderer.on('update-download-progress', (_, progress) => callback(progress));
+  },
+  onUpdateError: (callback: (error: string) => void) => {
+    ipcRenderer.on('update-error', (_, error) => callback(error));
+  },
+  onShowUpdateChangelog: (callback: (updateInfo: any) => void) => {
+    ipcRenderer.on('show-update-changelog', (_, updateInfo) => callback(updateInfo));
+  },
+  
+  // Remove update event listeners
+  removeUpdateListeners: () => {
+    ipcRenderer.removeAllListeners('update-available');
+    ipcRenderer.removeAllListeners('update-downloaded');
+    ipcRenderer.removeAllListeners('update-download-progress');
+    ipcRenderer.removeAllListeners('update-error');
+    ipcRenderer.removeAllListeners('show-update-changelog');
+  }
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);
