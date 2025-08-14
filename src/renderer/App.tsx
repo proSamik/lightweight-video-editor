@@ -1203,47 +1203,82 @@ const AppContent: React.FC = () => {
       overflow: 'hidden'
     }}>
       
-      {/* Liquid Glass Drag Region */}
+      {/* Draggable Header with Border */}
       <div 
         style={{
           position: 'absolute',
           top: 0,
           left: 0,
-          right: '16px',
-          height: '72px',
+          right: 0,
+          height: '60px',
           WebkitAppRegion: 'drag',
-          zIndex: 50,
-          pointerEvents: 'none',
-          background: `linear-gradient(180deg, ${theme.colors.glass.background} 0%, transparent 100%)`,
+          zIndex: 100,
+          background: `linear-gradient(180deg, ${theme.colors.glass.background} 0%, ${theme.colors.background}E6 100%)`,
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-          borderBottom: `1px solid ${theme.colors.glass.border}`,
+          borderBottom: `1px solid ${theme.colors.border}`,
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+          display: 'grid',
+          gridTemplateColumns: 'minmax(250px, auto) 1fr minmax(250px, auto)',
+          alignItems: 'center',
+          padding: `0 ${theme.spacing.lg}`,
+          paddingLeft: '90px', // Extra space to avoid window controls
+          gap: theme.spacing.lg,
         }}
         className="drag-region"
-      />
-
-      {/* Arc-Inspired Top Menu Bar */}
-      <div style={{
-        position: 'absolute',
-        top: '16px',
-        left: '80px',
-        right: '16px',
-        zIndex: 100,
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        WebkitAppRegion: 'no-drag',
-        padding: `0 ${theme.spacing.md}`,
-      }}>
-        {/* Project Info Card */}
+      >
+        {/* Left Section - Project Actions */}
         <Card 
           variant="glass" 
-          padding="sm"
+          padding="sm" 
+          style={{ 
+            display: 'flex', 
+            gap: theme.spacing.xs,
+            WebkitAppRegion: 'no-drag',
+            background: `linear-gradient(180deg, ${theme.colors.glass.background} 0%, ${theme.colors.background}E6 100%)`,
+          }}
+        >
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowProjectManager(true)}
+            title="Project Manager (Ctrl/Cmd+O)"
+          >
+            <ProjectManagerIcon size={14} />
+            <span style={{ marginLeft: theme.spacing.xs, fontSize: theme.typography.fontSize.xs }}>
+              Files
+            </span>
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleNewProject}
+            title="New Project (Ctrl/Cmd+N)"
+          >
+            <NewProjectIcon size={14} />
+            <span style={{ marginLeft: theme.spacing.xs, fontSize: theme.typography.fontSize.xs }}>
+              New
+            </span>
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleSaveProject}
+            title="Save (Ctrl/Cmd+S) • Save As (Ctrl/Cmd+Shift+S)"
+          >
+            <SaveProjectIcon size={14} />
+            <span style={{ marginLeft: theme.spacing.xs, fontSize: theme.typography.fontSize.xs }}>
+              Save
+            </span>
+          </Button>
+        </Card>
+
+        {/* Center Section - Project Name */}
+        <div 
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: theme.spacing.sm,
-            minWidth: '200px',
+            textAlign: 'center',
+            WebkitAppRegion: 'no-drag',
+            justifySelf: 'center',
           }}
         >
           {isEditingProjectName ? (
@@ -1262,115 +1297,93 @@ const AppContent: React.FC = () => {
               autoFocus
               style={{
                 fontWeight: theme.typography.fontWeight.semibold,
-                fontSize: theme.typography.fontSize.sm,
+                fontSize: theme.typography.fontSize.lg,
                 backgroundColor: theme.colors.input.background,
                 color: theme.colors.text,
                 border: `1px solid ${theme.colors.input.borderFocus}`,
-                borderRadius: theme.radius.sm,
-                padding: `${theme.spacing.xs} ${theme.spacing.sm}`,
+                borderRadius: theme.radius.md,
+                padding: `${theme.spacing.sm} ${theme.spacing.md}`,
                 outline: 'none',
                 minWidth: '200px',
                 fontFamily: theme.typography.fontFamily,
+                textAlign: 'center',
               }}
             />
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <span 
+            <div
+              style={{ 
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+              }}
+              onClick={handleStartRename}
+              onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => {
+                const cardElement = e.currentTarget.firstElementChild as HTMLElement;
+                if (cardElement) {
+                  cardElement.style.backgroundColor = theme.colors.surfaceHover;
+                }
+              }}
+              onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => {
+                const cardElement = e.currentTarget.firstElementChild as HTMLElement;
+                if (cardElement) {
+                  cardElement.style.backgroundColor = 'transparent';
+                }
+              }}
+            >
+              <Card 
+                variant="glass" 
+                padding="sm"
                 style={{ 
-                  fontWeight: theme.typography.fontWeight.semibold,
-                  fontSize: theme.typography.fontSize.sm,
-                  cursor: 'pointer',
-                  padding: `${theme.spacing.xs} ${theme.spacing.sm}`,
-                  borderRadius: theme.radius.sm,
                   transition: 'all 0.2s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: theme.spacing.xs,
+                  minWidth: '220px',
+                  maxWidth: '350px',
+                  background: `linear-gradient(180deg, ${theme.colors.glass.background} 0%, ${theme.colors.background}E6 100%)`,
                 }}
-                onClick={handleStartRename}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-                title="Click to rename project"
               >
-                {currentProjectInfo.projectName}
+              <div style={{ 
+                fontWeight: theme.typography.fontWeight.semibold,
+                fontSize: theme.typography.fontSize.xs,
+                color: theme.colors.text,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: theme.spacing.xs,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}>
+                {currentProjectInfo.projectName.replace(/\.lvep$/, '')}
                 {currentProjectInfo.isModified && (
                   <span style={{ 
                     color: theme.colors.primary,
-                    fontSize: '8px',
+                    fontSize: theme.typography.fontSize.xs,
                     fontWeight: theme.typography.fontWeight.bold 
                   }}>
                     ●
                   </span>
                 )}
-              </span>
-              {currentProjectInfo.projectPath && (
-                <span style={{ 
-                  fontSize: theme.typography.fontSize.xs, 
-                  color: theme.colors.textMuted,
-                  paddingLeft: theme.spacing.sm,
-                }}>
-                  {currentProjectInfo.projectPath.split('/').pop()}
-                </span>
-              )}
+              </div>
+              </Card>
             </div>
           )}
-        </Card>
+        </div>
 
-        {/* Action Buttons - Liquid Design */}
+        {/* Right Section - Action Buttons */}
         <div style={{
           display: 'flex',
-          gap: theme.spacing.sm,
+          gap: theme.spacing.xs,
           alignItems: 'center',
+          WebkitAppRegion: 'no-drag',
+          justifySelf: 'end',
         }}>
-          {/* Primary Actions Group */}
-          <Card variant="glass" padding="sm" style={{ display: 'flex', gap: theme.spacing.xs }}>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowProjectManager(true)}
-              title="Project Manager (Ctrl/Cmd+O)"
-            >
-              <ProjectManagerIcon size={16} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleNewProject}
-              title="New Project (Ctrl/Cmd+N)"
-            >
-              <NewProjectIcon size={16} />
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handleSaveProject}
-              title="Save Project (Ctrl/Cmd+S)"
-            >
-              <SaveProjectIcon size={16} />
-            </Button>
-          </Card>
-          
-          {/* Secondary Actions */}
-          <Card variant="glass" padding="sm" style={{ display: 'flex', gap: theme.spacing.xs }}>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleSaveProjectAs}
-              title="Save Project As (Ctrl/Cmd+Shift+S)"
-            >
-              <SaveProjectAsIcon size={16} />
-            </Button>
+          {/* Settings and AI */}
+          <Card variant="glass" padding="sm" style={{ display: 'flex', gap: theme.spacing.xs, background: `linear-gradient(180deg, ${theme.colors.glass.background} 0%, ${theme.colors.background}E6 100%)` }}>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setShowAISettings(true)}
               title="AI Settings (Ctrl/Cmd+,)"
             >
-              <SettingsIcon size={16} />
+              <SettingsIcon size={14} />
             </Button>
             <Button
               variant="ghost"
@@ -1379,33 +1392,33 @@ const AppContent: React.FC = () => {
               disabled={captions.length === 0}
               title="Generate AI Content (Ctrl/Cmd+G)"
             >
-              <BotIcon size={16} />
+              <BotIcon size={14} />
             </Button>
           </Card>
           
           {/* Audio Actions */}
-          <Card variant="glass" padding="sm" style={{ display: 'flex', gap: theme.spacing.xs, alignItems: 'center' }}>
+          <Card variant="glass" padding="sm" style={{ display: 'flex', gap: theme.spacing.xs, alignItems: 'center', background: `linear-gradient(180deg, ${theme.colors.glass.background} 0%, ${theme.colors.background}E6 100%)` }}>
             <Button
               variant="ghost"
               size="sm"
               onClick={handleAudioImport}
               disabled={!videoFile}
-              title={replacementAudioPath ? `Audio Replacement Set: ${replacementAudioPath.split('/').pop()}` : "Replace Video Audio Track"}
+              title="Replace Video Audio Track"
             >
-              {replacementAudioPath ? <MusicWithCheckIcon size={16} /> : <MusicIcon size={16} />}
+              {replacementAudioPath ? <MusicWithCheckIcon size={14} /> : <MusicIcon size={14} />}
             </Button>
             {replacementAudioPath && (
               <Button
                 variant="destructive"
                 size="sm"
                 onClick={() => setReplacementAudioPath(null)}
-                title="Clear audio replacement"
+                title="Clear Audio Replacement"
               >
-                <CloseIcon size={16} />
+                <CloseIcon size={12} />
               </Button>
             )}
             <Button
-              variant="success"
+              variant="ghost"
               size="sm"
               onClick={handleAudioExport}
               disabled={!videoFile}
@@ -1416,7 +1429,7 @@ const AppContent: React.FC = () => {
           </Card>
 
           {/* Export Actions */}
-          <Card variant="glass" padding="sm" style={{ display: 'flex', gap: theme.spacing.xs }}>
+          <Card variant="glass" padding="sm" style={{ display: 'flex', gap: theme.spacing.xs, background: `linear-gradient(180deg, ${theme.colors.glass.background} 0%, ${theme.colors.background}E6 100%)` }}>
             <Button
               variant="ghost"
               size="sm"
@@ -1424,7 +1437,7 @@ const AppContent: React.FC = () => {
               disabled={!captions || captions.length === 0}
               title="Export SRT Subtitle File"
             >
-              <ExportSrtIcon size={16} />
+              <ExportSrtIcon size={14} />
             </Button>
             <Button
               variant="primary"
@@ -1433,19 +1446,8 @@ const AppContent: React.FC = () => {
               disabled={!videoFile || !captions || captions.length === 0}
               title="Export Video with Captions"
             >
-              <ExportVideoIcon size={16} />
+              <ExportVideoIcon size={14} />
             </Button>
-            {replacementAudioPath && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleExportVideoWithNewAudio}
-                disabled={!videoFile}
-                title="Export Video with New Audio (No Subtitles)"
-              >
-                <ExportVideoWithNewAudioIcon size={16} />
-              </Button>
-            )}
           </Card>
         </div>
       </div>
@@ -1455,7 +1457,7 @@ const AppContent: React.FC = () => {
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
-        paddingTop: '88px', // Account for new header height
+        paddingTop: '70px', // Account for new header height (60px + 10px spacing)
         backgroundColor: theme.colors.background,
         overflow: 'hidden',
       }}>
@@ -1464,8 +1466,8 @@ const AppContent: React.FC = () => {
           flex: 1,
           display: 'flex',
           minHeight: 0,
-          gap: videoFile ? theme.spacing.sm : 0,
-          padding: videoFile ? theme.spacing.sm : 0,
+          gap: videoFile ? theme.spacing.md : 0,
+          padding: videoFile ? theme.spacing.md : theme.spacing.md,
         }}>
           {videoFile ? (
             <>
