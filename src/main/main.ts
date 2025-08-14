@@ -9,6 +9,7 @@ import ProjectManager from '../services/projectManager';
 import { SrtExporter } from '../services/srtExporter';
 import { AIService } from '../services/aiService';
 import { SettingsManager } from '../services/settingsManager';
+import { UpdateService } from '../services/updateService';
 
 let mainWindow: BrowserWindow;
 
@@ -117,6 +118,24 @@ app.whenReady().then(async () => {
     }
   } catch (error) {
     console.error('Failed to load AI settings on startup:', error);
+  }
+  
+  // Initialize update service
+  try {
+    const updateService = UpdateService.getInstance();
+    updateService.setMainWindow(mainWindow);
+    
+    // Check for updates on startup (after a delay to let the app fully load)
+    setTimeout(() => {
+      updateService.checkForUpdates().catch(console.error);
+    }, 5000); // 5 second delay
+    
+    // Setup periodic update checks
+    updateService.setupPeriodicChecks();
+    
+    console.log('Update service initialized successfully');
+  } catch (error) {
+    console.error('Failed to initialize update service:', error);
   }
 });
 
@@ -736,5 +755,49 @@ ipcMain.handle('rename-current-project', async (_event, newName: string) => {
   } catch (error) {
     console.error('Failed to rename current project:', error);
     throw new Error(`Failed to rename current project: ${error}`);
+  }
+});
+
+// Update-related IPC handlers
+ipcMain.handle('check-for-updates', async () => {
+  try {
+    const updateService = UpdateService.getInstance();
+    await updateService.checkForUpdates();
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to check for updates:', error);
+    throw new Error(`Failed to check for updates: ${error}`);
+  }
+});
+
+ipcMain.handle('download-update', async () => {
+  try {
+    const updateService = UpdateService.getInstance();
+    await updateService.downloadUpdate();
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to download update:', error);
+    throw new Error(`Failed to download update: ${error}`);
+  }
+});
+
+ipcMain.handle('install-update', async () => {
+  try {
+    const updateService = UpdateService.getInstance();
+    updateService.quitAndInstall();
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to install update:', error);
+    throw new Error(`Failed to install update: ${error}`);
+  }
+});
+
+ipcMain.handle('get-update-status', async () => {
+  try {
+    const updateService = UpdateService.getInstance();
+    return updateService.getUpdateStatus();
+  } catch (error) {
+    console.error('Failed to get update status:', error);
+    throw new Error(`Failed to get update status: ${error}`);
   }
 });
