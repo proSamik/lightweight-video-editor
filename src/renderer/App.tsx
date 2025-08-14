@@ -26,6 +26,7 @@ import {
   CloseIcon,
   ExportSrtIcon,
   ExportVideoIcon,
+  AudioImportIcon,
 } from './components/IconComponents';
 
 interface AppState {
@@ -1245,11 +1246,11 @@ const AppContent: React.FC = () => {
           borderBottom: `1px solid ${theme.colors.border}`,
           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
           display: 'grid',
-          gridTemplateColumns: 'minmax(250px, auto) 1fr minmax(250px, auto)',
+          gridTemplateColumns: 'minmax(200px, auto) 1fr minmax(200px, auto)',
           alignItems: 'center',
           padding: `0 ${theme.spacing.lg}`,
           paddingLeft: '90px', // Extra space to avoid window controls
-          gap: theme.spacing.lg,
+          gap: '1px',
         }}
         className="drag-region"
       >
@@ -1259,7 +1260,7 @@ const AppContent: React.FC = () => {
           padding="sm" 
           style={{ 
             display: 'flex', 
-            gap: theme.spacing.xs,
+            gap: '5px',
             WebkitAppRegion: 'no-drag',
             background: `linear-gradient(180deg, ${theme.colors.glass.background} 0%, ${theme.colors.background}E6 100%)`,
           }}
@@ -1269,10 +1270,11 @@ const AppContent: React.FC = () => {
             size="sm"
             onClick={() => setShowProjectManager(true)}
             title="Project Manager (Ctrl/Cmd+O)"
+            style={{ padding: '2px 6px' }}
           >
             <ProjectManagerIcon size={14} />
-            <span style={{ marginLeft: theme.spacing.xs, fontSize: theme.typography.fontSize.xs }}>
-              Files
+            <span style={{ fontSize: '10px' }}>
+              Projects
             </span>
           </Button>
           <Button
@@ -1280,9 +1282,10 @@ const AppContent: React.FC = () => {
             size="sm"
             onClick={handleNewProject}
             title="New Project (Ctrl/Cmd+N)"
+            style={{ padding: '2px 6px' }}
           >
             <NewProjectIcon size={14} />
-            <span style={{ marginLeft: theme.spacing.xs, fontSize: theme.typography.fontSize.xs }}>
+            <span style={{ fontSize: '10px' }}>
               New
             </span>
           </Button>
@@ -1291,9 +1294,10 @@ const AppContent: React.FC = () => {
             size="sm"
             onClick={handleSaveProject}
             title="Save (Ctrl/Cmd+S) • Save As (Ctrl/Cmd+Shift+S)"
+            style={{ padding: '2px 6px' }}
           >
             <SaveProjectIcon size={14} />
-            <span style={{ marginLeft: theme.spacing.xs, fontSize: theme.typography.fontSize.xs }}>
+            <span style={{ fontSize: '10px' }}>
               Save
             </span>
           </Button>
@@ -1339,7 +1343,7 @@ const AppContent: React.FC = () => {
             <div
               style={{ 
                 cursor: 'pointer',
-                transition: 'all 0.2s ease',
+                transition: 'all 0.1s ease',
               }}
               onClick={handleStartRename}
               onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => {
@@ -1359,7 +1363,7 @@ const AppContent: React.FC = () => {
                 variant="glass" 
                 padding="sm"
                 style={{ 
-                  transition: 'all 0.2s ease',
+                  transition: 'all 0.1s ease',
                   minWidth: '220px',
                   maxWidth: '350px',
                   background: `linear-gradient(180deg, ${theme.colors.glass.background} 0%, ${theme.colors.background}E6 100%)`,
@@ -1396,20 +1400,23 @@ const AppContent: React.FC = () => {
         {/* Right Section - Action Buttons */}
         <div style={{
           display: 'flex',
-          gap: theme.spacing.xs,
           alignItems: 'center',
           WebkitAppRegion: 'no-drag',
           justifySelf: 'end',
         }}>
-          {/* Settings and AI */}
-          <Card variant="glass" padding="sm" style={{ display: 'flex', gap: theme.spacing.xs, background: `linear-gradient(180deg, ${theme.colors.glass.background} 0%, ${theme.colors.background}E6 100%)` }}>
+          {/* Combined Action Group */}
+          <Card variant="glass" padding="sm" style={{ display: 'flex', gap: '5px', background: `linear-gradient(180deg, ${theme.colors.glass.background} 0%, ${theme.colors.background}E6 100%)` }}>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setShowAISettings(true)}
               title="AI Settings (Ctrl/Cmd+,)"
+              style={{ padding: '2px 6px' }}
             >
               <SettingsIcon size={14} />
+              <span style={{ fontSize: '10px' }}>
+                AI Settings
+              </span>
             </Button>
             <Button
               variant="ghost"
@@ -1417,21 +1424,25 @@ const AppContent: React.FC = () => {
               onClick={() => captions.length > 0 && setShowAIContent(true)}
               disabled={captions.length === 0}
               title="Generate AI Content (Ctrl/Cmd+G)"
+              style={{ padding: '2px 6px' }}
             >
               <BotIcon size={14} />
+              <span style={{ fontSize: '10px' }}>
+                Generate
+              </span>
             </Button>
-          </Card>
-          
-          {/* Audio Actions */}
-          <Card variant="glass" padding="sm" style={{ display: 'flex', gap: theme.spacing.xs, alignItems: 'center', background: `linear-gradient(180deg, ${theme.colors.glass.background} 0%, ${theme.colors.background}E6 100%)` }}>
             <Button
               variant="ghost"
               size="sm"
               onClick={handleAudioImport}
               disabled={!videoFile}
               title="Replace Video Audio Track"
+              style={{ padding: '2px 6px' }}
             >
-              {replacementAudioPath ? <MusicWithCheckIcon size={14} /> : <MusicIcon size={14} />}
+              {replacementAudioPath ? <MusicWithCheckIcon size={14} /> : <AudioImportIcon size={14} />}
+              <span style={{ fontSize: '10px' }}>
+                {replacementAudioPath ? 'Audio Set' : 'Replace Audio'}
+              </span>
             </Button>
             {replacementAudioPath && (
               <Button
@@ -1439,31 +1450,39 @@ const AppContent: React.FC = () => {
                 size="sm"
                 onClick={() => setReplacementAudioPath(null)}
                 title="Clear Audio Replacement"
+                style={{ padding: '2px 6px' }}
               >
                 <CloseIcon size={12} />
+                <span style={{ fontSize: '10px' }}>
+                  Clear
+                </span>
               </Button>
             )}
             <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleAudioExport}
-              disabled={!videoFile}
-              title="Export Audio from Video"
-            >
-              <MusicExportIcon size={14} />
-            </Button>
-          </Card>
-
-          {/* Export Actions */}
-          <Card variant="glass" padding="sm" style={{ display: 'flex', gap: theme.spacing.xs, background: `linear-gradient(180deg, ${theme.colors.glass.background} 0%, ${theme.colors.background}E6 100%)` }}>
-            <Button
-              variant="ghost"
+              variant="primary"
               size="sm"
               onClick={handleSrtExport}
               disabled={!captions || captions.length === 0}
               title="Export SRT Subtitle File"
+              style={{ padding: '2px 6px' }}
             >
               <ExportSrtIcon size={14} />
+              <span style={{  fontSize: '10px' }}>
+                SRT
+              </span>
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleAudioExport}
+              disabled={!videoFile}
+              title="Export Audio from Video"
+              style={{ padding: '2px 6px' }}
+            >
+              <MusicExportIcon size={14} />
+              <span style={{ fontSize: '10px' }}>
+                Audio
+              </span>
             </Button>
             <Button
               variant="primary"
@@ -1471,8 +1490,12 @@ const AppContent: React.FC = () => {
               onClick={handleShowExportSettings}
               disabled={!videoFile || !captions || captions.length === 0}
               title="Export Video with Captions"
+              style={{ padding: '2px 6px' }}
             >
               <ExportVideoIcon size={14} />
+              <span style={{  fontSize: '10px' }}>
+                Video
+              </span>
             </Button>
           </Card>
         </div>
