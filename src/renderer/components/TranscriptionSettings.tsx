@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
+import { LiquidModal } from './ui';
+import { SettingsIcon } from './IconComponents';
 
 interface TranscriptionSettingsProps {
   isOpen: boolean;
@@ -49,8 +51,6 @@ const TranscriptionSettings: React.FC<TranscriptionSettingsProps> = ({
     }
   };
 
-  if (!isOpen) return null;
-
   const handleConfirm = () => {
     // Validate inputs before confirming
     if (maxCharsPerLine < 12) {
@@ -67,261 +67,293 @@ const TranscriptionSettings: React.FC<TranscriptionSettingsProps> = ({
   };
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: theme.colors.modal.overlay,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000,
-      backdropFilter: 'blur(8px)',
-      WebkitBackdropFilter: 'blur(8px)'
-    }}>
-      <div style={{
-        backgroundColor: theme.colors.modal.background,
-        padding: '32px',
-        borderRadius: theme.radius.xl,
-        minWidth: '480px',
-        border: theme.colors.modal.border,
-        boxShadow: theme.colors.modal.shadow,
-        position: 'relative',
-        overflow: 'hidden'
-      }}>
-        {/* Blue gradient header */}
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: '4px',
-          background: `linear-gradient(90deg, ${theme.colors.primary}, ${theme.colors.secondary})`,
-        }} />
-        
-        <h3 style={{ 
-          margin: '0 0 24px 0', 
-          fontSize: theme.typography.fontSize.xxl, 
-          fontWeight: theme.typography.fontWeight.bold,
-          color: theme.colors.text,
-          fontFamily: theme.typography.fontFamily
-        }}>
-          Transcription Settings
-        </h3>
-        
-        <div style={{ marginBottom: '24px' }}>
-          <label style={{ 
-            display: 'block', 
-            marginBottom: '12px', 
-            fontSize: theme.typography.fontSize.base,
-            fontWeight: theme.typography.fontWeight.medium,
-            color: theme.colors.text,
-            fontFamily: theme.typography.fontFamily
-          }}>
-            Maximum Characters per Line: <span style={{ color: theme.colors.primary, fontWeight: theme.typography.fontWeight.bold }}>{maxCharsPerLine}</span>
-          </label>
+    <>
+      <style>
+        {`
+          input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: ${theme.colors.primary};
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+          }
           
-          {/* Blue-themed range slider container */}
-          <div style={{
-            padding: theme.spacing.md,
-            backgroundColor: theme.colors.primarySubtle,
-            borderRadius: theme.radius.lg,
-            border: `1px solid ${theme.colors.primary}20`,
-            marginBottom: theme.spacing.sm
-          }}>
-            <input
-              type="range"
-              min="12"
-              max="200"
-              step="1"
-              value={maxCharsPerLine}
-              onChange={(e) => setMaxCharsPerLine(parseInt(e.target.value))}
-              style={{
-                width: '100%',
-                height: '8px',
-                borderRadius: '4px',
-                background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${((maxCharsPerLine - 12) / (200 - 12)) * 100}%, ${theme.colors.border} ${((maxCharsPerLine - 12) / (200 - 12)) * 100}%, ${theme.colors.border} 100%)`,
-                outline: 'none',
-                appearance: 'none',
-                cursor: 'pointer'
-              }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', fontSize: theme.typography.fontSize.xs, color: theme.colors.primary, fontWeight: theme.typography.fontWeight.medium }}>
-              <span>12</span>
-              <span>200</span>
-            </div>
-          </div>
+          input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: ${theme.colors.primary};
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+          }
           
-          <div style={{ 
-            fontSize: theme.typography.fontSize.sm, 
-            color: theme.colors.textSecondary,
-            fontStyle: 'italic'
-          }}>
-            Text will wrap when this limit is reached
-          </div>
-        </div>
-
-        <div style={{ marginBottom: '32px' }}>
-          <label style={{ 
-            display: 'block', 
-            marginBottom: '12px', 
-            fontSize: theme.typography.fontSize.base,
-            fontWeight: theme.typography.fontWeight.medium,
-            color: theme.colors.text,
-            fontFamily: theme.typography.fontFamily
-          }}>
-            Maximum Words per Line: <span style={{ color: theme.colors.primary, fontWeight: theme.typography.fontWeight.bold }}>{maxWordsPerLine}</span>
-          </label>
-          
-          {/* Blue-themed range slider container */}
-          <div style={{
-            padding: theme.spacing.md,
-            backgroundColor: theme.colors.primarySubtle,
-            borderRadius: theme.radius.lg,
-            border: `1px solid ${theme.colors.primary}20`,
-            marginBottom: theme.spacing.sm
-          }}>
-            <input
-              type="range"
-              min="3"
-              max="20"
-              step="1"
-              value={maxWordsPerLine}
-              onChange={(e) => setMaxWordsPerLine(parseInt(e.target.value))}
-              style={{
-                width: '100%',
-                height: '8px',
-                borderRadius: '4px',
-                background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${((maxWordsPerLine - 3) / (20 - 3)) * 100}%, ${theme.colors.border} ${((maxWordsPerLine - 3) / (20 - 3)) * 100}%, ${theme.colors.border} 100%)`,
-                outline: 'none',
-                appearance: 'none',
-                cursor: 'pointer'
-              }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', fontSize: theme.typography.fontSize.xs, color: theme.colors.primary, fontWeight: theme.typography.fontWeight.medium }}>
-              <span>3</span>
-              <span>20</span>
-            </div>
-          </div>
-          
-          <div style={{ 
-            fontSize: theme.typography.fontSize.sm, 
-            color: theme.colors.textSecondary,
-            fontStyle: 'italic'
-          }}>
-            Text will wrap after this many words
-          </div>
-        </div>
-
-        <div style={{ marginBottom: '32px' }}>
-          <label style={{ 
-            display: 'block', 
-            marginBottom: '12px', 
-            fontSize: theme.typography.fontSize.base,
-            fontWeight: theme.typography.fontWeight.medium,
-            color: theme.colors.text,
-            fontFamily: theme.typography.fontFamily
+          input[type="range"]::-ms-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: ${theme.colors.primary};
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+          }
+        `}
+      </style>
+    <LiquidModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Transcription Settings"
+      subtitle="Configure how your video will be transcribed"
+      icon={<SettingsIcon size={24} />}
+      maxWidth="500px"
+    >
+      <div style={{ padding: '20px' }}>
+        {/* Whisper Model Selection */}
+                  <div style={{ marginBottom: '24px' }}>
+          <h3 style={{
+            margin: '0 0 16px 0',
+            fontSize: '18px',
+            fontWeight: '600',
+            color: theme.colors.text
           }}>
             Whisper Model
-          </label>
-          
-          <div style={{
-            padding: theme.spacing.md,
-            backgroundColor: theme.colors.primarySubtle,
-            borderRadius: theme.radius.lg,
-            border: `1px solid ${theme.colors.primary}20`,
-            marginBottom: theme.spacing.sm
-          }}>
-            <select
-              value={whisperModel}
-              onChange={(e) => setWhisperModel(e.target.value)}
-              style={{
-                width: '100%',
-                padding: `${theme.spacing.sm}px ${theme.spacing.md}px`,
-                backgroundColor: theme.colors.modal.background,
-                color: theme.colors.text,
-                border: `1px solid ${theme.colors.border}`,
-                borderRadius: theme.radius.md,
-                fontSize: theme.typography.fontSize.base,
-                fontFamily: theme.typography.fontFamily,
-                cursor: 'pointer',
-                outline: 'none'
-              }}
-            >
-              {whisperModels.map((model) => (
-                <option key={model.value} value={model.value}>
-                  {model.label}
-                </option>
-              ))}
-            </select>
-            
-            <div style={{
-              marginTop: theme.spacing.sm,
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
-              <div style={{
-                fontSize: theme.typography.fontSize.sm,
-                color: theme.colors.primary
-              }}>
-                Estimated time: <strong style={{ color: theme.colors.primary }}>
-                  {getEstimatedTime(whisperModel, videoDuration)}
-                </strong>
-              </div>
-              <div style={{
-                fontSize: theme.typography.fontSize.sm,
-                color: theme.colors.textSecondary,
-                fontStyle: 'italic'
-              }}>
-                {whisperModel === 'tiny' && 'Fastest, lower accuracy'}
-                {whisperModel === 'base' && 'Good balance of speed and accuracy'}
-                {whisperModel === 'small' && 'Better accuracy, slower'}
-                {whisperModel === 'medium' && 'High accuracy, much slower'}
-                {whisperModel === 'large' && 'Best accuracy, slowest'}
-              </div>
-            </div>
-          </div>
-          
-          <div style={{ 
-            fontSize: theme.typography.fontSize.sm, 
+          </h3>
+          <p style={{
+            margin: '0 0 16px 0',
+            fontSize: '14px',
             color: theme.colors.textSecondary,
-            fontStyle: 'italic'
+            lineHeight: '1.5'
           }}>
-            Larger models provide better accuracy but take longer to process
+            Choose the Whisper model for transcription. Larger models are more accurate but take longer to process.
+          </p>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(5, 1fr)',
+            gap: '8px'
+          }}>
+            {whisperModels.map((model) => (
+              <button
+                key={model.value}
+                onClick={() => setWhisperModel(model.value)}
+                style={{
+                  padding: '12px 16px',
+                  backgroundColor: whisperModel === model.value 
+                    ? theme.colors.primary 
+                    : theme.colors.surface,
+                  color: whisperModel === model.value 
+                    ? theme.colors.primaryForeground 
+                    : theme.colors.text,
+                  border: `1px solid ${whisperModel === model.value 
+                    ? theme.colors.primary 
+                    : theme.colors.border}`,
+                  borderRadius: theme.radius.md,
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+                onMouseEnter={(e) => {
+                  if (whisperModel !== model.value) {
+                    e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (whisperModel !== model.value) {
+                    e.currentTarget.style.backgroundColor = theme.colors.surface;
+                  }
+                }}
+              >
+                <span style={{ fontWeight: '600' }}>{model.label}</span>
+                <span style={{ 
+                  fontSize: '12px', 
+                  opacity: 0.8,
+                  textAlign: 'center'
+                }}>
+                  {getEstimatedTime(model.value, videoDuration)}
+                </span>
+              </button>
+            ))}
           </div>
         </div>
 
-        <div style={{ 
-          display: 'flex', 
-          gap: theme.spacing.md, 
+        {/* Text Formatting Settings */}
+        <div style={{ marginBottom: '24px' }}>
+          <h3 style={{
+            margin: '0 0 16px 0',
+            fontSize: '18px',
+            fontWeight: '600',
+            color: theme.colors.text
+          }}>
+            Text Formatting
+          </h3>
+          <p style={{
+            margin: '0 0 16px 0',
+            fontSize: '14px',
+            color: theme.colors.textSecondary,
+            lineHeight: '1.5'
+          }}>
+            Configure how the transcribed text will be formatted for captions.
+          </p>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* Max Characters Per Line */}
+            <div>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '8px'
+              }}>
+                <label style={{
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  color: theme.colors.text
+                }}>
+                  Max Characters Per Line
+                </label>
+                <span style={{
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: theme.colors.text
+                }}>
+                  {maxCharsPerLine}
+                </span>
+              </div>
+                             <div style={{
+                 padding: '12px',
+                 backgroundColor: theme.colors.modal.background,
+                 borderRadius: theme.radius.lg,
+                 border: `1px solid ${theme.colors.border}`
+               }}>
+                 <input
+                   type="range"
+                   min="12"
+                   max="50"
+                   step="1"
+                   value={maxCharsPerLine}
+                   onChange={(e) => setMaxCharsPerLine(parseInt(e.target.value))}
+                   style={{
+                     width: '100%',
+                     height: '6px',
+                     borderRadius: '3px',
+                     background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${((maxCharsPerLine - 12) / (50 - 12)) * 100}%, ${theme.colors.border} ${((maxCharsPerLine - 12) / (50 - 12)) * 100}%, ${theme.colors.border} 100%)`,
+                     outline: 'none',
+                     appearance: 'none',
+                     cursor: 'pointer',
+                     WebkitAppearance: 'none',
+                     MozAppearance: 'none'
+                   }}
+                 />
+                 <div style={{
+                   display: 'flex',
+                   justifyContent: 'space-between',
+                   marginTop: '8px',
+                   fontSize: '12px',
+                   color: theme.colors.textSecondary,
+                   fontWeight: '500'
+                 }}>
+                   <span>12</span>
+                   <span>50</span>
+                 </div>
+               </div>
+            </div>
+
+            {/* Max Words Per Line */}
+            <div>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '8px'
+              }}>
+                <label style={{
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  color: theme.colors.text
+                }}>
+                  Max Words Per Line
+                </label>
+                <span style={{
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: theme.colors.text
+                }}>
+                  {maxWordsPerLine}
+                </span>
+              </div>
+                             <div style={{
+                 padding: '12px',
+                 backgroundColor: theme.colors.modal.background,
+                 borderRadius: theme.radius.lg,
+                 border: `1px solid ${theme.colors.border}`
+               }}>
+                 <input
+                   type="range"
+                   min="1"
+                   max="10"
+                   step="1"
+                   value={maxWordsPerLine}
+                   onChange={(e) => setMaxWordsPerLine(parseInt(e.target.value))}
+                   style={{
+                     width: '100%',
+                     height: '6px',
+                     borderRadius: '3px',
+                     background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${((maxWordsPerLine - 1) / (10 - 1)) * 100}%, ${theme.colors.border} ${((maxWordsPerLine - 1) / (10 - 1)) * 100}%, ${theme.colors.border} 100%)`,
+                     outline: 'none',
+                     appearance: 'none',
+                     cursor: 'pointer'
+                   }}
+                 />
+                 <div style={{
+                   display: 'flex',
+                   justifyContent: 'space-between',
+                   marginTop: '8px',
+                   fontSize: '12px',
+                   color: theme.colors.textSecondary,
+                   fontWeight: '500'
+                 }}>
+                   <span>1</span>
+                   <span>10</span>
+                 </div>
+               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div style={{
+          display: 'flex',
+          gap: '12px',
           justifyContent: 'flex-end',
-          paddingTop: theme.spacing.lg,
-          borderTop: `1px solid ${theme.colors.primary}20`
+          borderTop: `1px solid ${theme.colors.border}`,
+          paddingTop: '24px'
         }}>
           <button
             onClick={onClose}
             style={{
-              padding: `${theme.spacing.md}px ${theme.spacing.xl}px`,
-              backgroundColor: theme.colors.button.ghost,
-              color: theme.colors.textSecondary,
-              border: `1px solid ${theme.colors.primary}20`,
+              padding: '12px 24px',
+              backgroundColor: 'transparent',
+              color: theme.colors.text,
+              border: `1px solid ${theme.colors.border}`,
               borderRadius: theme.radius.md,
               cursor: 'pointer',
-              fontSize: theme.typography.fontSize.base,
-              fontWeight: theme.typography.fontWeight.medium,
-              fontFamily: theme.typography.fontFamily,
+              fontSize: '14px',
+              fontWeight: '500',
               transition: 'all 0.2s ease'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = theme.colors.button.ghostHover;
-              e.currentTarget.style.borderColor = theme.colors.borderHover;
+              e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = theme.colors.button.ghost;
-              e.currentTarget.style.borderColor = theme.colors.border;
+              e.currentTarget.style.backgroundColor = 'transparent';
             }}
           >
             Cancel
@@ -329,34 +361,29 @@ const TranscriptionSettings: React.FC<TranscriptionSettingsProps> = ({
           <button
             onClick={handleConfirm}
             style={{
-              padding: `${theme.spacing.md}px ${theme.spacing.xl}px`,
+              padding: '12px 24px',
               backgroundColor: theme.colors.primary,
-              color: theme.colors.modal.background,
-              border: 'none',
+              color: theme.colors.primaryForeground,
+              border: `1px solid ${theme.colors.primary}`,
               borderRadius: theme.radius.md,
               cursor: 'pointer',
-              fontSize: theme.typography.fontSize.base,
-              fontWeight: theme.typography.fontWeight.semibold,
-              fontFamily: theme.typography.fontFamily,
-              transition: 'all 0.2s ease',
-              boxShadow: `0 2px 8px ${theme.colors.primary}30`
+              fontSize: '14px',
+              fontWeight: '500',
+              transition: 'all 0.2s ease'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = theme.colors.button.ghostHover;
-              e.currentTarget.style.boxShadow = `0 4px 12px ${theme.colors.primary}40`;
-              e.currentTarget.style.transform = 'translateY(-1px)';
+              e.currentTarget.style.backgroundColor = theme.colors.primaryHover;
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = theme.colors.primary;
-              e.currentTarget.style.boxShadow = `0 2px 8px ${theme.colors.primary}30`;
-              e.currentTarget.style.transform = 'translateY(0)';
             }}
           >
             Start Transcription
           </button>
         </div>
       </div>
-    </div>
+    </LiquidModal>
+    </>
   );
 };
 
