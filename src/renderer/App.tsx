@@ -1297,7 +1297,7 @@ const AppContent: React.FC = () => {
               autoFocus
               style={{
                 fontWeight: theme.typography.fontWeight.semibold,
-                fontSize: theme.typography.fontSize.lg,
+                fontSize: theme.typography.fontSize.xs,
                 backgroundColor: theme.colors.input.background,
                 color: theme.colors.text,
                 border: `1px solid ${theme.colors.input.borderFocus}`,
