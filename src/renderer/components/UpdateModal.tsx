@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Download, RotateCcw, ExternalLink, CheckCircle, AlertCircle } from 'lucide-react';
-import { Modal } from './ui/Modal';
+import { Download, RotateCcw, ExternalLink, CheckCircle, AlertCircle } from 'lucide-react';
+import LiquidModal from './ui/LiquidModal';
 import { Button } from './ui/Button';
 
 interface UpdateInfo {
@@ -104,183 +104,200 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
       case 'downloaded':
         return 'Update Ready to Install';
       case 'changelog':
-        return `What's New in v${updateInfo?.version}`;
+        return 'Release Notes';
       default:
         return 'Update';
+    }
+  };
+
+  const getModalSubtitle = () => {
+    switch (type) {
+      case 'available':
+        return `Version ${updateInfo?.version} is now available for download`;
+      case 'downloaded':
+        return `Version ${updateInfo?.version} has been downloaded and is ready to install`;
+      case 'changelog':
+        return `What's new in version ${updateInfo?.version}`;
+      default:
+        return '';
     }
   };
 
   const getModalIcon = () => {
     switch (type) {
       case 'available':
-        return <Download className="w-6 h-6 text-blue-500" />;
+        return <Download size={24} />;
       case 'downloaded':
-        return <CheckCircle className="w-6 h-6 text-green-500" />;
+        return <CheckCircle size={24} />;
       case 'changelog':
-        return <ExternalLink className="w-6 h-6 text-purple-500" />;
+        return <AlertCircle size={24} />;
       default:
-        return <AlertCircle className="w-6 h-6 text-gray-500" />;
+        return <Download size={24} />;
+    }
+  };
+
+  const getActionButton = () => {
+    if (error) {
+      return (
+        <Button
+          onClick={handleDownload}
+          variant="primary"
+          size="lg"
+          leftIcon={<RotateCcw size={16} />}
+        >
+          Retry Download
+        </Button>
+      );
+    }
+
+    switch (type) {
+      case 'available':
+        return (
+          <Button
+            onClick={handleDownload}
+            variant="primary"
+            size="lg"
+            leftIcon={<Download size={16} />}
+            isLoading={isDownloading}
+            disabled={isDownloading}
+          >
+            {isDownloading ? `Downloading... ${downloadProgress}%` : 'Download Update'}
+          </Button>
+        );
+      case 'downloaded':
+        return (
+          <Button
+            onClick={handleInstall}
+            variant="primary"
+            size="lg"
+            leftIcon={<CheckCircle size={16} />}
+          >
+            Install Update
+          </Button>
+        );
+      case 'changelog':
+        return (
+          <Button
+            onClick={onClose}
+            variant="primary"
+            size="lg"
+          >
+            Close
+          </Button>
+        );
+      default:
+        return null;
     }
   };
 
   return (
-          <Modal isOpen={isOpen} onClose={onClose} maxWidth={600}>
-      <div className="p-6">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-6">
-          <div className="flex items-center space-x-3">
-            {getModalIcon()}
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-                {getModalTitle()}
-              </h2>
-              {updateInfo && (
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Version {updateInfo.version}
-                  {updateInfo.releaseDate && (
-                    <span className="ml-2">
-                      • {new Date(updateInfo.releaseDate).toLocaleDateString()}
-                    </span>
-                  )}
-                </p>
-              )}
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
+    <LiquidModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={getModalTitle()}
+      subtitle={getModalSubtitle()}
+      icon={getModalIcon()}
+      maxWidth="700px"
+    >
+      <div style={{ padding: '32px' }}>
         {/* Error Display */}
         {error && (
-          <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 rounded-lg">
-            <div className="flex items-center space-x-2">
-              <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
-              <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+          <div style={{
+            padding: '16px',
+            backgroundColor: '#fef2f2',
+            border: '1px solid #fecaca',
+            borderRadius: '8px',
+            marginBottom: '24px',
+            color: '#dc2626'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <AlertCircle size={16} />
+              <strong>Error:</strong> {error}
             </div>
           </div>
         )}
 
         {/* Download Progress */}
-        {isDownloading && (
-          <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                Downloading update...
-              </span>
-              <span className="text-sm text-blue-600 dark:text-blue-400">
-                {downloadProgress}%
-              </span>
+        {isDownloading && type === 'available' && (
+          <div style={{
+            padding: '16px',
+            backgroundColor: '#f0f9ff',
+            border: '1px solid #bae6fd',
+            borderRadius: '8px',
+            marginBottom: '24px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+              <Download size={16} />
+              <strong>Downloading update...</strong>
             </div>
-            <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
-              <div
-                className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${downloadProgress}%` }}
-              />
+            <div style={{
+              width: '100%',
+              height: '8px',
+              backgroundColor: '#e0f2fe',
+              borderRadius: '4px',
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                width: `${downloadProgress}%`,
+                height: '100%',
+                backgroundColor: '#0284c7',
+                transition: 'width 0.3s ease'
+              }} />
+            </div>
+            <div style={{ marginTop: '8px', fontSize: '14px', color: '#0369a1' }}>
+              {downloadProgress}% complete
             </div>
           </div>
         )}
 
-        {/* Content */}
-        <div className="mb-6">
-          {type === 'available' && (
-            <div className="space-y-4">
-              <p className="text-gray-700 dark:text-gray-300">
-                A new version of Lightweight Video Editor is available. This update includes
-                new features, improvements, and bug fixes.
-              </p>
-              {updateInfo?.releaseNotes && (
-                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 max-h-64 overflow-y-auto">
-                  <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">
-                    Release Notes:
-                  </h4>
-                  <div
-                    className="text-sm prose prose-sm dark:prose-invert max-w-none"
-                    dangerouslySetInnerHTML={{
-                      __html: formatReleaseNotes(updateInfo.releaseNotes)
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-          )}
-
-          {type === 'downloaded' && (
-            <div className="space-y-4">
-              <p className="text-gray-700 dark:text-gray-300">
-                The update has been downloaded and is ready to install. The application
-                will restart to apply the update.
-              </p>
-              <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg p-3">
-                <div className="flex items-center space-x-2">
-                  <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
-                  <span className="text-sm text-green-700 dark:text-green-300">
-                    Update downloaded successfully
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {type === 'changelog' && updateInfo?.releaseNotes && (
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 max-h-96 overflow-y-auto">
-              <div
-                className="prose prose-sm dark:prose-invert max-w-none"
-                dangerouslySetInnerHTML={{
-                  __html: formatReleaseNotes(updateInfo.releaseNotes)
-                }}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Actions */}
-        <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
-          <div className="flex space-x-2">
-            <Button
-              variant="outline"
-              onClick={handleViewOnGitHub}
-              className="flex items-center space-x-2"
-            >
-              <ExternalLink className="w-4 h-4" />
-              <span>View on GitHub</span>
-            </Button>
+        {/* Release Notes */}
+        {updateInfo?.releaseNotes && (
+          <div style={{ marginBottom: '32px' }}>
+            <h3 style={{
+              margin: '0 0 16px 0',
+              fontSize: '18px',
+              fontWeight: '600',
+              color: '#1f2937'
+            }}>
+              What's New
+            </h3>
+            <div 
+              style={{
+                padding: '16px',
+                backgroundColor: '#f9fafb',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+                fontSize: '14px',
+                lineHeight: '1.6',
+                color: '#374151',
+                maxHeight: '300px',
+                overflowY: 'auto'
+              }}
+              dangerouslySetInnerHTML={{ __html: formatReleaseNotes(updateInfo.releaseNotes) }}
+            />
           </div>
+        )}
 
-          <div className="flex space-x-3">
-            {type === 'available' && !isDownloading && (
-              <>
-                <Button variant="outline" onClick={onClose}>
-                  Remind Me Later
-                </Button>
-                <Button onClick={handleDownload} disabled={isDownloading}>
-                  <Download className="w-4 h-4 mr-2" />
-                  Download Update
-                </Button>
-              </>
-            )}
-
-            {type === 'downloaded' && (
-              <>
-                <Button variant="outline" onClick={onClose}>
-                  Install Later
-                </Button>
-                <Button onClick={handleInstall}>
-                  <RotateCcw className="w-4 h-4 mr-2" />
-                  Restart & Install
-                </Button>
-              </>
-            )}
-
-            {(type === 'changelog' || isDownloading) && (
-              <Button onClick={onClose}>Close</Button>
-            )}
-          </div>
+        {/* Action Buttons */}
+        <div style={{
+          display: 'flex',
+          gap: '12px',
+          justifyContent: 'flex-end',
+          alignItems: 'center',
+          borderTop: '1px solid #e5e7eb',
+          paddingTop: '24px'
+        }}>
+          <Button
+            onClick={handleViewOnGitHub}
+            variant="ghost"
+            size="md"
+            leftIcon={<ExternalLink size={16} />}
+          >
+            View on GitHub
+          </Button>
+          {getActionButton()}
         </div>
       </div>
-    </Modal>
+    </LiquidModal>
   );
 };
