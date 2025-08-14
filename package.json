@@ -18,7 +18,9 @@
     "dist:linux": "npm run generate-icons && npm run build && electron-builder --linux",
     "dist:win": "npm run generate-icons && npm run build && electron-builder --win",
     "dist:all": "npm run generate-icons && npm run build && electron-builder -mwl",
-    "generate-icons": "node scripts/generate-icons.js"
+    "generate-icons": "node scripts/generate-icons.js",
+    "release": "npm run generate-icons && npm run build && electron-builder --publish=always",
+    "release:draft": "npm run generate-icons && npm run build && electron-builder --publish=never"
   },
   "repository": {
     "type": "git",
@@ -66,6 +68,7 @@
     "ai": "^4.3.19",
     "canvas": "^3.1.2",
     "canvas-record": "^5.0.1",
+    "electron-updater": "^6.6.2",
     "ffmpeg-static": "^5.2.0",
     "ffprobe-static": "^3.1.0",
     "fluent-ffmpeg": "^2.1.3",
@@ -91,6 +94,13 @@
       "node_modules/ffmpeg-static/**/*",
       "node_modules/ffprobe-static/**/*"
     ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "proSamik",
+        "repo": "lightweight-video-editor"
+      }
+    ],
     "mac": {
       "category": "public.app-category.video",
       "icon": "build/icons/icon.png",
@@ -106,7 +116,12 @@
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
-      "entitlementsInherit": "build/entitlements.mac.plist"
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "CFBundleVersion": "1.0.0",
+        "NSCameraUsageDescription": "This app needs access to camera for video recording features.",
+        "NSMicrophoneUsageDescription": "This app needs access to microphone for audio recording features."
+      }
     },
     "dmg": {
       "title": "Lightweight Video Editor",
