@@ -26,6 +26,8 @@ interface StylingPanelProps {
     isTranscribing: boolean;
     progress: number;
     message: string;
+    speed?: string;
+    eta?: string;
   };
 }
 
