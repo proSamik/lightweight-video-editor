@@ -8,9 +8,9 @@ const electronAPI = {
   replaceAudioTrack: (videoPath: string, audioPath: string, outputName?: string) => ipcRenderer.invoke('replace-audio-track', videoPath, audioPath, outputName),
   getVideoMetadata: (videoPath: string) => ipcRenderer.invoke('get-video-metadata', videoPath),
   extractAudio: (videoPath: string) => ipcRenderer.invoke('extract-audio', videoPath),
-  transcribeAudio: (audioPath: string) => ipcRenderer.invoke('transcribe-audio', audioPath),
-  transcribeAudioSegments: (audioPath: string, timelineSelections: any[]) => 
-    ipcRenderer.invoke('transcribe-audio-segments', audioPath, timelineSelections),
+  transcribeAudio: (audioPath: string, model?: string) => ipcRenderer.invoke('transcribe-audio', audioPath, model),
+  transcribeAudioSegments: (audioPath: string, timelineSelections: any[], model?: string) => 
+    ipcRenderer.invoke('transcribe-audio-segments', audioPath, timelineSelections, model),
   checkDependencies: () => ipcRenderer.invoke('check-dependencies'),
   testWhisperInstallation: () => ipcRenderer.invoke('test-whisper-installation'),
   renderVideoWithCaptions: (videoPath: string, captionsData: any[], outputPath: string, exportSettings?: any, replacementAudioPath?: string) => 
@@ -26,8 +26,8 @@ const electronAPI = {
   showItemInFolder: (filePath: string) => ipcRenderer.invoke('show-item-in-folder', filePath),
   applyWordDeletions: (inputVideoPath: string, originalCaptions: any[], updatedCaptions: any[], outputPath: string) =>
     ipcRenderer.invoke('apply-word-deletions', inputVideoPath, originalCaptions, updatedCaptions, outputPath),
-  onTranscriptionProgress: (callback: (progress: number) => void) => {
-    ipcRenderer.on('transcription-progress', (_, progress) => callback(progress));
+  onTranscriptionProgress: (callback: (progress: number, speed?: string, eta?: string) => void) => {
+    ipcRenderer.on('transcription-progress', (_, progress, speed, eta) => callback(progress, speed, eta));
   },
   removeTranscriptionProgressListener: () => {
     ipcRenderer.removeAllListeners('transcription-progress');
