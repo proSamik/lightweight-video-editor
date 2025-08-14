@@ -375,13 +375,13 @@ ipcMain.handle('extract-audio-for-project', async (_event, videoPath: string, pr
   }
 });
 
-ipcMain.handle('transcribe-audio', async (event, audioPath: string) => {
+ipcMain.handle('transcribe-audio', async (event, audioPath: string, model: string = 'base') => {
   try {
     const whisperService = WhisperService.getInstance();
-    return await whisperService.transcribeAudio(audioPath, (progress: number) => {
+    return await whisperService.transcribeAudio(audioPath, (progress: number, speed?: string, eta?: string) => {
       // Send progress updates to renderer
-      event.sender.send('transcription-progress', progress);
-    });
+      event.sender.send('transcription-progress', progress, speed, eta);
+    }, model);
   } catch (error) {
     throw new Error(`Failed to transcribe audio: ${error}`);
   }
@@ -465,13 +465,13 @@ ipcMain.handle('handle-file-drop', async (_event, filePath: string) => {
   return true;
 });
 
-ipcMain.handle('transcribe-audio-segments', async (event, audioPath: string, timelineSelections: any[]) => {
+ipcMain.handle('transcribe-audio-segments', async (event, audioPath: string, timelineSelections: any[], model: string = 'base') => {
   try {
     const whisperService = WhisperService.getInstance();
-    return await whisperService.transcribeAudioSegments(audioPath, timelineSelections, (progress: number) => {
+    return await whisperService.transcribeAudioSegments(audioPath, timelineSelections, (progress: number, speed?: string, eta?: string) => {
       // Send progress updates to renderer
-      event.sender.send('transcription-progress', progress);
-    });
+      event.sender.send('transcription-progress', progress, speed, eta);
+    }, model);
   } catch (error) {
     throw new Error(`Failed to transcribe audio segments: ${error}`);
   }
