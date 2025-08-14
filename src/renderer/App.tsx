@@ -54,6 +54,7 @@ const AppContent: React.FC = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [exportedFilePath, setExportedFilePath] = useState<string>('');
   const [pendingVideoPath, setPendingVideoPath] = useState<string | null>(null);
+  const [pendingVideoDuration, setPendingVideoDuration] = useState<number | undefined>(undefined);
   const [pendingTranscriptionSettings, setPendingTranscriptionSettings] = useState<{ maxCharsPerLine: number; maxWordsPerLine: number } | null>(null);
   const [showAISettings, setShowAISettings] = useState(false);
   const [showAIContent, setShowAIContent] = useState(false);
@@ -73,6 +74,8 @@ const AppContent: React.FC = () => {
     isTranscribing: boolean;
     progress: number;
     message: string;
+    speed?: string;
+    eta?: string;
   }>({ isTranscribing: false, progress: 0, message: '' });
   const [cancelController, setCancelController] = useState<AbortController | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -171,11 +174,11 @@ const AppContent: React.FC = () => {
 
   // Progress tracking and file drop event listeners
   useEffect(() => {
-    const handleTranscriptionProgress = (progress: number) => {
+    const handleTranscriptionProgress = (progress: number, speed?: string, eta?: string) => {
       setLoadingProgress(progress);
       // Also update transcription status if actively transcribing
       setTranscriptionStatus(prev => 
-        prev.isTranscribing ? { ...prev, progress } : prev
+        prev.isTranscribing ? { ...prev, progress, speed, eta } : prev
       );
     };
     
@@ -257,6 +260,9 @@ const AppContent: React.FC = () => {
     try {
       const filePath = await window.electronAPI.selectVideoFile();
       if (filePath) {
+        // Load video metadata to get duration for time estimation
+        const metadata = await window.electronAPI.getVideoMetadata(filePath);
+        setPendingVideoDuration(metadata?.duration);
         setShowTranscriptionSettings(true);
         setPendingVideoPath(filePath);
       }
@@ -270,6 +276,14 @@ const AppContent: React.FC = () => {
     if (!(await checkDependencies())) return;
     
     console.log('Dependencies checked, opening transcription settings');
+    // Load video metadata to get duration for time estimation
+    try {
+      const metadata = await window.electronAPI.getVideoMetadata(filePath);
+      setPendingVideoDuration(metadata?.duration);
+    } catch (error) {
+      console.error('Error loading video metadata:', error);
+      setPendingVideoDuration(undefined);
+    }
     setShowTranscriptionSettings(true);
     setPendingVideoPath(filePath);
   };
@@ -277,7 +291,7 @@ const AppContent: React.FC = () => {
 
   const generateCaptions = async (
     videoPath: string, 
-    settings?: { maxCharsPerLine: number; maxWordsPerLine: number }
+    settings?: { maxCharsPerLine: number; maxWordsPerLine: number; whisperModel?: string }
   ) => {
     try {
       // Start background transcription without blocking UI
@@ -298,12 +312,12 @@ const AppContent: React.FC = () => {
         audioPath = await window.electronAPI.extractAudio(videoPath);
       }
       
-      setTranscriptionStatus({ isTranscribing: true, progress: 20, message: 'Transcribing audio (this may take a few minutes)...' });
+      setTranscriptionStatus(prev => ({ ...prev, message: 'Transcribing audio' }));
       
       // Transcribe entire audio
-      const transcriptionResult = await window.electronAPI.transcribeAudio(audioPath);
+      const transcriptionResult = await window.electronAPI.transcribeAudio(audioPath, settings?.whisperModel || 'base');
       
-      setTranscriptionStatus({ isTranscribing: true, progress: 80, message: 'Processing transcription results...' });
+      setTranscriptionStatus(prev => ({ ...prev, message: 'Processing transcription results...' }));
       
       // Convert transcription to caption segments with optional line wrapping
       // Get video metadata to determine aspect ratio for responsive font sizing
@@ -350,14 +364,14 @@ const AppContent: React.FC = () => {
         }
       }));
 
-      setTranscriptionStatus({ isTranscribing: true, progress: 90, message: 'Applying line wrapping...' });
+      setTranscriptionStatus(prev => ({ ...prev, message: 'Applying line wrapping...' }));
       
       // Apply line wrapping if settings provided
       if (settings) {
         captionSegments = applyLineWrapping(captionSegments, settings);
       }
       
-      setTranscriptionStatus({ isTranscribing: true, progress: 95, message: 'Finalizing captions...' });
+      setTranscriptionStatus(prev => ({ ...prev, message: 'Finalizing captions...' }));
       
       setCaptions(captionSegments);
       setOriginalCaptions([...captionSegments]); // Save original captions for comparison
@@ -365,7 +379,7 @@ const AppContent: React.FC = () => {
       // If we extracted audio for a project, save the project to persist the audio path
       if (projectPath) {
         try {
-          setTranscriptionStatus({ isTranscribing: true, progress: 97, message: 'Saving project...' });
+          setTranscriptionStatus(prev => ({ ...prev, message: 'Saving project...' }));
           // The project data will be updated with the extractedAudioPath state which was set above
           const projectData = getCurrentProjectData();
           await window.electronAPI.saveProject(projectData);
@@ -461,7 +475,7 @@ const AppContent: React.FC = () => {
     return wrappedSegments;
   };
 
-  const handleTranscriptionSettingsConfirm = async (settings: { maxCharsPerLine: number; maxWordsPerLine: number }) => {
+  const handleTranscriptionSettingsConfirm = async (settings: { maxCharsPerLine: number; maxWordsPerLine: number; whisperModel: string }) => {
     if (pendingVideoPath) {
       try {
         // Start background processing without blocking UI
@@ -1098,7 +1112,7 @@ const AppContent: React.FC = () => {
       const audioPath = await window.electronAPI.extractAudio(videoFile.path);
       
       // Transcribe the selected segment
-      const transcriptionResult = await window.electronAPI.transcribeAudioSegments(audioPath, timelineSelections);
+      const transcriptionResult = await window.electronAPI.transcribeAudioSegments(audioPath, timelineSelections, 'base');
       
       if (transcriptionResult && transcriptionResult.length > 0) {
         // Save current state to history
@@ -1586,8 +1600,10 @@ const AppContent: React.FC = () => {
         onClose={() => {
           setShowTranscriptionSettings(false);
           setPendingVideoPath(null);
+          setPendingVideoDuration(undefined);
         }}
         onConfirm={handleTranscriptionSettingsConfirm}
+        videoDuration={pendingVideoDuration || videoFile?.duration}
       />
 
 
