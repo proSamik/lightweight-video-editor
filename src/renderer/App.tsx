@@ -10,6 +10,8 @@ import LoadingScreen from './components/LoadingScreen';
 import AISettingsModal from './components/AISettingsModal';
 import AIContentModal from './components/AIContentModal';
 import ExportSettingsModal from './components/ExportSettings';
+import { UpdateModal } from './components/UpdateModal';
+import { UpdateNotification } from './components/UpdateNotification';
 import { Button, Card } from './components/ui';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import {
@@ -62,6 +64,11 @@ const AppContent: React.FC = () => {
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null);
   const [showExportSettings, setShowExportSettings] = useState(false);
   const [showSrtSuccess, setShowSrtSuccess] = useState(false);
+
+  // Update-related state
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [updateModalType, setUpdateModalType] = useState<'available' | 'downloaded' | 'changelog'>('available');
+  const [updateInfo, setUpdateInfo] = useState<any>(null);
   const [exportedSrtPath, setExportedSrtPath] = useState<string>('');
   const [currentProjectInfo, setCurrentProjectInfo] = useState<{
     projectPath: string | null;
@@ -134,6 +141,13 @@ const AppContent: React.FC = () => {
     newHistory.push(currentState);
     setHistory(newHistory);
     setHistoryIndex(newHistory.length - 1);
+  };
+
+  // Update-related handlers
+  const handleShowUpdateModal = (type: 'available' | 'downloaded' | 'changelog', info: any) => {
+    setUpdateInfo(info);
+    setUpdateModalType(type);
+    setShowUpdateModal(true);
   };
 
   // Undo/Redo handlers
@@ -1747,6 +1761,20 @@ const AppContent: React.FC = () => {
           </Card>
         </div>
       )}
+
+      {/* Update Modal */}
+      <UpdateModal
+        isOpen={showUpdateModal}
+        onClose={() => setShowUpdateModal(false)}
+        updateInfo={updateInfo}
+        type={updateModalType}
+      />
+
+      {/* Update Notification */}
+      <UpdateNotification
+        onShowModal={handleShowUpdateModal}
+      />
+
     </div>
   );
 };
