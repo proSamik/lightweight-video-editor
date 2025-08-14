@@ -8,6 +8,8 @@ interface TranscriptionStatusProps {
     isTranscribing: boolean;
     progress: number;
     message: string;
+    speed?: string;
+    eta?: string;
   };
 }
 
@@ -71,18 +73,35 @@ export const TranscriptionStatus: React.FC<TranscriptionStatusProps> = ({
             <FiMic size={16} color={theme.colors.textSecondary} />
             <h4 style={headerStyles}>Transcribing Audio...</h4>
           </div>
-          <span style={progressValueStyles}>
-            {Math.round(transcriptionStatus.progress)}%
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
+            <span style={progressValueStyles}>
+              {Math.round(transcriptionStatus.progress)}%
+            </span>
+          </div>
         </HStack>
         
         <div style={progressBarContainerStyles}>
           <div style={progressBarStyles} />
         </div>
         
-        <p style={messageStyles}>
-          {transcriptionStatus.message}
-        </p>
+        <HStack justify="between" align="center">
+          <p style={messageStyles}>
+            {transcriptionStatus.message}
+          </p>
+          {transcriptionStatus.eta && (
+            <span style={{
+              fontSize: typography.fontSize.sm,
+              fontWeight: typography.fontWeight.semibold,
+              color: theme.colors.success,
+              backgroundColor: theme.colors.backgroundSecondary,
+              padding: `${spacing.xs}px ${spacing.sm}px`,
+              borderRadius: borderRadius.sm,
+              border: `1px solid ${theme.colors.success}20`,
+            }}>
+              ETA: {transcriptionStatus.eta}
+            </span>
+          )}
+        </HStack>
       </Stack>
     </div>
   );
