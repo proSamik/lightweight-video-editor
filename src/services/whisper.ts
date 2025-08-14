@@ -122,14 +122,15 @@ export class WhisperService {
 
   public async transcribeAudio(
     audioPath: string,
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number, speed?: string, eta?: string) => void,
+    model: string = 'base'
   ): Promise<TranscriptionResult> {
     // Wait for device detection to complete
     await this.waitForDeviceDetection();
     
     // Try with best device first, then fall back to CPU if it fails
     try {
-      return await this.attemptTranscription(audioPath, this.bestDevice, onProgress);
+      return await this.attemptTranscription(audioPath, this.bestDevice, onProgress, model);
     } catch (error) {
       const errorMessage = (error as Error).message;
       
@@ -140,7 +141,7 @@ export class WhisperService {
         // Force CPU fallback
         const cpuDevice = { type: 'cpu' as const, available: true, name: 'CPU Fallback' };
         try {
-          return await this.attemptTranscription(audioPath, cpuDevice, onProgress);
+          return await this.attemptTranscription(audioPath, cpuDevice, onProgress, model);
         } catch (cpuError) {
           throw new Error(`Transcription failed on both ${this.bestDevice?.type} and CPU: ${(cpuError as Error).message}`);
         }
@@ -168,7 +169,8 @@ export class WhisperService {
   private async attemptTranscription(
     audioPath: string,
     device: DeviceInfo | null,
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number, speed?: string, eta?: string) => void,
+    model: string = 'base'
   ): Promise<TranscriptionResult> {
     return new Promise((resolve, reject) => {
       if (!this.whisperPath) {
@@ -202,7 +204,7 @@ export class WhisperService {
         const args = [
           '-m', 'whisper',
           audioPath,
-          '--model', 'base',
+          '--model', model,
           '--device', deviceString,
           '--output_format', 'json',
           '--word_timestamps', 'True',
@@ -215,7 +217,7 @@ export class WhisperService {
         // Use direct whisper command
         const args = [
           audioPath,
-          '--model', 'base',
+          '--model', model,
           '--device', deviceString,
           '--output_format', 'json',
           '--word_timestamps', 'True',
@@ -233,6 +235,8 @@ export class WhisperService {
       let processedSegments = 0;
       let progressTimer: NodeJS.Timeout | null = null;
       let lastProgressUpdate = 0;
+      let currentProcessingSpeed = '';
+      let currentETA = '';
 
       // Start a timer to provide regular progress updates
       if (onProgress) {
@@ -240,7 +244,7 @@ export class WhisperService {
           if (progressStarted && lastProgressUpdate < 85) {
             // Gradually increase progress over time to show activity
             lastProgressUpdate = Math.min(lastProgressUpdate + 1, 85);
-            onProgress(lastProgressUpdate);
+            onProgress(lastProgressUpdate, currentProcessingSpeed, currentETA);
           }
         }, 2000); // Update every 2 seconds
       }
@@ -267,7 +271,7 @@ export class WhisperService {
           if (progressStarted) {
             processedSegments++;
             lastProgressUpdate = Math.min(10 + (processedSegments * 2), 80);
-            onProgress(lastProgressUpdate);
+            onProgress(lastProgressUpdate, currentProcessingSpeed, currentETA);
           }
         }
       });
@@ -279,22 +283,55 @@ export class WhisperService {
         
         // Track progress from stderr output as well
         if (onProgress) {
+          // Look for progress bar with ETA: 44%|████▎     | 29640/67955 [08:40<10:53, 58.64frames/s]
+          const progressMatch = output.match(/(\d+)%\|[^|]+\|\s*\d+\/\d+\s*\[([^<]+)<([^,]+),\s*([\d.]+)frames?\/s\]/i);
+          if (progressMatch) {
+            const [, progressPercent, elapsed, remaining, framesPerSec] = progressMatch;
+            
+            // Update progress percentage
+            const newProgress = parseInt(progressPercent);
+            if (newProgress > lastProgressUpdate) {
+              lastProgressUpdate = newProgress;
+            }
+            
+            // Format ETA
+            currentETA = remaining.trim();
+            
+            // Format processing speed
+            currentProcessingSpeed = `${framesPerSec} fps`;
+            
+            onProgress(lastProgressUpdate, currentProcessingSpeed, currentETA);
+            return; // Skip other progress logic when we have detailed progress
+          }
+
+          // Fallback: Look for processing speed information in output
+          const speedMatch = output.match(/(\d+\.\d+)x\s+realtime/i) || 
+                           output.match(/(\d+\.\d+)\s*fps/i) ||
+                           output.match(/(\d+\.\d+)\s*frames?\s*\/\s*sec/i);
+          if (speedMatch) {
+            if (output.includes('realtime')) {
+              currentProcessingSpeed = `${speedMatch[1]}x realtime`;
+            } else {
+              currentProcessingSpeed = `${speedMatch[1]} fps`;
+            }
+          }
+
           // Look for Whisper's actual progress indicators
           if (output.includes('Loading model') || output.includes('Detecting language')) {
             lastProgressUpdate = 15;
-            onProgress(lastProgressUpdate);
+            onProgress(lastProgressUpdate, currentProcessingSpeed, currentETA);
           } else if (output.includes('transcribing')) {
             lastProgressUpdate = 25;
-            onProgress(lastProgressUpdate);
+            onProgress(lastProgressUpdate, currentProcessingSpeed, currentETA);
           } else if (output.includes('segment') || output.includes('words')) {
             processedSegments++;
             lastProgressUpdate = Math.min(25 + (processedSegments * 3), 85);
-            onProgress(lastProgressUpdate);
+            onProgress(lastProgressUpdate, currentProcessingSpeed, currentETA);
           } else if (output.includes('Processing')) {
             // Increment progress for any processing activity
             processedSegments++;
             lastProgressUpdate = Math.min(25 + (processedSegments * 2), 85);
-            onProgress(lastProgressUpdate);
+            onProgress(lastProgressUpdate, currentProcessingSpeed, currentETA);
           }
         }
       });
@@ -371,7 +408,7 @@ export class WhisperService {
           
           // Final progress update
           if (onProgress) {
-            onProgress(100);
+            onProgress(100, currentProcessingSpeed, currentETA);
           }
           
           resolve(result);
@@ -443,11 +480,12 @@ export class WhisperService {
   public async transcribeAudioSegments(
     audioPath: string,
     timelineSelections: any[],
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number, speed?: string, eta?: string) => void,
+    model: string = 'base'
   ): Promise<TranscriptionResult[]> {
     // For now, we'll transcribe the whole audio and then filter the results
     // This is simpler than extracting audio segments
-    const fullTranscription = await this.transcribeAudio(audioPath, onProgress);
+    const fullTranscription = await this.transcribeAudio(audioPath, onProgress, model);
     
     // Filter segments to only include those within selected timeline ranges
     const filteredSegments = fullTranscription.segments.filter(segment => {
