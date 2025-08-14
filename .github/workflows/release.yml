@@ -1,0 +1,131 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags like v1.0.0, v1.0.1, etc.
+
+jobs:
+  release:
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+        include:
+          - os: macos-latest
+            platform: mac
+            artifact_name: Lightweight Video Editor
+          - os: ubuntu-latest
+            platform: linux
+            artifact_name: Lightweight Video Editor
+          - os: windows-latest
+            platform: win
+            artifact_name: Lightweight Video Editor
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate icons
+        run: npm run generate-icons
+
+      - name: Build application
+        run: npm run build
+
+      - name: Build and publish
+        uses: samuelmeuli/action-electron-builder@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          release: ${{ startsWith(github.ref, 'refs/tags/') }}
+          publish: always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}-${{ matrix.platform }}
+          path: dist/*
+
+  # Separate job for creating GitHub release
+  create-release:
+    needs: release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
+          body: |
+            ## What's New in ${{ github.ref_name }}
+            
+            ### 🚀 New Features
+            - Add your new features here
+            
+            ### 🐛 Bug Fixes  
+            - Add your bug fixes here
+            
+            ### 🔧 Improvements
+            - Add your improvements here
+            
+            ---
+            
+            ### 📥 Download
+            Download the appropriate installer for your platform above.
+            
+            ### 🔄 Auto-Update
+            Existing users will be automatically notified of this update within 4 hours.
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Assets
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./Lightweight Video Editor-mac/Lightweight Video Editor-*.dmg
+          asset_name: Lightweight Video Editor-${{ github.ref_name }}-mac.dmg
+          asset_content_type: application/octet-stream
+
+      - name: Upload Release Assets (Windows)
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./Lightweight Video Editor-win/Lightweight Video Editor Setup *.exe
+          asset_name: Lightweight Video Editor-${{ github.ref_name }}-win.exe
+          asset_content_type: application/octet-stream
+
+      - name: Upload Release Assets (Linux)
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./Lightweight Video Editor-linux/Lightweight Video Editor-*.AppImage
+          asset_name: Lightweight Video Editor-${{ github.ref_name }}-linux.AppImage
+          asset_content_type: application/octet-stream
