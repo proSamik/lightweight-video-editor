@@ -103,10 +103,10 @@ export const zIndex = {
 // =============================================================================
 export const transitions = {
   duration: {
-    fast: '150ms',
-    normal: '200ms',
-    slow: '300ms',
-    slower: '500ms',
+    fast: '100ms',
+    normal: '150ms',
+    slow: '200ms',
+    slower: '300ms',
   },
   easing: {
     linear: 'linear',
