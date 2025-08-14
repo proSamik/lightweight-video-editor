@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { VideoFile, CaptionSegment } from '../../types';
 import { useTheme } from '../contexts/ThemeContext';
 import { FiEye } from 'react-icons/fi';
+import { Video } from 'lucide-react';
 
 interface VideoPanelProps {
   videoFile: VideoFile | null;
@@ -734,14 +735,26 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
           zIndex: 1,
           padding: '40px'
         }}>
-          {/* Blue-tinted video icon */}
+          {/* Video icon at the top */}
           <div style={{ 
-            fontSize: '64px', 
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '80px',
+            height: '80px',
+            borderRadius: '50%',
+            backgroundColor: theme.colors.primary + '20',
             marginBottom: '24px',
-            color: theme.colors.primary,
-            textShadow: `0 4px 8px ${theme.colors.primary}20`
+            boxShadow: `0 8px 24px ${theme.colors.primary}30`,
+            margin: '0 auto 24px auto', // Center the icon horizontally
           }}>
-            📹
+            <Video 
+              size={40} 
+              color={theme.colors.primary}
+              style={{
+                filter: `drop-shadow(0 4px 8px ${theme.colors.primary}40)`
+              }}
+            />
           </div>
           
           <div style={{ 
