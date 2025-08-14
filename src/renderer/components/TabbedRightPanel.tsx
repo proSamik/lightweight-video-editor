@@ -15,6 +15,8 @@ interface TabbedRightPanelProps {
     isTranscribing: boolean;
     progress: number;
     message: string;
+    speed?: string;
+    eta?: string;
   };
   selectedSegmentId: string | null;
   onSegmentSelect: (segmentId: string) => void;
