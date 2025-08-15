@@ -32,7 +32,8 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
 
   const hasVideo = Boolean(videoFile?.path);
   const hasCaptions = Boolean(captions?.length);
-  const canExport = hasVideo && hasCaptions && onExport;
+  const hasReplacementAudio = Boolean(replacementAudioPath);
+  const canExport = hasVideo && (hasCaptions || hasReplacementAudio) && onExport;
 
   // Export to SRT file
   const handleSrtExport = () => {
@@ -147,6 +148,9 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
         <Stack gap="sm">
           <StatusIndicator isAvailable={hasVideo} label="Video loaded" />
           <StatusIndicator isAvailable={hasCaptions} label="Captions available" />
+          {hasReplacementAudio && (
+            <StatusIndicator isAvailable={hasReplacementAudio} label="Replacement audio loaded" />
+          )}
         </Stack>
 
         {/* Export buttons */}
@@ -160,20 +164,21 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
             disabled={!canExport}
             fullWidth
           >
-            Export Video with Captions
+            {hasCaptions ? 'Export Video with Captions' : 'Export Video with Audio'}
           </Button>
 
-          {/* Export SRT */}
-          <Button
-            variant="outline"
-            size="md"
-            leftIcon={<ExportSrtIcon />}
-            onClick={handleSrtExport}
-            disabled={!hasCaptions}
-            fullWidth
-          >
-            Export SRT Subtitle File
-          </Button>
+          {/* Export SRT - only show if captions exist */}
+          {hasCaptions && (
+            <Button
+              variant="outline"
+              size="md"
+              leftIcon={<ExportSrtIcon />}
+              onClick={handleSrtExport}
+              fullWidth
+            >
+              Export SRT Subtitle File
+            </Button>
+          )}
 
           {/* Export Video with New Audio (only show if replacement audio is loaded) */}
           {replacementAudioPath && (
@@ -213,11 +218,11 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
                 color: theme.colors.textSecondary,
                 lineHeight: typography.lineHeight.relaxed,
               }}>
-                {!hasVideo && !hasCaptions 
-                  ? 'Load a video and generate captions to start exporting.'
+                {!hasVideo && !hasCaptions && !hasReplacementAudio
+                  ? 'Load a video and generate captions or add replacement audio to start exporting.'
                   : !hasVideo 
-                  ? 'Load a video file to export with captions.'
-                  : 'Generate captions from your video to enable export options.'
+                  ? 'Load a video file to export.'
+                  : 'Generate captions or add replacement audio to enable export options.'
                 }
               </p>
             </Stack>
