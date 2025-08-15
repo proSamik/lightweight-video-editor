@@ -1459,19 +1459,20 @@ const AppContent: React.FC = () => {
                 </span>
               </Button>
             )}
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handleSrtExport}
-              disabled={!captions || captions.length === 0}
-              title="Export SRT Subtitle File"
-              style={{ padding: '2px 6px' }}
-            >
-              <ExportSrtIcon size={14} />
-              <span style={{  fontSize: '10px' }}>
-                SRT
-              </span>
-            </Button>
+            {captions && captions.length > 0 && (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleSrtExport}
+                title="Export SRT Subtitle File"
+                style={{ padding: '2px 6px' }}
+              >
+                <ExportSrtIcon size={14} />
+                <span style={{  fontSize: '10px' }}>
+                  SRT
+                </span>
+              </Button>
+            )}
             <Button
               variant="primary"
               size="sm"
@@ -1489,8 +1490,8 @@ const AppContent: React.FC = () => {
               variant="primary"
               size="sm"
               onClick={handleShowExportSettings}
-              disabled={!videoFile || !captions || captions.length === 0}
-              title="Export Video with Captions"
+              disabled={!videoFile || (!captions || captions.length === 0) && !replacementAudioPath}
+              title={captions && captions.length > 0 ? "Export Video with Captions" : "Export Video with Audio"}
               style={{ padding: '2px 6px' }}
             >
               <ExportVideoIcon size={14} />
@@ -1698,6 +1699,7 @@ const AppContent: React.FC = () => {
           handleExport(settings);
         }}
         replacementAudioPath={replacementAudioPath}
+        captions={captions}
       />
 
       {/* SRT Export Success Modal */}
