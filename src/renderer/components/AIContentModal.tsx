@@ -324,6 +324,7 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
+            onKeyDown={(e) => e.stopPropagation()}
             placeholder="AI-generated description will appear here, or you can write your own..."
             rows={8}
             style={{
