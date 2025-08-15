@@ -185,6 +185,7 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
           <select
             value={settings.selectedProvider}
             onChange={(e) => handleProviderChange(e.target.value as any)}
+            onKeyDown={(e) => e.stopPropagation()}
             style={{
               width: '100%',
               padding: '12px 16px',
@@ -229,6 +230,7 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
                   setAvailableModels([]);
                 }
               }}
+              onKeyDown={(e) => e.stopPropagation()}
               placeholder="sk-ant-..."
               style={{
                 width: '100%',
@@ -263,6 +265,7 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
                   setAvailableModels([]);
                 }
               }}
+              onKeyDown={(e) => e.stopPropagation()}
               placeholder="AIza..."
               style={{
                 width: '100%',
@@ -297,6 +300,7 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
                   setAvailableModels([]);
                 }
               }}
+              onKeyDown={(e) => e.stopPropagation()}
               placeholder="sk-or-..."
               style={{
                 width: '100%',
@@ -329,6 +333,7 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
               <select
                 value={settings.selectedModel || ''}
                 onChange={(e) => setSettings({ ...settings, selectedModel: e.target.value })}
+                onKeyDown={(e) => e.stopPropagation()}
                 style={{
                   width: '100%',
                   padding: '10px',
@@ -408,6 +413,7 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
           <textarea
             value={settings.descriptionPrompt || ''}
             onChange={(e) => setSettings({ ...settings, descriptionPrompt: e.target.value })}
+            onKeyDown={(e) => e.stopPropagation()}
             placeholder="Custom prompt for generating YouTube descriptions... (leave empty for default)"
             rows={4}
             style={{
@@ -433,6 +439,7 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
           <textarea
             value={settings.titlePrompt || ''}
             onChange={(e) => setSettings({ ...settings, titlePrompt: e.target.value })}
+            onKeyDown={(e) => e.stopPropagation()}
             placeholder="Custom prompt for generating YouTube titles... (leave empty for default)"
             rows={4}
             style={{
@@ -458,6 +465,7 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
           <textarea
             value={settings.tweetPrompt || ''}
             onChange={(e) => setSettings({ ...settings, tweetPrompt: e.target.value })}
+            onKeyDown={(e) => e.stopPropagation()}
             placeholder="Custom prompt for generating Twitter video hooks... (leave empty for default)"
             rows={4}
             style={{
@@ -483,6 +491,7 @@ const AISettingsModal: React.FC<AISettingsModalProps> = ({ isOpen, onClose, onSa
           <textarea
             value={settings.thumbnailPrompt || ''}
             onChange={(e) => setSettings({ ...settings, thumbnailPrompt: e.target.value })}
+            onKeyDown={(e) => e.stopPropagation()}
             placeholder="Custom prompt for generating thumbnail concept ideas... (leave empty for default)"
             rows={4}
             style={{
