@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
-import { ExportSettings } from '../../types';
-import { Button, LiquidModal } from './ui';
+import { ExportSettings, CaptionSegment } from '../../types';
+import { LiquidModal } from './ui';
 import { FiSettings, FiZap, FiTarget, FiStar, FiMusic, FiFileText, FiVideo } from 'react-icons/fi';
 
 interface ExportSettingsProps {
@@ -9,18 +9,23 @@ interface ExportSettingsProps {
   onClose: () => void;
   onConfirm: (settings: ExportSettings) => void;
   replacementAudioPath?: string | null;
+  captions?: CaptionSegment[];
 }
 
 const ExportSettingsModal: React.FC<ExportSettingsProps> = ({
   isOpen,
   onClose,
   onConfirm,
-  replacementAudioPath
+  replacementAudioPath,
+  captions
 }) => {
   const { theme } = useTheme();
   const [framerate, setFramerate] = useState<30 | 60>(30);
   const [exportMode, setExportMode] = useState<'complete' | 'newAudio' | 'subtitlesOnly'>('complete');
   const quality = 'high'; // Always use high quality
+  
+  const hasCaptions = Boolean(captions?.length);
+  const hasReplacementAudio = Boolean(replacementAudioPath);
 
   const handleConfirm = () => {
     onConfirm({
@@ -31,144 +36,216 @@ const ExportSettingsModal: React.FC<ExportSettingsProps> = ({
   };
 
   return (
+    <>
+      <style>
+        {`
+          input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: ${theme.colors.primary};
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+          }
+          
+          input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: ${theme.colors.primary};
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+          }
+          
+          input[type="range"]::-ms-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: ${theme.colors.primary};
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+          }
+        `}
+      </style>
     <LiquidModal
       isOpen={isOpen}
       onClose={onClose}
       title="Export Settings"
       subtitle="Configure video export quality and framerate"
       icon={<FiSettings size={24} color="white" />}
-      maxWidth="650px"
+      maxWidth="500px"
     >
-      {/* Modal Content */}
-      <div style={{ padding: '24px 32px' }}>
+      <div style={{ padding: '20px' }}>
 
         {/* Framerate Selection */}
         <div style={{ marginBottom: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-            <div style={{
-              width: '32px',
-              height: '32px',
-              backgroundColor: theme.colors.accent,
-              borderRadius: '6px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <FiZap size={16} color={theme.colors.accentForeground} />
-            </div>
-            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: theme.colors.text }}>
-              Frame Rate
-            </h3>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <Button
-              onClick={() => setFramerate(30)}
-              variant={framerate === 30 ? 'primary' : 'outline'}
-              size="lg"
-              fullWidth
-              style={{
-                justifyContent: 'flex-start',
-                textAlign: 'left',
-                padding: '16px'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                <FiTarget size={16} />
-                <span style={{ fontSize: '15px', fontWeight: '600' }}>30 FPS</span>
-              </div>
-              <div style={{ 
-                fontSize: '12px', 
-                color: framerate === 30 ? theme.colors.primaryForeground : theme.colors.textSecondary,
-                lineHeight: '1.4',
-                opacity: 0.9
-              }}>
-                Standard quality, faster rendering
-              </div>
-            </Button>
-            <Button
-              onClick={() => setFramerate(60)}
-              variant={framerate === 60 ? 'primary' : 'outline'}
-              size="lg"
-              fullWidth
-              style={{
-                justifyContent: 'flex-start',
-                textAlign: 'left',
-                padding: '16px'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                <FiStar size={16} />
-                <span style={{ fontSize: '15px', fontWeight: '600' }}>60 FPS</span>
-              </div>
-              <div style={{ 
-                fontSize: '12px', 
-                color: framerate === 60 ? theme.colors.primaryForeground : theme.colors.textSecondary,
-                lineHeight: '1.4',
-                opacity: 0.9
-              }}>
-                Smooth motion, longer rendering
-              </div>
-            </Button>
+          <h3 style={{
+            margin: '0 0 16px 0',
+            fontSize: '18px',
+            fontWeight: '600',
+            color: theme.colors.text
+          }}>
+            Frame Rate
+          </h3>
+          <p style={{
+            margin: '0 0 16px 0',
+            fontSize: '14px',
+            color: theme.colors.textSecondary,
+            lineHeight: '1.5'
+          }}>
+            Choose the frame rate for your exported video. Higher frame rates produce smoother motion but take longer to render.
+          </p>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(2, 1fr)',
+            gap: '8px'
+          }}>
+            {[
+              { value: 30, label: '30 FPS', description: 'Standard quality, faster rendering', icon: FiTarget },
+              { value: 60, label: '60 FPS', description: 'Smooth motion, longer rendering', icon: FiStar }
+            ].map((option) => (
+              <button
+                key={option.value}
+                onClick={() => setFramerate(option.value as 30 | 60)}
+                style={{
+                  padding: '12px 16px',
+                  backgroundColor: framerate === option.value 
+                    ? theme.colors.primary 
+                    : theme.colors.surface,
+                  color: framerate === option.value 
+                    ? theme.colors.primaryForeground 
+                    : theme.colors.text,
+                  border: `1px solid ${framerate === option.value 
+                    ? theme.colors.primary 
+                    : theme.colors.border}`,
+                  borderRadius: theme.radius.md,
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+                onMouseEnter={(e) => {
+                  if (framerate !== option.value) {
+                    e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (framerate !== option.value) {
+                    e.currentTarget.style.backgroundColor = theme.colors.surface;
+                  }
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <option.icon size={16} />
+                  <span style={{ fontWeight: '600' }}>{option.label}</span>
+                </div>
+                <span style={{ 
+                  fontSize: '12px', 
+                  opacity: 0.8,
+                  textAlign: 'center'
+                }}>
+                  {option.description}
+                </span>
+              </button>
+            ))}
           </div>
         </div>
 
         {/* Export Mode Selection */}
         <div style={{ marginBottom: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-            <div style={{
-              width: '32px',
-              height: '32px',
-              backgroundColor: theme.colors.success,
-              borderRadius: '6px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <FiVideo size={16} color={theme.colors.successForeground} />
-            </div>
-            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: theme.colors.text }}>
-              Export Mode
-            </h3>
-          </div>
+          <h3 style={{
+            margin: '0 0 16px 0',
+            fontSize: '18px',
+            fontWeight: '600',
+            color: theme.colors.text
+          }}>
+            Export Mode
+          </h3>
+          <p style={{
+            margin: '0 0 16px 0',
+            fontSize: '14px',
+            color: theme.colors.textSecondary,
+            lineHeight: '1.5'
+          }}>
+            Choose what to include in your exported video.
+          </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {[
-              // Always show Export Complete Video
+              // Always show Export Complete Video - adjust description based on available content
               { 
                 value: 'complete', 
                 label: 'Export Complete Video', 
-                description: replacementAudioPath 
-                  ? 'Export video with new audio and subtitles' 
-                  : 'Export video with original audio and subtitles', 
+                description: (() => {
+                  if (hasReplacementAudio && hasCaptions) {
+                    return 'Export video with new audio and subtitles';
+                  } else if (hasReplacementAudio && !hasCaptions) {
+                    return 'Export video with new audio only';
+                  } else if (!hasReplacementAudio && hasCaptions) {
+                    return 'Export video with original audio and subtitles';
+                  } else {
+                    return 'Export video with original audio only';
+                  }
+                })(), 
                 icon: FiVideo 
               },
               // Show Export Video with New Audio only if replacement audio is available
-              ...(replacementAudioPath ? [{ 
+              ...(hasReplacementAudio ? [{ 
                 value: 'newAudio', 
                 label: 'Export Video with New Audio', 
                 description: 'Export video with new audio only (no subtitles)', 
                 icon: FiMusic 
               }] : []),
-              // Show Export Video with Subtitles Only if replacement audio is available
-              ...(replacementAudioPath ? [{ 
+              // Show Export Video with Subtitles Only only if replacement audio AND captions are available
+              ...(hasReplacementAudio && hasCaptions ? [{ 
                 value: 'subtitlesOnly', 
                 label: 'Export Video with Subtitles Only', 
                 description: 'Export video with original audio and subtitles', 
                 icon: FiFileText 
               }] : [])
             ].map(option => (
-              <Button
+              <button
                 key={option.value}
                 onClick={() => setExportMode(option.value as any)}
-                variant={exportMode === option.value ? 'primary' : 'outline'}
-                size="lg"
-                fullWidth
                 style={{
-                  justifyContent: 'flex-start',
-                  textAlign: 'left',
                   padding: '12px 16px',
+                  backgroundColor: exportMode === option.value 
+                    ? theme.colors.primary 
+                    : theme.colors.surface,
+                  color: exportMode === option.value 
+                    ? theme.colors.primaryForeground 
+                    : theme.colors.text,
+                  border: `1px solid ${exportMode === option.value 
+                    ? theme.colors.primary 
+                    : theme.colors.border}`,
+                  borderRadius: theme.radius.md,
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  transition: 'all 0.2s ease',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '12px'
+                  gap: '12px',
+                  width: '100%',
+                  textAlign: 'left'
+                }}
+                onMouseEnter={(e) => {
+                  if (exportMode !== option.value) {
+                    e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (exportMode !== option.value) {
+                    e.currentTarget.style.backgroundColor = theme.colors.surface;
+                  }
                 }}
               >
                 <div style={{
@@ -196,39 +273,71 @@ const ExportSettingsModal: React.FC<ExportSettingsProps> = ({
                     {option.description}
                   </div>
                 </div>
-              </Button>
+              </button>
             ))}
           </div>
         </div>
 
-        </div>
-
         {/* Action Buttons */}
         <div style={{
-          padding: '16px 24px',
-          borderTop: `1px solid ${theme.colors.border}`,
           display: 'flex',
           gap: '12px',
           justifyContent: 'flex-end',
-          background: theme.colors.modal.background
+          borderTop: `1px solid ${theme.colors.border}`,
+          paddingTop: '24px'
         }}>
-          <Button
+          <button
             onClick={onClose}
-            variant="outline"
-            size="md"
+            style={{
+              padding: '12px 24px',
+              backgroundColor: 'transparent',
+              color: theme.colors.text,
+              border: `1px solid ${theme.colors.border}`,
+              borderRadius: theme.radius.md,
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '500',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
           >
             Cancel
-          </Button>
-          <Button
+          </button>
+          <button
             onClick={handleConfirm}
-            variant="primary"
-            size="md"
-            leftIcon={<FiZap size={16} />}
+            style={{
+              padding: '12px 24px',
+              backgroundColor: theme.colors.primary,
+              color: theme.colors.primaryForeground,
+              border: `1px solid ${theme.colors.primary}`,
+              borderRadius: theme.radius.md,
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '500',
+              transition: 'all 0.2s ease',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = theme.colors.primaryHover;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = theme.colors.primary;
+            }}
           >
+            <FiZap size={16} />
             Start Export
-          </Button>
+          </button>
         </div>
+      </div>
     </LiquidModal>
+    </>
   );
 };
 
