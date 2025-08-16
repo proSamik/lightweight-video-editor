@@ -446,6 +446,10 @@ ipcMain.handle('render-video-with-captions', async (event, videoPath: string, ca
       }, exportSettings);
     } 
   } catch (error) {
+    // Check if this is a cancellation (expected behavior)
+    if (error instanceof Error && error.message.includes('cancelled')) {
+      throw error; // Re-throw cancellation errors as-is
+    }
     throw new Error(`Failed to render video: ${error}`);
   }
 });
