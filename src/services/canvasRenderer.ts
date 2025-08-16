@@ -14,6 +14,9 @@ import { createCanvas, loadImage, Canvas, CanvasRenderingContext2D, registerFont
 export class CanvasVideoRenderer {
   private static instance: CanvasVideoRenderer;
   private fontsRegistered = false;
+  private isCancelled: boolean = false;
+  private activeFFmpegProcesses: Set<any> = new Set();
+  private currentTempDir: string | null = null;
 
   private constructor() {}
 
@@ -22,6 +25,33 @@ export class CanvasVideoRenderer {
       CanvasVideoRenderer.instance = new CanvasVideoRenderer();
     }
     return CanvasVideoRenderer.instance;
+  }
+
+  /**
+   * Cancel the current rendering operation
+   */
+  public cancelRendering(): void {
+    console.log('[CanvasVideoRenderer] Cancellation requested');
+    this.isCancelled = true;
+    
+    // Kill all active FFmpeg processes
+    for (const ffmpegCommand of this.activeFFmpegProcesses) {
+      try {
+        if (ffmpegCommand && typeof ffmpegCommand.kill === 'function') {
+          console.log('[CanvasVideoRenderer] Killing FFmpeg command');
+          ffmpegCommand.kill('SIGTERM');
+        }
+      } catch (error) {
+        console.error('[CanvasVideoRenderer] Error killing FFmpeg command:', error);
+      }
+    }
+    this.activeFFmpegProcesses.clear();
+    
+    // Clean up temporary files
+    if (this.currentTempDir) {
+      this.cleanupTempFiles(this.currentTempDir);
+      this.currentTempDir = null;
+    }
   }
 
   /**
@@ -36,6 +66,8 @@ export class CanvasVideoRenderer {
     exportSettings?: { framerate: number; quality: string }
   ): Promise<string> {
     try {
+      // Reset cancellation state for new render
+      this.isCancelled = false;
       // Validate inputs
       await this.validateInputs(videoPath, captions, outputPath);
       
@@ -58,11 +90,18 @@ export class CanvasVideoRenderer {
       
       // Create temporary directory for frame extraction
       const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'video-frames-'));
+      this.currentTempDir = tempDir; // Track for cancellation cleanup
       
       try {
         // Step 1: Extract video frames (FFmpeg needed for video decoding)
         const framesDir = path.join(tempDir, 'frames');
         await fs.promises.mkdir(framesDir);
+        
+        // Check if cancelled before starting frame extraction
+        if (this.isCancelled) {
+          throw new Error('Rendering cancelled before frame extraction');
+        }
+        
         await this.extractVideoFrames(videoPath, framesDir, metadata.fps, onProgress);
         
         // Validate frame extraction
@@ -82,8 +121,15 @@ export class CanvasVideoRenderer {
       } finally {
         // Clean up temporary files
         await this.cleanupTempFiles(tempDir);
+        this.currentTempDir = null;
       }
     } catch (error) {
+      // Check if this is a cancellation (expected behavior)
+      if (error instanceof Error && (error.message.includes('cancelled') || this.isCancelled)) {
+        console.log('=== CANVAS RENDERER CANCELLED ===');
+        throw error; // Re-throw cancellation errors without fallback
+      }
+      
       console.error('Video rendering failed:', error);
       
       return await this.copyVideo(videoPath, outputPath);
@@ -191,20 +237,43 @@ export class CanvasVideoRenderer {
         ])
         .output(path.join(batchDir, 'frame_%06d.png'))
         .on('start', (commandLine: string) => {
-          // Batch extraction started
+          // Track FFmpeg command for cancellation
+          this.activeFFmpegProcesses.add(command);
         })
         .on('progress', (progress: any) => {
+          // Check for cancellation during progress
+          if (this.isCancelled) {
+            try {
+              command.kill('SIGTERM');
+            } catch (error) {
+              // Silently handle kill errors during cancellation
+            }
+            reject(new Error('Frame extraction cancelled'));
+            return;
+          }
+          
           if (onProgress && progress.percent) {
             const batchProgress = (processedFrames / totalFrames) + (progress.percent / 100) * (numFrames / totalFrames);
             onProgress(batchProgress * 30); // 30% of total progress
           }
         })
         .on('end', () => {
+          // Clean up process tracking
+          this.activeFFmpegProcesses.delete(command);
           resolve();
         })
         .on('error', (err: any) => {
-          console.error('Batch frame extraction error:', err);
-          reject(err);
+          // Clean up process tracking
+          this.activeFFmpegProcesses.delete(command);
+          
+          // Check if this is cancellation (expected error)
+          if (this.isCancelled || (err.message && err.message.includes('signal 15'))) {
+            // This is expected when we cancel, don't log as error
+            reject(new Error('Frame extraction cancelled'));
+          } else {
+            console.error('Batch frame extraction error:', err);
+            reject(err);
+          }
         });
 
       command.run();
@@ -1244,9 +1313,27 @@ export class CanvasVideoRenderer {
   private async cleanupTempFiles(tempDir: string): Promise<void> {
     try {
       await fs.promises.rm(tempDir, { recursive: true, force: true });
-      console.log('Temporary files cleaned up');
+      if (!this.isCancelled) {
+        console.log('Temporary files cleaned up');
+      }
     } catch (error) {
-      console.warn('Failed to cleanup temporary files:', error);
+      // During cancellation, FFmpeg may leave files behind - this is expected
+      if (this.isCancelled) {
+        // Try force cleanup during cancellation
+        try {
+          const { execSync } = require('child_process');
+          if (process.platform === 'win32') {
+            execSync(`rmdir /s /q "${tempDir}"`, { stdio: 'ignore' });
+          } else {
+            execSync(`rm -rf "${tempDir}"`, { stdio: 'ignore' });
+          }
+          console.log('Temporary files cleaned up after cancellation');
+        } catch (altError) {
+          console.warn('Failed to cleanup temporary files after cancellation:', altError);
+        }
+      } else {
+        console.warn('Failed to cleanup temporary files:', error);
+      }
     }
   }
 }
