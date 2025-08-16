@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import { VideoFile } from '../types';
 import { GPUCanvasVideoRenderer } from './gpuCanvasRenderer';
 import { CanvasVideoRenderer } from './canvasRenderer';
+import { FFmpegOverlayRenderer } from './ffmpegOverlayRenderer';
 
 // Import bundled FFmpeg binaries
 let ffmpegPath: string;
@@ -372,41 +373,71 @@ export class FFmpegService {
       // Reset cancellation state at start of new render
       this.isCancelled = false;
       
-      // Use Canvas-based rendering for perfect preview matching
+      // Try rendering approaches in order of preference
       try {
-        console.log('Starting Canvas-based video rendering...');
+        console.log('Starting video rendering with captions...');
         
         // Check if cancelled before starting
         if (this.isCancelled) {
           throw new Error('Rendering cancelled');
         }
         
-        // Try GPU-accelerated renderer first, fall back to regular Canvas renderer
         let result: string;
+        
+        // 1. Try FFmpeg overlay renderer first (most efficient - no frame extraction)
         try {
-          const gpuRenderer = GPUCanvasVideoRenderer.getInstance();
-          result = await gpuRenderer.renderVideoWithCaptions(
+          console.log('Attempting FFmpeg overlay rendering...');
+          const overlayRenderer = FFmpegOverlayRenderer.getInstance();
+          result = await overlayRenderer.renderVideoWithCaptions(
             videoPath,
             captionsData,
             outputPath,
             onProgress,
             exportSettings
           );
-        } catch (gpuError) {
-          // Check if cancelled during GPU rendering
+          console.log('FFmpeg overlay rendering completed successfully');
+        } catch (overlayError) {
+          // Check if cancelled during overlay rendering
           if (this.isCancelled) {
             throw new Error('Rendering cancelled');
           }
           
-          console.warn('GPU Canvas renderer failed, trying regular Canvas renderer:', gpuError);
-          const canvasRenderer = CanvasVideoRenderer.getInstance();
-          result = await canvasRenderer.renderVideoWithCaptions(
-            videoPath,
-            captionsData,
-            outputPath,
-            onProgress,
-            exportSettings
-          );
+          console.error('FFmpeg overlay renderer failed - NO FALLBACK (for debugging):', overlayError);
+          throw overlayError; // Re-throw error to see exact failure without fallback
+          
+          // COMMENTED OUT FALLBACKS FOR DEBUGGING
+          // console.warn('FFmpeg overlay renderer failed, trying GPU Canvas renderer:', overlayError);
+          
+          // // 2. Fall back to GPU-accelerated Canvas renderer
+          // try {
+          //   const gpuRenderer = GPUCanvasVideoRenderer.getInstance();
+          //   result = await gpuRenderer.renderVideoWithCaptions(
+          //     videoPath,
+          //     captionsData,
+          //     outputPath,
+          //     onProgress,
+          //     exportSettings
+          //   );
+          //   console.log('GPU Canvas rendering completed successfully');
+          // } catch (gpuError) {
+          //   // Check if cancelled during GPU rendering
+          //   if (this.isCancelled) {
+          //     throw new Error('Rendering cancelled');
+          //   }
+          //   
+          //   console.warn('GPU Canvas renderer failed, trying regular Canvas renderer:', gpuError);
+          //   
+          //   // 3. Final fallback to regular Canvas renderer
+          //   const canvasRenderer = CanvasVideoRenderer.getInstance();
+          //   result = await canvasRenderer.renderVideoWithCaptions(
+          //     videoPath,
+          //     captionsData,
+          //     outputPath,
+          //     onProgress,
+          //     exportSettings
+          //   );
+          //   console.log('Canvas rendering completed successfully');
+          // }
         }
         
         // Check if cancelled before resolving
@@ -494,7 +525,14 @@ export class FFmpegService {
       console.log('[FFmpegService] Rendering cancellation requested');
       this.isCancelled = true;
       
-      // Cancel Canvas renderers
+      // Cancel all renderers
+      try {
+        const overlayRenderer = FFmpegOverlayRenderer.getInstance();
+        overlayRenderer.cancelRendering();
+      } catch (error) {
+        console.warn('[FFmpegService] Error cancelling overlay renderer:', error);
+      }
+      
       try {
         const gpuRenderer = GPUCanvasVideoRenderer.getInstance();
         gpuRenderer.cancelRendering();
