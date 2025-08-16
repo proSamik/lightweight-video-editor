@@ -716,7 +716,7 @@ const AppContent: React.FC = () => {
       setIsLoading(false);
       setLoadingProgress(undefined); // Clear progress
       setCancelController(null);
-      if (error instanceof Error && error.name === 'AbortError') {
+      if (error instanceof Error && (error.name === 'AbortError' || error.message.includes('cancelled'))) {
         // Export was cancelled
         console.log('Export cancelled by user');
       } else {
@@ -903,7 +903,11 @@ const AppContent: React.FC = () => {
       console.error('Export with new audio failed:', error);
       setIsLoading(false);
       setLoadingProgress(undefined);
-      alert(`Export failed: ${error}`);
+      if (error instanceof Error && error.message.includes('cancelled')) {
+        console.log('Export cancelled by user');
+      } else {
+        alert(`Export failed: ${error}`);
+      }
     }
   };
 
