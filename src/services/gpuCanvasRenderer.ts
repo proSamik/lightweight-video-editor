@@ -17,6 +17,10 @@ export class GPUCanvasVideoRenderer {
   private static instance: GPUCanvasVideoRenderer;
   private fontsRegistered = false;
   private maxWorkers: number;
+  private isCancelled: boolean = false;
+  private activeWorkers: Set<any> = new Set();
+  private activeFFmpegProcesses: Set<any> = new Set();
+  private currentTempDir: string | null = null;
 
   private constructor() {
     // Determine optimal number of worker threads based on CPU cores
@@ -29,6 +33,46 @@ export class GPUCanvasVideoRenderer {
       GPUCanvasVideoRenderer.instance = new GPUCanvasVideoRenderer();
     }
     return GPUCanvasVideoRenderer.instance;
+  }
+
+  /**
+   * Cancel the current rendering operation
+   */
+  public cancelRendering(): void {
+    console.log('[GPUCanvasVideoRenderer] Cancellation requested');
+    this.isCancelled = true;
+    
+    // Terminate all active worker threads
+    for (const worker of this.activeWorkers) {
+      try {
+        if (worker && typeof worker.terminate === 'function') {
+          console.log('[GPUCanvasVideoRenderer] Terminating worker thread');
+          worker.terminate();
+        }
+      } catch (error) {
+        console.error('[GPUCanvasVideoRenderer] Error terminating worker:', error);
+      }
+    }
+    this.activeWorkers.clear();
+    
+    // Kill all active FFmpeg processes
+    for (const ffmpegCommand of this.activeFFmpegProcesses) {
+      try {
+        if (ffmpegCommand && typeof ffmpegCommand.kill === 'function') {
+          console.log('[GPUCanvasVideoRenderer] Killing FFmpeg command');
+          ffmpegCommand.kill('SIGTERM');
+        }
+      } catch (error) {
+        console.error('[GPUCanvasVideoRenderer] Error killing FFmpeg command:', error);
+      }
+    }
+    this.activeFFmpegProcesses.clear();
+    
+    // Clean up temporary files
+    if (this.currentTempDir) {
+      this.cleanupTempFiles(this.currentTempDir);
+      this.currentTempDir = null;
+    }
   }
 
   /**
@@ -68,6 +112,9 @@ export class GPUCanvasVideoRenderer {
     exportSettings?: { framerate: number; quality: string }
   ): Promise<string> {
     try {
+      // Reset cancellation state for new render
+      this.isCancelled = false;
+      
       console.log('=== GPU RENDERER DEBUG START ===');
       console.log('Input video path:', videoPath);
       console.log('Output path:', outputPath);
@@ -75,6 +122,11 @@ export class GPUCanvasVideoRenderer {
       console.log('Captions data:', JSON.stringify(captions?.slice(0, 2), null, 2));
       console.log('Export settings:', exportSettings);
       console.log('Using worker threads:', this.maxWorkers);
+      
+      // Check if cancelled before starting
+      if (this.isCancelled) {
+        throw new Error('Rendering cancelled');
+      }
       
       // Validate inputs
       await this.validateInputs(videoPath, captions, outputPath);
@@ -99,12 +151,19 @@ export class GPUCanvasVideoRenderer {
       
       // Create temporary directory for frame extraction
       const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'gpu-video-frames-'));
+      this.currentTempDir = tempDir; // Track for cancellation cleanup
       console.log('Temp directory created:', tempDir);
       
       try {
         // Step 1: Extract video frames (FFmpeg needed for video decoding)
         const framesDir = path.join(tempDir, 'frames');
         await fs.promises.mkdir(framesDir);
+        
+        // Check if cancelled before starting frame extraction
+        if (this.isCancelled) {
+          throw new Error('Rendering cancelled before frame extraction');
+        }
+        
         console.log('Starting frame extraction...');
         await this.extractVideoFrames(videoPath, framesDir, metadata.fps, onProgress);
         
@@ -133,8 +192,15 @@ export class GPUCanvasVideoRenderer {
       } finally {
         // Clean up temporary files
         await this.cleanupTempFiles(tempDir);
+        this.currentTempDir = null;
       }
     } catch (error) {
+      // Check if this is a cancellation (expected behavior)
+      if (error instanceof Error && (error.message.includes('cancelled') || this.isCancelled)) {
+        console.log('=== GPU RENDERER CANCELLED ===');
+        throw error; // Re-throw cancellation errors without fallback
+      }
+      
       console.error('=== GPU RENDERER DEBUG END - ERROR ===');
       console.error('GPU-accelerated video rendering failed:', error);
       if (error instanceof Error) {
@@ -1074,8 +1140,21 @@ export class GPUCanvasVideoRenderer {
       command
         .on('start', (commandLine: string) => {
           console.log('Multi-threaded FFmpeg frame extraction command:', commandLine);
+          // Track the FFmpeg command for cancellation
+          this.activeFFmpegProcesses.add(command);
         })
         .on('progress', (progress: any) => {
+          // Check for cancellation during progress
+          if (this.isCancelled) {
+            try {
+              command.kill('SIGTERM');
+            } catch (error) {
+              // Silently handle kill errors during cancellation
+            }
+            reject(new Error('Frame extraction cancelled'));
+            return;
+          }
+          
           console.log('Frame extraction progress:', progress);
           if (onProgress) {
             onProgress((progress.percent || 0) * 0.5); // Frame extraction is 50% of total progress
@@ -1083,11 +1162,22 @@ export class GPUCanvasVideoRenderer {
         })
         .on('end', () => {
           console.log('Multi-threaded frame extraction completed successfully');
+          // Clean up process tracking
+          this.activeFFmpegProcesses.delete(command);
           resolve();
         })
         .on('error', (err: any) => {
-          console.error('Multi-threaded frame extraction error:', err);
-          reject(err);
+          // Clean up process tracking
+          this.activeFFmpegProcesses.delete(command);
+          
+          // Check if this is cancellation (expected error)
+          if (this.isCancelled || (err.message && err.message.includes('signal 15'))) {
+            // This is expected when we cancel, don't log as error
+            reject(new Error('Frame extraction cancelled'));
+          } else {
+            console.error('Multi-threaded frame extraction error:', err);
+            reject(err);
+          }
         })
         .run();
     });
@@ -1290,22 +1380,40 @@ export class GPUCanvasVideoRenderer {
       // Check if directory exists before trying to remove it
       if (await fs.promises.access(tempDir).then(() => true).catch(() => false)) {
         await fs.promises.rm(tempDir, { recursive: true, force: true });
-        console.log('Temporary files cleaned up successfully');
+        if (!this.isCancelled) {
+          console.log('Temporary files cleaned up successfully');
+        }
       }
     } catch (error) {
-      console.warn('Failed to cleanup temporary files:', error);
-      
-      // Try alternative cleanup method
-      try {
-        const { execSync } = require('child_process');
-        if (process.platform === 'win32') {
-          execSync(`rmdir /s /q "${tempDir}"`, { stdio: 'ignore' });
-        } else {
-          execSync(`rm -rf "${tempDir}"`, { stdio: 'ignore' });
+      // During cancellation, FFmpeg may leave files behind - this is expected
+      if (this.isCancelled) {
+        // Try force cleanup during cancellation
+        try {
+          const { execSync } = require('child_process');
+          if (process.platform === 'win32') {
+            execSync(`rmdir /s /q "${tempDir}"`, { stdio: 'ignore' });
+          } else {
+            execSync(`rm -rf "${tempDir}"`, { stdio: 'ignore' });
+          }
+          console.log('Temporary files cleaned up after cancellation');
+        } catch (altError) {
+          console.warn('Failed to cleanup temporary files after cancellation:', altError);
         }
-        console.log('Temporary files cleaned up using alternative method');
-      } catch (altError) {
-        console.error('All cleanup methods failed:', altError);
+      } else {
+        console.warn('Failed to cleanup temporary files:', error);
+        
+        // Try alternative cleanup method for non-cancellation cases
+        try {
+          const { execSync } = require('child_process');
+          if (process.platform === 'win32') {
+            execSync(`rmdir /s /q "${tempDir}"`, { stdio: 'ignore' });
+          } else {
+            execSync(`rm -rf "${tempDir}"`, { stdio: 'ignore' });
+          }
+          console.log('Temporary files cleaned up using alternative method');
+        } catch (altError) {
+          console.error('All cleanup methods failed:', altError);
+        }
       }
     }
   }
