@@ -51,11 +51,26 @@ export class WhisperService {
     for (const whisperPath of commonPaths) {
       try {
         if (fs.existsSync(whisperPath)) {
-          this.whisperPath = whisperPath;
+          // Test that the whisper path actually works
+          const { execSync } = require('child_process');
+          const env = {
+            ...process.env,
+            PATH: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:${process.env.PATH || ''}`,
+            PYTHONPATH: `/opt/homebrew/lib/python3.*/site-packages:${process.env.PYTHONPATH || ''}`
+          };
+          
+          if (whisperPath.includes('python3')) {
+            execSync(`"${whisperPath}" -m whisper --help`, { stdio: 'pipe', env, timeout: 10000 });
+            this.whisperPath = `${whisperPath} -m whisper`;
+          } else {
+            execSync(`"${whisperPath}" --help`, { stdio: 'pipe', env, timeout: 10000 });
+            this.whisperPath = whisperPath;
+          }
           console.log(`Whisper found at: ${whisperPath}`);
           break;
         }
       } catch (error) {
+        console.log(`Whisper test failed for path ${whisperPath}:`, (error as Error).message);
         continue;
       }
     }
@@ -74,16 +89,20 @@ export class WhisperService {
         // Try whisper command
         try {
           execSync('which whisper', { stdio: 'pipe', env });
+          // Test that whisper actually works
+          execSync('whisper --help', { stdio: 'pipe', env, timeout: 10000 });
           this.whisperPath = 'whisper';
           console.log('Whisper found in PATH');
         } catch (e) {
           // Try python3 -m whisper
           try {
             execSync('which python3', { stdio: 'pipe', env });
+            // Test that python3 -m whisper actually works
+            execSync('python3 -m whisper --help', { stdio: 'pipe', env, timeout: 10000 });
             this.whisperPath = 'python3 -m whisper';
             console.log('Python3 found in PATH, will use python3 -m whisper');
           } catch (e2) {
-            console.log('Neither whisper nor python3 found in PATH');
+            console.log('Neither whisper nor python3 -m whisper working. Error:', (e2 as Error).message);
           }
         }
       } catch (error) {
@@ -453,6 +472,39 @@ export class WhisperService {
 
   public checkWhisperAvailability(): boolean {
     return this.whisperPath !== '';
+  }
+
+  public getDetailedAvailability(): { available: boolean; path: string; error?: string } {
+    if (this.whisperPath === '') {
+      return { 
+        available: false, 
+        path: '', 
+        error: 'Whisper not found. Please install OpenAI Whisper: pip install openai-whisper' 
+      };
+    }
+
+    // Test if the Whisper path actually works
+    try {
+      const { execSync } = require('child_process');
+      const env = {
+        ...process.env,
+        PATH: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:${process.env.PATH || ''}`,
+        PYTHONPATH: `/opt/homebrew/lib/python3.*/site-packages:${process.env.PYTHONPATH || ''}`
+      };
+
+      if (this.whisperPath.includes('python3 -m whisper')) {
+        execSync('python3 -m whisper --help', { stdio: 'pipe', env, timeout: 10000 });
+      } else {
+        execSync(`"${this.whisperPath}" --help`, { stdio: 'pipe', env, timeout: 10000 });
+      }
+      return { available: true, path: this.whisperPath };
+    } catch (error) {
+      return { 
+        available: false, 
+        path: this.whisperPath, 
+        error: `Whisper found at ${this.whisperPath} but failed to execute: ${(error as Error).message}` 
+      };
+    }
   }
 
   public getWhisperPath(): string {

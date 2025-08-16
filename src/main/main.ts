@@ -10,6 +10,7 @@ import { SrtExporter } from '../services/srtExporter';
 import { AIService } from '../services/aiService';
 import { SettingsManager } from '../services/settingsManager';
 import { UpdateService } from '../services/updateService';
+import DependencyInstaller from '../services/dependencyInstaller';
 
 let mainWindow: BrowserWindow;
 
@@ -145,10 +146,6 @@ app.on('window-all-closed', () => {
   try {
     const ffmpegService = FFmpegService.getInstance();
     ffmpegService.cleanup();
-    
-    const { StreamingVideoRenderer } = require('../services/streamingRenderer');
-    const renderer = StreamingVideoRenderer.getInstance();
-    renderer.cleanup();
   } catch (error) {
     console.warn('Error during cleanup:', error);
   }
@@ -169,10 +166,6 @@ app.on('before-quit', () => {
   try {
     const ffmpegService = FFmpegService.getInstance();
     ffmpegService.cleanup();
-    
-    const { StreamingVideoRenderer } = require('../services/streamingRenderer');
-    const renderer = StreamingVideoRenderer.getInstance();
-    renderer.cleanup();
   } catch (error) {
     console.warn('Error during cleanup:', error);
   }
@@ -184,10 +177,6 @@ process.on('SIGINT', () => {
   try {
     const ffmpegService = FFmpegService.getInstance();
     ffmpegService.cleanup();
-    
-    const { StreamingVideoRenderer } = require('../services/streamingRenderer');
-    const renderer = StreamingVideoRenderer.getInstance();
-    renderer.cleanup();
   } catch (error) {
     console.warn('Error during cleanup:', error);
   }
@@ -199,10 +188,6 @@ process.on('SIGTERM', () => {
   try {
     const ffmpegService = FFmpegService.getInstance();
     ffmpegService.cleanup();
-    
-    const { StreamingVideoRenderer } = require('../services/streamingRenderer');
-    const renderer = StreamingVideoRenderer.getInstance();
-    renderer.cleanup();
   } catch (error) {
     console.warn('Error during cleanup:', error);
   }
@@ -410,9 +395,14 @@ ipcMain.handle('check-dependencies', async () => {
   const ffmpegService = FFmpegService.getInstance();
   const whisperService = WhisperService.getInstance();
   
+  const ffmpegStatus = ffmpegService.getDetailedAvailability();
+  const whisperStatus = whisperService.getDetailedAvailability();
+  
   return {
-    ffmpeg: ffmpegService.checkFFmpegAvailability(),
-    whisper: whisperService.checkWhisperAvailability()
+    ffmpeg: ffmpegStatus.available,
+    whisper: whisperStatus.available,
+    ffmpegDetails: ffmpegStatus,
+    whisperDetails: whisperStatus
   };
 });
 
@@ -799,5 +789,65 @@ ipcMain.handle('get-update-status', async () => {
   } catch (error) {
     console.error('Failed to get update status:', error);
     throw new Error(`Failed to get update status: ${error}`);
+  }
+});
+
+// Dependency installation handlers
+ipcMain.handle('check-installation-capabilities', async () => {
+  try {
+    const installer = DependencyInstaller.getInstance();
+    return await installer.checkInstallationCapabilities();
+  } catch (error) {
+    console.error('Failed to check installation capabilities:', error);
+    throw new Error(`Failed to check installation capabilities: ${error}`);
+  }
+});
+
+ipcMain.handle('install-ffmpeg', async (event) => {
+  try {
+    const installer = DependencyInstaller.getInstance();
+    return await installer.installFFmpeg((progress) => {
+      event.sender.send('installation-progress', 'ffmpeg', progress);
+    });
+  } catch (error) {
+    console.error('Failed to install FFmpeg:', error);
+    throw new Error(`Failed to install FFmpeg: ${error}`);
+  }
+});
+
+ipcMain.handle('install-whisper', async (event) => {
+  try {
+    const installer = DependencyInstaller.getInstance();
+    return await installer.installWhisper((progress) => {
+      event.sender.send('installation-progress', 'whisper', progress);
+    });
+  } catch (error) {
+    console.error('Failed to install Whisper:', error);
+    throw new Error(`Failed to install Whisper: ${error}`);
+  }
+});
+
+ipcMain.handle('refresh-dependency-detection', async () => {
+  try {
+    // Force re-detection of dependencies by creating new service instances
+    // Note: This is a simplified approach - in production you'd want more sophisticated instance management
+    
+    // Get new instances (which will trigger path detection)
+    const ffmpegService = FFmpegService.getInstance();
+    const whisperService = WhisperService.getInstance();
+    
+    // Return updated status
+    const ffmpegStatus = ffmpegService.getDetailedAvailability();
+    const whisperStatus = whisperService.getDetailedAvailability();
+    
+    return {
+      ffmpeg: ffmpegStatus.available,
+      whisper: whisperStatus.available,
+      ffmpegDetails: ffmpegStatus,
+      whisperDetails: whisperStatus
+    };
+  } catch (error) {
+    console.error('Failed to refresh dependency detection:', error);
+    throw new Error(`Failed to refresh dependency detection: ${error}`);
   }
 });

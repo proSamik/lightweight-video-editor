@@ -12,6 +12,7 @@ import AIContentModal from './components/AIContentModal';
 import ExportSettingsModal from './components/ExportSettings';
 import { UpdateModal } from './components/UpdateModal';
 import { UpdateNotification } from './components/UpdateNotification';
+import DependencyInstallModal from './components/DependencyInstallModal';
 import { Button, Card } from './components/ui';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import {
@@ -64,6 +65,8 @@ const AppContent: React.FC = () => {
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null);
   const [showExportSettings, setShowExportSettings] = useState(false);
   const [showSrtSuccess, setShowSrtSuccess] = useState(false);
+  const [showDependencyInstall, setShowDependencyInstall] = useState(false);
+  const [missingDependencies, setMissingDependencies] = useState({ ffmpeg: false, whisper: false });
 
   // Update-related state
   const [showUpdateModal, setShowUpdateModal] = useState(false);
@@ -258,13 +261,31 @@ const AppContent: React.FC = () => {
       const deps = await window.electronAPI.checkDependencies();
       
       if (!deps.ffmpeg || !deps.whisper) {
-        alert('FFmpeg and OpenAI Whisper are required. Please install them first.');
+        // Set missing dependencies and show installation modal
+        setMissingDependencies({
+          ffmpeg: !deps.ffmpeg,
+          whisper: !deps.whisper
+        });
+        setShowDependencyInstall(true);
         return false;
       }
       return true;
     } catch (error) {
       console.error('Error checking dependencies:', error);
+      alert('Error checking dependencies. Please ensure FFmpeg and Whisper are installed.');
       return false;
+    }
+  };
+
+  const handleInstallationComplete = async () => {
+    setShowDependencyInstall(false);
+    // Refresh services to pick up newly installed dependencies
+    try {
+      // Force a reload of the services to detect newly installed dependencies
+      await window.electronAPI.refreshDependencyDetection();
+      console.log('Dependencies refreshed after installation');
+    } catch (error) {
+      console.error('Error refreshing dependencies after installation:', error);
     }
   };
 
@@ -1690,6 +1711,13 @@ const AppContent: React.FC = () => {
         initialContent={generatedContent || undefined}
       />
 
+      {/* Dependency Installation Modal */}
+      <DependencyInstallModal
+        isOpen={showDependencyInstall}
+        onClose={() => setShowDependencyInstall(false)}
+        missingDependencies={missingDependencies}
+        onInstallComplete={handleInstallationComplete}
+      />
       {/* Export Settings Modal */}
       <ExportSettingsModal
         isOpen={showExportSettings}

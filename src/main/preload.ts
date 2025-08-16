@@ -35,6 +35,9 @@ const electronAPI = {
   onRenderingProgress: (callback: (progress: number) => void) => {
     ipcRenderer.on('rendering-progress', (_, progress) => callback(progress));
   },
+  onInstallationProgress: (callback: (dependency: string, progress: any) => void) => {
+    ipcRenderer.on('installation-progress', (_, dependency, progress) => callback(dependency, progress));
+  },
   removeRenderingProgressListener: () => {
     ipcRenderer.removeAllListeners('rendering-progress');
   },
@@ -101,6 +104,16 @@ const electronAPI = {
     ipcRenderer.invoke('install-update'),
   getUpdateStatus: () =>
     ipcRenderer.invoke('get-update-status'),
+
+  // Dependency installation
+  checkInstallationCapabilities: () => 
+    ipcRenderer.invoke('check-installation-capabilities'),
+  installFFmpeg: () => 
+    ipcRenderer.invoke('install-ffmpeg'),
+  installWhisper: () => 
+    ipcRenderer.invoke('install-whisper'),
+  refreshDependencyDetection: () =>
+    ipcRenderer.invoke('refresh-dependency-detection'),
   
   // Update event listeners
   onUpdateAvailable: (callback: (updateInfo: any) => void) => {
