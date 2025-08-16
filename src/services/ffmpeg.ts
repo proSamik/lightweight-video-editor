@@ -23,6 +23,8 @@ export class FFmpegService {
   private static instance: FFmpegService;
   private ffmpegPath: string = '';
   private ffprobePath: string = '';
+  private activeProcesses: Set<any> = new Set();
+  private isCancelled: boolean = false;
 
   private constructor() {
     this.detectFFmpegPaths();
@@ -367,9 +369,17 @@ export class FFmpegService {
         return;
       }
 
+      // Reset cancellation state at start of new render
+      this.isCancelled = false;
+      
       // Use Canvas-based rendering for perfect preview matching
       try {
         console.log('Starting Canvas-based video rendering...');
+        
+        // Check if cancelled before starting
+        if (this.isCancelled) {
+          throw new Error('Rendering cancelled');
+        }
         
         // Try GPU-accelerated renderer first, fall back to regular Canvas renderer
         let result: string;
@@ -383,6 +393,11 @@ export class FFmpegService {
             exportSettings
           );
         } catch (gpuError) {
+          // Check if cancelled during GPU rendering
+          if (this.isCancelled) {
+            throw new Error('Rendering cancelled');
+          }
+          
           console.warn('GPU Canvas renderer failed, trying regular Canvas renderer:', gpuError);
           const canvasRenderer = CanvasVideoRenderer.getInstance();
           result = await canvasRenderer.renderVideoWithCaptions(
@@ -394,8 +409,20 @@ export class FFmpegService {
           );
         }
         
+        // Check if cancelled before resolving
+        if (this.isCancelled) {
+          throw new Error('Rendering cancelled');
+        }
+        
         resolve(result);
       } catch (error) {
+        // Check if this is a cancellation (expected behavior)
+        if (error instanceof Error && (error.message.includes('cancelled') || this.isCancelled)) {
+          console.log('[FFmpegService] Rendering cancelled - stopping without fallback');
+          reject(new Error('Rendering cancelled'));
+          return;
+        }
+        
         console.error('Canvas rendering failed, using basic copy:', error);
         
         // Final fallback: just copy the video if rendering fails
@@ -406,7 +433,7 @@ export class FFmpegService {
           .on('end', () => resolve(outputPath))
           .on('error', (err: any) => reject(new Error(`Video processing failed: ${err.message}`)));
         
-        command.run();
+        this.runWithTracking(command);
       }
     });
   }
@@ -440,13 +467,68 @@ export class FFmpegService {
   }
 
   /**
+   * Helper method to run FFmpeg command with process tracking
+   */
+  private runWithTracking(command: any): void {
+    command.run();
+    
+    // Track the FFmpeg process for cancellation
+    if (command.ffmpegProc) {
+      this.activeProcesses.add(command.ffmpegProc);
+      
+      // Clean up when process ends
+      command.on('end', () => {
+        this.activeProcesses.delete(command.ffmpegProc);
+      });
+      command.on('error', () => {
+        this.activeProcesses.delete(command.ffmpegProc);
+      });
+    }
+  }
+
+  /**
    * Cancel the current rendering operation
    */
   public cancelRendering(): void {
     try {
-      // Note: Rendering cancellation logic would go here
-      // For now, just log the cancellation request
       console.log('[FFmpegService] Rendering cancellation requested');
+      this.isCancelled = true;
+      
+      // Cancel Canvas renderers
+      try {
+        const gpuRenderer = GPUCanvasVideoRenderer.getInstance();
+        gpuRenderer.cancelRendering();
+      } catch (error) {
+        console.warn('[FFmpegService] Error cancelling GPU renderer:', error);
+      }
+      
+      try {
+        const canvasRenderer = CanvasVideoRenderer.getInstance();
+        if (typeof canvasRenderer.cancelRendering === 'function') {
+          canvasRenderer.cancelRendering();
+        }
+      } catch (error) {
+        console.warn('[FFmpegService] Error cancelling Canvas renderer:', error);
+      }
+      
+      // Kill all active FFmpeg processes
+      for (const process of this.activeProcesses) {
+        try {
+          if (process && typeof process.kill === 'function') {
+            console.log('[FFmpegService] Killing FFmpeg process');
+            process.kill('SIGTERM'); // Try graceful termination first
+            setTimeout(() => {
+              if (process && !process.killed) {
+                process.kill('SIGKILL'); // Force kill if needed
+              }
+            }, 3000);
+          }
+        } catch (killError) {
+          console.error('[FFmpegService] Error killing process:', killError);
+        }
+      }
+      
+      this.activeProcesses.clear();
     } catch (error) {
       console.warn('[FFmpegService] Error cancelling rendering:', error);
     }
