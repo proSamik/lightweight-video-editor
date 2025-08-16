@@ -69,7 +69,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ message, progress, onCanc
             color: theme.colors.textSecondary,
             textAlign: 'center'
           }}>
-            {Math.round(progress)}%
+            {isNaN(progress) ? '0' : Math.round(progress)}%
           </div>
         </div>
       )}
