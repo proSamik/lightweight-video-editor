@@ -50,6 +50,9 @@ export class GPUCanvasVideoRenderer {
     // Cap at reasonable maximum to prevent system overload
     optimalWorkers = Math.min(optimalWorkers, 16);
     
+    // Ensure we always have at least 1 worker to prevent division by zero
+    optimalWorkers = Math.max(1, optimalWorkers);
+    
     console.log(`CPU cores: ${cpuCores}, Memory: ${Math.round(memoryGB)}GB, Optimal workers: ${optimalWorkers}`);
     return optimalWorkers;
   }

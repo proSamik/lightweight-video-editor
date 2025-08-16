@@ -2,6 +2,8 @@ import ffmpeg from 'fluent-ffmpeg';
 import * as path from 'path';
 import * as fs from 'fs';
 import { VideoFile } from '../types';
+import { GPUCanvasVideoRenderer } from './gpuCanvasRenderer';
+import { CanvasVideoRenderer } from './canvasRenderer';
 
 // Import bundled FFmpeg binaries
 let ffmpegPath: string;
@@ -368,11 +370,33 @@ export class FFmpegService {
       // Use Canvas-based rendering for perfect preview matching
       try {
         console.log('Starting Canvas-based video rendering...');
-        // Note: Canvas renderer would be imported here when available
-        // For now, fall back to basic copy
-        throw new Error('Canvas renderer not available');
+        
+        // Try GPU-accelerated renderer first, fall back to regular Canvas renderer
+        let result: string;
+        try {
+          const gpuRenderer = GPUCanvasVideoRenderer.getInstance();
+          result = await gpuRenderer.renderVideoWithCaptions(
+            videoPath,
+            captionsData,
+            outputPath,
+            onProgress,
+            exportSettings
+          );
+        } catch (gpuError) {
+          console.warn('GPU Canvas renderer failed, trying regular Canvas renderer:', gpuError);
+          const canvasRenderer = CanvasVideoRenderer.getInstance();
+          result = await canvasRenderer.renderVideoWithCaptions(
+            videoPath,
+            captionsData,
+            outputPath,
+            onProgress,
+            exportSettings
+          );
+        }
+        
+        resolve(result);
       } catch (error) {
-        console.error('Canvas rendering not available, using basic copy:', error);
+        console.error('Canvas rendering failed, using basic copy:', error);
         
         // Final fallback: just copy the video if rendering fails
         const command = ffmpeg(videoPath)
