@@ -1,5 +1,5 @@
-import React from 'react';
-import { CaptionSegment } from '../../../types';
+import React, { useState } from 'react';
+import { CaptionSegment, CaptionPreset } from '../../../types';
 import { useTheme } from '../../contexts/ThemeContext';
 
 // Import UI components
@@ -16,6 +16,7 @@ import {
 import { TranscriptionStatus } from './TranscriptionStatus';
 import { WordLevelEditor } from './WordLevelEditor';
 import { StyleControls } from './StyleControls';
+import { PresetSelector } from './PresetSelector';
 
 interface StylingPanelProps {
   selectedSegment: CaptionSegment | null;
@@ -39,12 +40,26 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
   transcriptionStatus,
 }) => {
   const { theme } = useTheme();
+  const [activeTab, setActiveTab] = useState<'presets' | 'custom'>('presets');
+  const [selectedPresetId, setSelectedPresetId] = useState<string>();
 
   // Handle style updates
   const handleStyleUpdate = (styleUpdates: Partial<CaptionSegment['style']>) => {
     if (selectedSegment) {
       onSegmentUpdate(selectedSegment.id, {
         style: { ...selectedSegment.style, ...styleUpdates }
+      });
+    }
+  };
+
+  // Handle preset selection
+  const handlePresetSelect = (preset: CaptionPreset) => {
+    setSelectedPresetId(preset.id);
+    if (selectedSegment) {
+      // Extract animation from style before applying
+      const { animation, ...styleWithoutAnimation } = preset.style;
+      onSegmentUpdate(selectedSegment.id, {
+        style: { ...selectedSegment.style, ...styleWithoutAnimation }
       });
     }
   };
@@ -258,15 +273,24 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
     <>
       <div style={panelStyles}>
         <div style={headerStyles}>
-          <HStack justify="between" align="center">
-            <h3 style={{ 
-              margin: 0, 
-              fontSize: typography.fontSize.xl, 
-              fontWeight: typography.fontWeight.semibold,
-              color: theme.colors.text 
-            }}>
-              Styling Controls
-            </h3>
+          <HStack justify="between" align="center" style={{ marginBottom: spacing.lg }}>
+            <div>
+              <h3 style={{ 
+                margin: 0, 
+                fontSize: typography.fontSize.xl, 
+                fontWeight: typography.fontWeight.semibold,
+                color: theme.colors.text 
+              }}>
+                Caption Styling
+              </h3>
+              <p style={{
+                margin: '4px 0 0 0',
+                fontSize: typography.fontSize.sm,
+                color: theme.colors.textSecondary
+              }}>
+                Customize your caption appearance with presets or manual controls
+              </p>
+            </div>
             <Button
               variant="primary"
               size="sm"
@@ -276,36 +300,108 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
               Apply to All
             </Button>
           </HStack>
+          
+          {/* Tab Navigation */}
+          <div style={{
+            display: 'flex',
+            gap: '4px',
+            backgroundColor: theme.colors.surface,
+            padding: '4px',
+            borderRadius: theme.radius.lg,
+            border: `1px solid ${theme.colors.border}`
+          }}>
+            <button
+              onClick={() => setActiveTab('presets')}
+              style={{
+                flex: 1,
+                padding: '12px 16px',
+                backgroundColor: activeTab === 'presets' ? theme.colors.primary : 'transparent',
+                color: activeTab === 'presets' ? theme.colors.primaryForeground : theme.colors.text,
+                border: 'none',
+                borderRadius: theme.radius.md,
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                justifyContent: 'center'
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="currentColor" fillOpacity="0.3"/>
+              </svg>
+              Style Presets
+            </button>
+            <button
+              onClick={() => setActiveTab('custom')}
+              style={{
+                flex: 1,
+                padding: '12px 16px',
+                backgroundColor: activeTab === 'custom' ? theme.colors.primary : 'transparent',
+                color: activeTab === 'custom' ? theme.colors.primaryForeground : theme.colors.text,
+                border: 'none',
+                borderRadius: theme.radius.md,
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                justifyContent: 'center'
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" stroke="currentColor" strokeWidth="2"/>
+              </svg>
+              Custom Controls
+            </button>
+          </div>
         </div>
         
         <div style={contentStyles}>
-          <Stack gap="2xl">
+          <Stack gap="xl">
             <TranscriptionStatus transcriptionStatus={transcriptionStatus} />
             
-            {selectedSegment.words && selectedSegment.words.length > 0 && (
-              <div style={{
-                padding: `${spacing.lg}px`,
-                backgroundColor: theme.colors.background,
-                borderRadius: borderRadius.lg,
-                border: `1px solid ${theme.colors.border}`,
-                margin: `0 -${spacing.md}px`,
-                boxShadow: theme.shadows.sm
-              }}>
-                <WordLevelEditor
-                  words={selectedSegment.words}
-                  onWordUpdate={handleWordUpdate}
-                  onWordDelete={handleWordDelete}
-                  onWordDeleteWithAudio={handleWordDeleteWithAudio}
-                  onWordMerge={handleWordMerge}
-                  onJumpToWord={handleJumpToWord}
+            {/* Tab Content */}
+            {activeTab === 'presets' ? (
+              <PresetSelector
+                selectedPresetId={selectedPresetId}
+                onPresetSelect={handlePresetSelect}
+                onStyleUpdate={handleStyleUpdate}
+                onApplyToAll={onApplyToAll}
+              />
+            ) : (
+              <div>
+                {selectedSegment.words && selectedSegment.words.length > 0 && (
+                  <div style={{
+                    padding: `${spacing.lg}px`,
+                    backgroundColor: theme.colors.background,
+                    borderRadius: borderRadius.lg,
+                    border: `1px solid ${theme.colors.border}`,
+                    marginBottom: spacing.xl,
+                    boxShadow: theme.shadows.sm
+                  }}>
+                    <WordLevelEditor
+                      words={selectedSegment.words}
+                      onWordUpdate={handleWordUpdate}
+                      onWordDelete={handleWordDelete}
+                      onWordDeleteWithAudio={handleWordDeleteWithAudio}
+                      onWordMerge={handleWordMerge}
+                      onJumpToWord={handleJumpToWord}
+                    />
+                  </div>
+                )}
+                
+                <StyleControls
+                  style={selectedSegment.style}
+                  onStyleUpdate={handleStyleUpdate}
                 />
               </div>
             )}
-            
-            <StyleControls
-              style={selectedSegment.style}
-              onStyleUpdate={handleStyleUpdate}
-            />
           </Stack>
         </div>
       </div>
