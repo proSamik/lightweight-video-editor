@@ -1504,4 +1504,14 @@ function parseColor(colorStr: string): { r: number, g: number, b: number, a: num
   return { r: 255, g: 255, b: 255, a: 1 };
 }
 
+// Expose rendering functions globally for PresetPreview
+if (typeof window !== 'undefined') {
+  (window as any).renderCaptionOnCanvas = renderCaptionOnCanvas;
+  (window as any).parseColor = parseColor;
+  (window as any).mapFontName = mapFontName;
+  (window as any).renderSimpleTextOnCanvas = renderSimpleTextOnCanvas;
+  (window as any).renderKaraokeTextOnCanvas = renderKaraokeTextOnCanvas;
+  (window as any).renderProgressiveTextOnCanvas = renderProgressiveTextOnCanvas;
+}
+
 export default VideoPanel;
