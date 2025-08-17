@@ -229,6 +229,16 @@ ipcMain.handle('get-file-url', async (_event, filePath: string) => {
   }
 });
 
+// Check if file exists
+ipcMain.handle('file-exists', async (_event, filePath: string) => {
+  try {
+    return fs.existsSync(filePath);
+  } catch (error) {
+    console.error('Error checking file existence:', error);
+    return false;
+  }
+});
+
 // Get audio buffer for WaveSurfer
 ipcMain.handle('get-audio-buffer', async (_event, filePath: string) => {
   try {
@@ -512,10 +522,15 @@ ipcMain.handle('save-project', async (_event, projectData: any, fileName?: strin
 
 ipcMain.handle('load-project', async (_event, filePath: string) => {
   try {
+    console.log(`[MAIN] Loading project: ${filePath}`);
     const projectManager = ProjectManager.getInstance();
-    return await projectManager.loadProject(filePath);
+    const result = await projectManager.loadProject(filePath);
+    console.log(`[MAIN] Project loaded successfully: ${filePath}`);
+    return result;
   } catch (error) {
-    throw new Error(`Failed to load project: ${error}`);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`[MAIN] Project loading failed for ${filePath}:`, errorMessage);
+    throw new Error(`Failed to load project: ${errorMessage}`);
   }
 });
 

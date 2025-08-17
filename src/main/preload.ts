@@ -94,6 +94,9 @@ const electronAPI = {
   // Extract audio for project (persistent audio file)
   extractAudioForProject: (videoPath: string, projectPath: string) =>
     ipcRenderer.invoke('extract-audio-for-project', videoPath, projectPath),
+  // Check if file exists
+  fileExists: (filePath: string) =>
+    ipcRenderer.invoke('file-exists', filePath),
   
   // Update-related APIs
   checkForUpdates: () => 

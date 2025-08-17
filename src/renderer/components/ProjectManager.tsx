@@ -54,12 +54,30 @@ const ProjectManagerModal: React.FC<ProjectManagerProps> = ({
 
   const handleLoadProject = async (filePath: string) => {
     try {
+      console.log('[RENDERER] Loading project:', filePath);
       const projectData = await window.electronAPI.loadProject(filePath);
+      console.log('[RENDERER] Project loaded successfully');
       onLoadProject(projectData);
       onClose();
     } catch (error) {
-      console.error('Failed to load project:', error);
-      alert('Failed to load project. The file may be corrupted or in an unsupported format.');
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('[RENDERER] Failed to load project:', {
+        filePath,
+        error: errorMessage,
+        fullError: error
+      });
+      
+      // More specific error message based on the error content
+      let userMessage = 'Failed to load project. The file may be corrupted or in an unsupported format.';
+      if (errorMessage.includes('not found')) {
+        userMessage = 'Failed to load project. The project file was not found.';
+      } else if (errorMessage.includes('JSON')) {
+        userMessage = 'Failed to load project. The project file appears to be corrupted.';
+      } else if (errorMessage.includes('permission')) {
+        userMessage = 'Failed to load project. Permission denied accessing the file.';
+      }
+      
+      alert(userMessage);
     }
   };
 

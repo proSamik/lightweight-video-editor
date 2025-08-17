@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { VideoFile, CaptionSegment } from '../../types';
 import { useTheme } from '../contexts/ThemeContext';
 import { FiEye } from 'react-icons/fi';
-import { Video } from 'lucide-react';
+import { Video, AlertTriangle } from 'lucide-react';
 import CaptionStyleModal from './CaptionStyleModal';
 
 interface VideoPanelProps {
@@ -54,6 +54,30 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   const lastUpdateTimeRef = useRef<number>(0);
   const [isHoveringCaption, setIsHoveringCaption] = useState(false);
   const tempDragPositionRef = useRef<{ x: number; y: number } | null>(null);
+  const [videoFileExists, setVideoFileExists] = useState<boolean | null>(null);
+  const [videoLoadError, setVideoLoadError] = useState<boolean>(false);
+
+  // Check if video file exists when videoFile changes
+  useEffect(() => {
+    if (!videoFile || !videoFile.path) {
+      setVideoFileExists(null);
+      return;
+    }
+
+    // Use IPC to check file existence in main process
+    const checkFileExists = async () => {
+      try {
+        const exists = await (window as any).electronAPI.fileExists(videoFile.path);
+        setVideoFileExists(exists);
+        setVideoLoadError(false); // Reset error state when checking new file
+      } catch (error) {
+        console.error('Error checking video file existence:', error);
+        setVideoFileExists(false);
+      }
+    };
+
+    checkFileExists();
+  }, [videoFile]);
 
   // Helper function to check if mouse click is on rendered caption text
   const isClickOnCaption = (mouseX: number, mouseY: number, caption: CaptionSegment): boolean => {
@@ -373,9 +397,23 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
       
       video.addEventListener('loadedmetadata', handleLoadedMetadata);
       return () => video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+    } else if (canvas && videoLoadError && videoFile) {
+      // Fallback canvas size when video fails to load but we have video file metadata
+      const fallbackWidth = videoFile.width || 1920;
+      const fallbackHeight = videoFile.height || 1080;
+      canvas.width = fallbackWidth;
+      canvas.height = fallbackHeight;
+      setCanvasSize({ width: fallbackWidth, height: fallbackHeight });
+      
+      // Calculate scale factor for fallback
+      const canvasRect = canvas.getBoundingClientRect();
+      const scaleX = canvasRect.width / canvas.width;
+      const scaleY = canvasRect.height / canvas.height;
+      const newScaleFactor = Math.min(scaleX, scaleY);
+      setScaleFactor(newScaleFactor);
     }
     return undefined;
-  }, [videoFile]);
+  }, [videoFile, videoLoadError]);
 
   // Update scale factor when canvas size changes
   useEffect(() => {
@@ -694,6 +732,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     setIsDragOver(false);
   };
 
+  // No video file selected
   if (!videoFile) {
     return (
       <div 
@@ -794,6 +833,142 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     );
   }
 
+  // Video file selected but doesn't exist
+  if (videoFile && videoFileExists === false) {
+    return (
+      <div 
+        style={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: theme.colors.backgroundSecondary,
+          margin: '20px',
+          borderRadius: theme.radius.lg,
+          border: `2px solid ${theme.colors.error}40`,
+          position: 'relative',
+          overflow: 'hidden'
+        }}
+      >
+        {/* Error gradient background */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: `linear-gradient(135deg, ${theme.colors.error}20, ${theme.colors.backgroundSecondary})`,
+          opacity: 0.6
+        }} />
+        
+        <div style={{ 
+          textAlign: 'center', 
+          position: 'relative',
+          zIndex: 1,
+          padding: '40px'
+        }}>
+          {/* Warning icon */}
+          <div style={{ 
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '80px',
+            height: '80px',
+            borderRadius: '50%',
+            backgroundColor: theme.colors.error + '20',
+            marginBottom: '24px',
+            boxShadow: `0 8px 24px ${theme.colors.error}30`,
+            margin: '0 auto 24px auto',
+          }}>
+            <AlertTriangle 
+              size={40} 
+              color={theme.colors.error}
+              style={{
+                filter: `drop-shadow(0 4px 8px ${theme.colors.error}40)`
+              }}
+            />
+          </div>
+          
+          <div style={{ 
+            fontSize: '20px', 
+            marginBottom: '12px',
+            color: theme.colors.text,
+            fontWeight: '600',
+            fontFamily: theme.typography.fontFamily
+          }}>
+            Video file not found
+          </div>
+          
+          <div style={{ 
+            fontSize: '15px', 
+            color: theme.colors.textSecondary,
+            marginBottom: '20px',
+            maxWidth: '400px',
+            lineHeight: '1.5'
+          }}>
+            The video file "{videoFile.name}" could not be found at:
+            <br />
+            <span style={{ 
+              fontFamily: 'monospace', 
+              backgroundColor: theme.colors.background,
+              padding: '4px 8px',
+              borderRadius: '4px',
+              display: 'inline-block',
+              marginTop: '8px',
+              wordBreak: 'break-all'
+            }}>
+              {videoFile.path}
+            </span>
+          </div>
+          
+          {/* Select new video button */}
+          <div 
+            style={{
+              display: 'inline-block',
+              padding: '8px 16px',
+              backgroundColor: theme.colors.primary,
+              color: theme.colors.primaryForeground,
+              borderRadius: theme.radius.md,
+              fontSize: '14px',
+              fontWeight: '500',
+              boxShadow: theme.shadows.sm,
+              transition: 'all 0.2s ease',
+              cursor: 'pointer'
+            }}
+            onClick={onVideoSelect}
+          >
+            Select New Video File
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Loading state while checking file existence
+  if (videoFile && videoFileExists === null) {
+    return (
+      <div 
+        style={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: theme.colors.backgroundSecondary,
+          margin: '20px',
+          borderRadius: theme.radius.lg,
+          border: `1px solid ${theme.colors.border}`,
+        }}
+      >
+        <div style={{ 
+          textAlign: 'center',
+          color: theme.colors.textSecondary
+        }}>
+          Checking video file...
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div 
       data-video-preview
@@ -830,7 +1005,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
             width: 'auto',
             height: 'auto',
             objectFit: 'contain',
-            display: 'block'
+            display: videoLoadError ? 'none' : 'block'
           }}
           onTimeUpdate={(e) => {
             const video = e.currentTarget;
@@ -846,7 +1021,37 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
             // Force canvas re-render when seek is complete
             setTimeout(() => renderCaptionsOnCanvas(), 50);
           }}
+          onError={(e) => {
+            console.error('Video load error:', e);
+            setVideoLoadError(true);
+          }}
+          onLoadStart={() => {
+            setVideoLoadError(false);
+          }}
         />
+
+        {/* Video load error fallback */}
+        {videoLoadError && (
+          <div style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            textAlign: 'center',
+            color: theme.colors.textSecondary,
+            backgroundColor: theme.colors.background,
+            padding: '20px',
+            borderRadius: theme.radius.md,
+            border: `1px solid ${theme.colors.border}`,
+            zIndex: 5
+          }}>
+            <AlertTriangle size={24} color={theme.colors.error} style={{ marginBottom: '8px' }} />
+            <div>Unable to load video</div>
+            <div style={{ fontSize: '14px', marginTop: '4px' }}>
+              Subtitle preview may still work
+            </div>
+          </div>
+        )}
 
         {/* Replacement Audio Element */}
         {replacementAudioPath && (
@@ -870,7 +1075,10 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
             objectFit: 'contain',
             pointerEvents: captions.some(c => currentTime >= c.startTime && currentTime <= c.endTime) ? 'auto' : 'none',
             cursor: isDragging ? 'grabbing' : (isHoveringCaption ? 'grab' : 'default'),
-            zIndex: 10
+            zIndex: 10,
+            // Show canvas background when video fails to load
+            backgroundColor: videoLoadError ? theme.colors.backgroundSecondary : 'transparent',
+            border: videoLoadError ? `1px solid ${theme.colors.border}` : 'none'
           }}
           onMouseDown={handleCanvasMouseDown}
           onMouseMove={handleCanvasMouseMove}
