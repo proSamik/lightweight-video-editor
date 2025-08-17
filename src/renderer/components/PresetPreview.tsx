@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { CaptionPreset } from '../../types';
+import { CaptionPreset, CaptionSegment } from '../../types';
 import { useTheme } from '../contexts/ThemeContext';
 
 interface PresetPreviewProps {
@@ -8,6 +8,45 @@ interface PresetPreviewProps {
   onClick?: () => void;
   size?: 'small' | 'medium' | 'large';
 }
+
+// Import the same rendering functions from VideoPanel
+declare function renderCaptionOnCanvas(
+  ctx: CanvasRenderingContext2D,
+  caption: CaptionSegment,
+  canvasWidth: number,
+  canvasHeight: number,
+  currentTime: number,
+  scaleFactor: number
+): void;
+
+declare function parseColor(colorString: string): { r: number; g: number; b: number; a: number };
+declare function mapFontName(fontName: string): string;
+declare function renderSimpleTextOnCanvas(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  caption: CaptionSegment,
+  x: number,
+  y: number,
+  scaleFactor: number
+): void;
+declare function renderKaraokeTextOnCanvas(
+  ctx: CanvasRenderingContext2D,
+  words: any[],
+  caption: CaptionSegment,
+  frameTime: number,
+  centerX: number,
+  centerY: number,
+  scaleFactor: number
+): void;
+declare function renderProgressiveTextOnCanvas(
+  ctx: CanvasRenderingContext2D,
+  words: any[],
+  caption: CaptionSegment,
+  frameTime: number,
+  centerX: number,
+  centerY: number,
+  scaleFactor: number
+): void;
 
 export const PresetPreview: React.FC<PresetPreviewProps> = ({
   preset,
@@ -19,16 +58,61 @@ export const PresetPreview: React.FC<PresetPreviewProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
   const [isAnimating, setIsAnimating] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
 
   const sizeConfig = {
-    small: { width: 220, height: 130, fontSize: 18 },
-    medium: { width: 280, height: 160, fontSize: 20 },
-    large: { width: 400, height: 240, fontSize: 28 }
+    small: { width: 220, height: 100, fontSize: 18 },
+    medium: { width: 280, height: 120, fontSize: 20 },
+    large: { width: 400, height: 160, fontSize: 28 }
   };
 
   const config = sizeConfig[size];
-  const demoText = ['PREVIEW', 'YOUR'];
-  const words = demoText;
+
+  // Apply text transform exactly like VideoPanel
+  const applyTextTransform = (text: string, transform?: string): string => {
+    if (!transform) return text;
+    
+    switch (transform) {
+      case 'uppercase':
+        return text.toUpperCase();
+      case 'lowercase':
+        return text.toLowerCase();
+      case 'capitalize':
+        return text.replace(/\b\w/g, l => l.toUpperCase());
+      default:
+        return text;
+    }
+  };
+
+  // Create a mock caption segment from the preset
+  const createMockCaption = (timeOffset: number = 0): CaptionSegment => {
+    const demoText = ['PREVIEW', 'YOUR', 'STYLE'];
+    
+    // Apply text transform to demo text first
+    const transformedDemoText = demoText.map(word => 
+      applyTextTransform(word, preset.style.textTransform)
+    );
+    
+    // Create word timestamps for animation
+    const words = transformedDemoText.map((word, index) => ({
+      word,
+      start: index * 500 + timeOffset, // 500ms per word
+      end: (index + 1) * 500 + timeOffset
+    }));
+
+    return {
+      id: 'preview',
+      startTime: timeOffset,
+      endTime: timeOffset + (demoText.length * 500),
+      text: transformedDemoText.join(' '),
+      words,
+      style: {
+        ...preset.style,
+        // Adjust font size for preview but keep proportions
+        fontSize: Math.max(Math.round(preset.style.fontSize * 0.5), 12)
+      }
+    };
+  };
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -45,183 +129,45 @@ export const PresetPreview: React.FC<PresetPreviewProps> = ({
     canvas.style.height = `${config.height}px`;
     ctx.scale(dpr, dpr);
 
-    let currentWordIndex = 0;
-    let animationStartTime = Date.now();
-    const wordDelay = preset.style.animation?.delay || 100;
-    const animationDuration = preset.style.animation?.duration || 300;
+    let animationStart = Date.now();
+    const animationDuration = 3000; // 3 seconds total loop
 
     const drawFrame = () => {
-      // Clear canvas with checkered background
+      const now = Date.now();
+      const elapsed = (now - animationStart) % animationDuration;
+      
+      // Clear canvas and set background to match Style Presets section
       ctx.clearRect(0, 0, config.width, config.height);
       
-      // Draw checkered background to show transparency
-      const checkSize = 8;
-      for (let x = 0; x < config.width; x += checkSize) {
-        for (let y = 0; y < config.height; y += checkSize) {
-          const isEven = (Math.floor(x / checkSize) + Math.floor(y / checkSize)) % 2 === 0;
-          ctx.fillStyle = isEven ? '#f0f0f0' : '#e0e0e0';
-          ctx.fillRect(x, y, checkSize, checkSize);
+      // Draw solid background matching the Style Presets section
+      ctx.fillStyle = theme.colors.background;
+      ctx.fillRect(0, 0, config.width, config.height);
+
+      // Create mock caption with current time
+      const mockCaption = createMockCaption(0);
+      
+      try {
+        // Use the same rendering function as VideoPanel
+        if (typeof (window as any).renderCaptionOnCanvas === 'function') {
+          (window as any).renderCaptionOnCanvas(
+            ctx,
+            mockCaption,
+            config.width,
+            config.height,
+            elapsed,
+            1.0 // scaleFactor
+          );
+        } else {
+          // Fallback rendering if the function isn't available
+          renderFallbackCaption(ctx, mockCaption, elapsed);
         }
+      } catch (error) {
+        console.error('Error rendering caption preview:', error);
+        // Fallback to simple text rendering
+        renderFallbackCaption(ctx, mockCaption, elapsed);
       }
 
-      // Set up text styling
-      const fontSize = Math.max(config.fontSize, 14);
-      ctx.font = `${preset.style.textTransform === 'uppercase' ? 'bold' : 'normal'} ${fontSize}px ${preset.style.font}`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-
-      const centerX = config.width / 2;
-      const centerY = config.height / 2;
-      const currentTime = Date.now();
-      const elapsed = currentTime - animationStartTime;
-
-      // Draw each word with animation
-      words.forEach((word, index) => {
-        const wordStartTime = index * wordDelay;
-        const wordElapsed = elapsed - wordStartTime;
-        
-        if (wordElapsed < 0) return; // Word hasn't started yet
-
-        // Determine if this word should be highlighted
-        const isCurrentWord = index === currentWordIndex;
-        const shouldHighlight = wordElapsed < animationDuration;
-
-        // Calculate animation progress (0 to 1)
-        const animProgress = Math.min(wordElapsed / animationDuration, 1);
-        
-        // Apply animation effects based on preset type
-        let scale = 1;
-        let alpha = 1;
-        let offsetX = 0;
-        let offsetY = 0;
-        let rotation = 0;
-
-        if (shouldHighlight && preset.style.animation) {
-          const intensity = preset.style.animation.intensity || 0.5;
-          
-          switch (preset.style.animation.type) {
-            case 'bounce':
-              scale = 1 + (Math.sin(animProgress * Math.PI) * 0.3 * intensity);
-              break;
-              
-            case 'fade':
-              alpha = animProgress;
-              break;
-              
-            case 'slide':
-              const direction = preset.style.animation.direction || 'up';
-              const distance = 20 * intensity;
-              if (direction === 'up') offsetY = (1 - animProgress) * distance;
-              else if (direction === 'down') offsetY = -(1 - animProgress) * distance;
-              else if (direction === 'left') offsetX = (1 - animProgress) * distance;
-              else if (direction === 'right') offsetX = -(1 - animProgress) * distance;
-              break;
-              
-            case 'zoom':
-              scale = 0.5 + (animProgress * 0.5) + (Math.sin(animProgress * Math.PI) * 0.2 * intensity);
-              break;
-              
-            case 'glow':
-              // Glow effect will be simulated with color brightness
-              break;
-              
-            case 'wave':
-              offsetY = Math.sin(animProgress * Math.PI * 2) * 5 * intensity;
-              break;
-              
-            case 'shake':
-              offsetX = (Math.random() - 0.5) * 4 * intensity;
-              offsetY = (Math.random() - 0.5) * 4 * intensity;
-              break;
-              
-            case 'typewriter':
-              // For typewriter, we'll just show the word when it's time
-              alpha = animProgress > 0.5 ? 1 : 0;
-              break;
-          }
-        }
-
-        // Calculate word position with proper spacing
-        ctx.font = `${preset.style.textTransform === 'uppercase' ? 'bold' : 'normal'} ${fontSize}px ${preset.style.font}`;
-        
-        // Measure all words to calculate proper spacing
-        const wordWidths = words.map(word => {
-          let displayWord = word;
-          switch (preset.style.textTransform) {
-            case 'uppercase': displayWord = word.toUpperCase(); break;
-            case 'lowercase': displayWord = word.toLowerCase(); break;
-            case 'capitalize': displayWord = word.charAt(0).toUpperCase() + word.slice(1).toLowerCase(); break;
-          }
-          return ctx.measureText(displayWord).width;
-        });
-        
-        const wordGap = fontSize * 1.2; // Space between words - significantly increased to prevent overlap
-        const totalWidth = wordWidths.reduce((sum, width) => sum + width, 0) + (wordGap * (words.length - 1));
-        
-        let currentX = centerX - totalWidth / 2;
-        const wordX = currentX + wordWidths.slice(0, index).reduce((sum, width) => sum + width + wordGap, 0) + (wordWidths[index] / 2) + offsetX;
-        const wordY = centerY + offsetY;
-
-        // Save context for transformations
-        ctx.save();
-        
-        // Apply transformations
-        ctx.translate(wordX, wordY);
-        ctx.scale(scale, scale);
-        ctx.rotate(rotation);
-        ctx.globalAlpha = alpha;
-
-        // Draw background if specified
-        if (preset.style.backgroundColor !== 'transparent' && (isCurrentWord || !preset.style.emphasizeMode)) {
-          const bgColor = isCurrentWord && preset.style.emphasizeMode 
-            ? preset.style.highlighterColor 
-            : preset.style.backgroundColor;
-          
-          ctx.fillStyle = bgColor;
-          const metrics = ctx.measureText(word);
-          const bgWidth = metrics.width + 8;
-          const bgHeight = fontSize + 4;
-          ctx.fillRect(-bgWidth/2, -bgHeight/2, bgWidth, bgHeight);
-        }
-
-        // Draw stroke if specified
-        if (preset.style.strokeWidth && preset.style.strokeColor !== 'transparent') {
-          ctx.strokeStyle = preset.style.strokeColor || '#000000';
-          ctx.lineWidth = preset.style.strokeWidth;
-          ctx.strokeText(word, 0, 0);
-        }
-
-        // Draw text
-        const textColor = isCurrentWord && preset.style.emphasizeMode 
-          ? preset.style.highlighterColor 
-          : preset.style.textColor;
-        
-        ctx.fillStyle = textColor;
-        
-        // Apply text transform
-        let displayWord = word;
-        switch (preset.style.textTransform) {
-          case 'uppercase': displayWord = word.toUpperCase(); break;
-          case 'lowercase': displayWord = word.toLowerCase(); break;
-          case 'capitalize': displayWord = word.charAt(0).toUpperCase() + word.slice(1).toLowerCase(); break;
-        }
-        
-        ctx.fillText(displayWord, 0, 0);
-
-        ctx.restore();
-      });
-
-      // Continue animation
       if (isAnimating) {
-        // Move to next word if current animation is done
-        if (elapsed > (currentWordIndex + 1) * wordDelay + animationDuration) {
-          currentWordIndex = (currentWordIndex + 1) % words.length;
-          if (currentWordIndex === 0) {
-            // Reset animation immediately
-            animationStartTime = Date.now();
-          }
-        }
-        
         animationRef.current = requestAnimationFrame(drawFrame);
       }
     };
@@ -237,6 +183,103 @@ export const PresetPreview: React.FC<PresetPreviewProps> = ({
       setIsAnimating(false);
     };
   }, [preset, config, isAnimating]);
+
+  // Fallback rendering function that matches VideoPanel spacing exactly
+  const renderFallbackCaption = (ctx: CanvasRenderingContext2D, caption: CaptionSegment, currentTime: number) => {
+    const { width, height } = config;
+    const x = (width * caption.style.position.x) / 100;
+    const y = (height * caption.style.position.y) / 100;
+    
+    // Set font with proper baseline (matching VideoPanel)
+    const fontSize = caption.style.fontSize;
+    const scale = caption.style.scale || 1;
+    ctx.font = `bold ${fontSize}px ${caption.style.font}, Arial, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom'; // VideoPanel uses bottom, not middle
+
+    if (caption.style.renderMode === 'progressive' && caption.words) {
+      // Progressive rendering - stack words vertically (matching VideoPanel progressive logic)
+      const visibleWords = caption.words.filter(word => currentTime >= word.start);
+      const lineHeight = fontSize * 1.4; // Match VideoPanel line height
+      
+      // Center the progressive text block
+      const totalHeight = visibleWords.length * lineHeight;
+      const startY = y - (totalHeight / 2) + (lineHeight / 2);
+
+      visibleWords.forEach((word, index) => {
+        const wordY = startY + (index * lineHeight);
+        const isLastWord = index === visibleWords.length - 1;
+        const isCurrentWord = currentTime >= word.start && currentTime <= word.end;
+        
+        // Apply styling exactly like VideoPanel progressive mode
+        if (isLastWord) {
+          // Last word in progressive mode gets larger and highlighted
+          ctx.font = `bold ${Math.round(fontSize * 1.2)}px ${caption.style.font}, Arial, sans-serif`;
+          ctx.fillStyle = caption.style.highlighterColor;
+        } else if (isCurrentWord && caption.style.emphasizeMode) {
+          ctx.font = `bold ${Math.round(fontSize * 1.05)}px ${caption.style.font}, Arial, sans-serif`;
+          ctx.fillStyle = caption.style.highlighterColor;
+        } else {
+          ctx.font = `bold ${fontSize}px ${caption.style.font}, Arial, sans-serif`;
+          ctx.fillStyle = caption.style.textColor;
+        }
+
+        // Word is already transformed in createMockCaption
+        ctx.fillText(word.word, x, wordY);
+      });
+    } else {
+      // Horizontal rendering with exact VideoPanel spacing
+      if (caption.words) {
+        const wordSpacing = 12 * scale; // Exact VideoPanel spacing
+        const wordPadding = 4 * scale;  // Exact VideoPanel padding
+        
+        // Calculate total width exactly like VideoPanel
+        let totalWidth = 0;
+        for (const word of caption.words) {
+          const wordWidth = ctx.measureText(word.word).width;
+          totalWidth += wordWidth + (wordPadding * 2) + wordSpacing;
+        }
+        totalWidth -= wordSpacing; // Remove last spacing
+        
+        let currentX = x - (totalWidth / 2) + wordPadding; // Start with padding
+        
+        caption.words.forEach((word, index) => {
+          const isCurrentWord = currentTime >= word.start && currentTime <= word.end;
+          const wordWidth = ctx.measureText(word.word).width;
+          
+          // Apply styling exactly like VideoPanel
+          if (isCurrentWord && caption.style.emphasizeMode) {
+            // Emphasis mode: 5% larger font and highlighter color
+            ctx.font = `bold ${Math.round(fontSize * 1.05)}px ${caption.style.font}, Arial, sans-serif`;
+            ctx.fillStyle = caption.style.highlighterColor;
+          } else {
+            ctx.font = `bold ${fontSize}px ${caption.style.font}, Arial, sans-serif`;
+            ctx.fillStyle = caption.style.textColor;
+          }
+
+          // Draw background box if not in emphasis mode and highlighted
+          if (isCurrentWord && !caption.style.emphasizeMode && caption.style.backgroundColor !== 'transparent') {
+            const boxWidth = wordWidth + (wordPadding * 2);
+            const boxHeight = fontSize + (wordPadding * 2);
+            const boxX = currentX - wordPadding;
+            const boxY = y - fontSize - wordPadding;
+            
+            ctx.fillStyle = caption.style.highlighterColor;
+            ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+            ctx.fillStyle = caption.style.textColor; // Reset for text
+          }
+
+          // Word is already transformed in createMockCaption
+          ctx.fillText(word.word, currentX + wordWidth / 2, y);
+          currentX += wordWidth + (wordPadding * 2) + wordSpacing;
+        });
+      } else {
+        // Simple text
+        ctx.fillStyle = caption.style.textColor;
+        ctx.fillText(caption.text, x, y);
+      }
+    }
+  };
 
   const containerStyle: React.CSSProperties = {
     width: config.width,
@@ -254,10 +297,10 @@ export const PresetPreview: React.FC<PresetPreviewProps> = ({
   };
 
   const labelStyle: React.CSSProperties = {
-    padding: '8px 12px',
+    padding: '6px 8px',
     backgroundColor: theme.colors.background,
     borderTop: `1px solid ${theme.colors.border}`,
-    fontSize: '14px',
+    fontSize: '12px',
     fontWeight: '500',
     color: theme.colors.text,
     textAlign: 'center',
@@ -273,7 +316,7 @@ export const PresetPreview: React.FC<PresetPreviewProps> = ({
         style={{
           display: 'block',
           width: '100%',
-          height: config.height - 40, // Leave space for label
+          height: config.height - 32, // Leave space for smaller label
         }}
       />
       <div style={labelStyle}>
