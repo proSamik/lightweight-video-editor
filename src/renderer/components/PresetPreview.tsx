@@ -108,8 +108,8 @@ export const PresetPreview: React.FC<PresetPreviewProps> = ({
       words,
       style: {
         ...preset.style,
-        // Adjust font size for preview but keep proportions
-        fontSize: Math.max(Math.round(preset.style.fontSize * 0.5), 12)
+        // Adjust font size for preview to fit in small cards
+        fontSize: Math.max(Math.round(preset.style.fontSize * 0.25), 8)
       }
     };
   };
@@ -190,19 +190,19 @@ export const PresetPreview: React.FC<PresetPreviewProps> = ({
     const x = (width * caption.style.position.x) / 100;
     const y = (height * caption.style.position.y) / 100;
     
-    // Set font with proper baseline (matching VideoPanel)
+    // Set font with center baseline for preview cards
     const fontSize = caption.style.fontSize;
     const scale = caption.style.scale || 1;
     ctx.font = `bold ${fontSize}px ${caption.style.font}, Arial, sans-serif`;
     ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom'; // VideoPanel uses bottom, not middle
+    ctx.textBaseline = 'middle'; // Use middle for centered preview
 
     if (caption.style.renderMode === 'progressive' && caption.words) {
       // Progressive rendering - stack words vertically (matching VideoPanel progressive logic)
       const visibleWords = caption.words.filter(word => currentTime >= word.start);
       const lineHeight = fontSize * 1.4; // Match VideoPanel line height
       
-      // Center the progressive text block
+      // Center the progressive text block properly
       const totalHeight = visibleWords.length * lineHeight;
       const startY = y - (totalHeight / 2) + (lineHeight / 2);
 
@@ -262,7 +262,7 @@ export const PresetPreview: React.FC<PresetPreviewProps> = ({
             const boxWidth = wordWidth + (wordPadding * 2);
             const boxHeight = fontSize + (wordPadding * 2);
             const boxX = currentX - wordPadding;
-            const boxY = y - fontSize - wordPadding;
+            const boxY = y - fontSize/2 - wordPadding; // Center the box
             
             ctx.fillStyle = caption.style.highlighterColor;
             ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
