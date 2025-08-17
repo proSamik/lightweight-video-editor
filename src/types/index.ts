@@ -26,6 +26,26 @@ export interface CaptionStyle {
   renderMode?: 'horizontal' | 'progressive'; // New: horizontal (default) or progressive reveal
   textAlign?: 'left' | 'center' | 'right'; // Text alignment for progressive mode
   burnInSubtitles?: boolean; // Whether to burn subtitles into video or not (default: true)
+  animation?: AnimationStyle; // Animation properties for the preset
+}
+
+export interface AnimationStyle {
+  type: 'bounce' | 'fade' | 'slide' | 'typewriter' | 'glow' | 'wave' | 'zoom' | 'shake';
+  duration?: number; // Animation duration in milliseconds
+  delay?: number; // Delay between word animations in milliseconds
+  intensity?: number; // Animation intensity (0-1)
+  direction?: 'up' | 'down' | 'left' | 'right'; // For slide animations
+}
+
+export interface CaptionPreset {
+  id: string;
+  name: string;
+  description: string;
+  category: 'modern' | 'classic' | 'creative' | 'professional';
+  style: CaptionStyle;
+  thumbnail?: string; // Base64 encoded preview image
+  tags: string[];
+  popularity?: number; // For sorting by popularity
 }
 
 export interface WordTimestamp {
@@ -158,4 +178,11 @@ export interface GeneratedContent {
   titles?: { title: string; characterCount: number }[];
   tweets?: { hook: string; lineCount: number; wordCount: number }[];
   thumbnails?: string[];
+}
+
+export interface PresetCategory {
+  id: string;
+  name: string;
+  description: string;
+  presets: CaptionPreset[];
 }
