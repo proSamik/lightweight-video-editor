@@ -92,7 +92,29 @@ export class ProjectManager {
         version: '1.0'
       };
 
-      await fs.promises.writeFile(filePath, JSON.stringify(dataToSave, null, 2), 'utf8');
+      // Serialize JSON first to check for issues
+      const jsonString = JSON.stringify(dataToSave, null, 2);
+      const sizeKB = Math.round(jsonString.length / 1024);
+      console.log(`Saving project data size: ${jsonString.length} characters (${sizeKB} KB)`);
+
+      // Warn about large project files
+      if (sizeKB > 1000) { // 1MB
+        console.warn(`⚠️  Large project file: ${sizeKB} KB. Consider reducing caption density for better performance.`);
+      } else if (sizeKB > 5000) { // 5MB
+        console.warn(`⚠️  Very large project file: ${sizeKB} KB. This may cause performance issues.`);
+      }
+
+      // For large files, use streaming write to avoid buffer limits
+      const tempFilePath = `${filePath}.tmp`;
+      
+      if (jsonString.length > 500000) { // 500KB threshold
+        console.log('Large project detected, using streaming write...');
+        await this.writeFileStreaming(tempFilePath, jsonString);
+      } else {
+        await fs.promises.writeFile(tempFilePath, jsonString, 'utf8');
+      }
+      
+      await fs.promises.rename(tempFilePath, filePath);
       
       // Update current project path and reset modified flag
       this.currentProjectPath = filePath;
@@ -129,7 +151,29 @@ export class ProjectManager {
         version: '1.0'
       };
 
-      await fs.promises.writeFile(filePath, JSON.stringify(dataToSave, null, 2), 'utf8');
+      // Serialize JSON first to check for issues
+      const jsonString = JSON.stringify(dataToSave, null, 2);
+      const sizeKB = Math.round(jsonString.length / 1024);
+      console.log(`Saving project-as data size: ${jsonString.length} characters (${sizeKB} KB)`);
+
+      // Warn about large project files
+      if (sizeKB > 1000) { // 1MB
+        console.warn(`⚠️  Large project file: ${sizeKB} KB. Consider reducing caption density for better performance.`);
+      } else if (sizeKB > 5000) { // 5MB
+        console.warn(`⚠️  Very large project file: ${sizeKB} KB. This may cause performance issues.`);
+      }
+
+      // For large files, use streaming write to avoid buffer limits
+      const tempFilePath = `${filePath}.tmp`;
+      
+      if (jsonString.length > 500000) { // 500KB threshold
+        console.log('Large project detected, using streaming write...');
+        await this.writeFileStreaming(tempFilePath, jsonString);
+      } else {
+        await fs.promises.writeFile(tempFilePath, jsonString, 'utf8');
+      }
+      
+      await fs.promises.rename(tempFilePath, filePath);
       
       // Update current project path to the new file
       this.currentProjectPath = filePath;
@@ -144,22 +188,63 @@ export class ProjectManager {
 
   public async loadProject(filePath: string): Promise<ProjectData> {
     try {
+      // Check if file exists and get stats
+      if (!fs.existsSync(filePath)) {
+        throw new Error(`Project file not found: ${filePath}`);
+      }
+
+      const stats = await fs.promises.stat(filePath);
+      console.log(`Loading project file size: ${stats.size} bytes`);
+
+      // Check for reasonable file size (warn if > 10MB)
+      if (stats.size > 10 * 1024 * 1024) {
+        console.warn(`Large project file detected: ${stats.size} bytes`);
+      }
+
+      // Read file with proper error handling
       const data = await fs.promises.readFile(filePath, 'utf8');
-      const projectData = JSON.parse(data) as ProjectData;
+      
+      // Log data length vs file size for debugging
+      console.log(`File size: ${stats.size}, Data length: ${data.length}`);
+      
+      // Check for truncated file
+      if (data.length === 0) {
+        throw new Error('Project file is empty');
+      }
+
+      // Try to parse JSON with better error handling
+      let projectData: ProjectData;
+      try {
+        projectData = JSON.parse(data) as ProjectData;
+      } catch (parseError) {
+        // Try to identify the issue
+        const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
+        console.error('JSON Parse Error Details:', {
+          error: errorMessage,
+          fileSize: stats.size,
+          dataLength: data.length,
+          firstChars: data.substring(0, 100),
+          lastChars: data.substring(Math.max(0, data.length - 100))
+        });
+        
+        throw new Error(`Invalid JSON in project file: ${errorMessage}`);
+      }
       
       // Validate project data structure
       if (!projectData.version || !projectData.captions) {
-        throw new Error('Invalid project file format');
+        throw new Error('Invalid project file format - missing required fields');
       }
 
       // Update current project path and reset modified flag
       this.currentProjectPath = filePath;
       this.projectModified = false;
       
-      console.log(`Project loaded: ${filePath}`);
+      console.log(`Project loaded successfully: ${filePath}`);
       return projectData;
     } catch (error) {
-      throw new Error(`Failed to load project: ${error}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Project loading failed:', errorMessage);
+      throw new Error(`Failed to load project: ${errorMessage}`);
     }
   }
 
@@ -305,6 +390,49 @@ export class ProjectManager {
       ? videoFileName.replace(/\.[^/.]+$/, '') // Remove extension
       : 'project';
     return `${baseName}-${timestamp}.lvep`;
+  }
+
+  /**
+   * Write large files using streaming to avoid buffer limits
+   */
+  private async writeFileStreaming(filePath: string, content: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const writeStream = fs.createWriteStream(filePath, { encoding: 'utf8' });
+      
+      writeStream.on('error', (error) => {
+        console.error('Stream write error:', error);
+        reject(error);
+      });
+      
+      writeStream.on('finish', () => {
+        console.log('Stream write completed successfully');
+        resolve();
+      });
+      
+      // Write in chunks to avoid memory issues
+      const chunkSize = 64 * 1024; // 64KB chunks
+      let offset = 0;
+      
+      const writeNextChunk = () => {
+        if (offset >= content.length) {
+          writeStream.end();
+          return;
+        }
+        
+        const chunk = content.slice(offset, offset + chunkSize);
+        offset += chunkSize;
+        
+        if (!writeStream.write(chunk)) {
+          // Wait for drain event if buffer is full
+          writeStream.once('drain', writeNextChunk);
+        } else {
+          // Continue immediately
+          setImmediate(writeNextChunk);
+        }
+      };
+      
+      writeNextChunk();
+    });
   }
 }
 
