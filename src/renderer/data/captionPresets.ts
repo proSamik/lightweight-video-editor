@@ -842,6 +842,194 @@ export const captionPresets: CaptionPreset[] = [
     },
     tags: ['progressive', 'minimal', 'clean', 'subtle'],
     popularity: 75
+  },
+
+  // More Text Transform Showcase Presets
+  {
+    id: 'all-caps-energy',
+    name: 'All Caps Energy',
+    description: 'High-energy all caps with bright neon colors',
+    category: 'modern',
+    style: {
+      font: 'Poppins',
+      fontSize: 92,
+      textColor: '#ffffff',
+      highlighterColor: '#ff0080',
+      backgroundColor: 'transparent',
+      strokeColor: '#000000',
+      strokeWidth: 3,
+      textTransform: 'uppercase',
+      position: { x: 50, y: 83, z: 0 },
+      scale: 1.1,
+      emphasizeMode: true,
+      renderMode: 'horizontal',
+      textAlign: 'center',
+      burnInSubtitles: true,
+      animation: {
+        type: 'bounce',
+        duration: 250,
+        delay: 70,
+        intensity: 0.9
+      }
+    },
+    tags: ['uppercase', 'energy', 'neon', 'bold'],
+    popularity: 87
+  },
+
+  {
+    id: 'whisper-lowercase-soft',
+    name: 'Whisper Soft',
+    description: 'Gentle lowercase with soft pastel colors',
+    category: 'professional',
+    style: {
+      font: 'Nunito',
+      fontSize: 68,
+      textColor: '#8b7397',
+      highlighterColor: '#c4b5d6',
+      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+      strokeColor: 'transparent',
+      strokeWidth: 0,
+      textTransform: 'lowercase',
+      position: { x: 50, y: 87, z: 0 },
+      scale: 1.0,
+      emphasizeMode: false,
+      renderMode: 'horizontal',
+      textAlign: 'center',
+      burnInSubtitles: true,
+      animation: {
+        type: 'fade',
+        duration: 400,
+        delay: 150,
+        intensity: 0.3
+      }
+    },
+    tags: ['lowercase', 'soft', 'pastel', 'gentle'],
+    popularity: 72
+  },
+
+  {
+    id: 'title-case-modern',
+    name: 'Title Case Modern',
+    description: 'Sleek title case with modern typography',
+    category: 'professional',
+    style: {
+      font: 'SF Pro Display',
+      fontSize: 84,
+      textColor: '#1a1a1a',
+      highlighterColor: '#007aff',
+      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+      strokeColor: 'transparent',
+      strokeWidth: 0,
+      textTransform: 'capitalize',
+      position: { x: 50, y: 82, z: 0 },
+      scale: 1.0,
+      emphasizeMode: true,
+      renderMode: 'horizontal',
+      textAlign: 'center',
+      burnInSubtitles: true,
+      animation: {
+        type: 'slide',
+        duration: 300,
+        delay: 85,
+        intensity: 0.6,
+        direction: 'up'
+      }
+    },
+    tags: ['capitalize', 'modern', 'clean', 'apple'],
+    popularity: 81
+  },
+
+  {
+    id: 'mixed-case-natural',
+    name: 'Natural Mixed',
+    description: 'Natural mixed case for conversational content',
+    category: 'creative',
+    style: {
+      font: 'Open Sans',
+      fontSize: 76,
+      textColor: '#2d3748',
+      highlighterColor: '#4299e1',
+      backgroundColor: 'rgba(237, 242, 247, 0.9)',
+      strokeColor: 'transparent',
+      strokeWidth: 0,
+      textTransform: 'none',
+      position: { x: 50, y: 84, z: 0 },
+      scale: 1.0,
+      emphasizeMode: false,
+      renderMode: 'horizontal',
+      textAlign: 'center',
+      burnInSubtitles: true,
+      animation: {
+        type: 'typewriter',
+        duration: 200,
+        delay: 75,
+        intensity: 0.5
+      }
+    },
+    tags: ['mixed-case', 'natural', 'conversational', 'blue'],
+    popularity: 78
+  },
+
+  {
+    id: 'progressive-caps-bold',
+    name: 'Progressive CAPS',
+    description: 'Progressive all caps with bold impact',
+    category: 'creative',
+    style: {
+      font: 'Montserrat',
+      fontSize: 94,
+      textColor: '#ffffff',
+      highlighterColor: '#ff6b35',
+      backgroundColor: 'transparent',
+      strokeColor: '#8b2500',
+      strokeWidth: 2,
+      textTransform: 'uppercase',
+      position: { x: 50, y: 72, z: 0 },
+      scale: 1.15,
+      emphasizeMode: true,
+      renderMode: 'progressive',
+      textAlign: 'center',
+      burnInSubtitles: true,
+      animation: {
+        type: 'zoom',
+        duration: 350,
+        delay: 110,
+        intensity: 0.8
+      }
+    },
+    tags: ['progressive', 'uppercase', 'bold', 'impact'],
+    popularity: 84
+  },
+
+  {
+    id: 'progressive-lowercase-calm',
+    name: 'Progressive calm',
+    description: 'Progressive lowercase with calming effect',
+    category: 'professional',
+    style: {
+      font: 'Lato',
+      fontSize: 72,
+      textColor: '#4a5568',
+      highlighterColor: '#68d391',
+      backgroundColor: 'rgba(255, 255, 255, 0.85)',
+      strokeColor: 'transparent',
+      strokeWidth: 0,
+      textTransform: 'lowercase',
+      position: { x: 50, y: 76, z: 0 },
+      scale: 1.0,
+      emphasizeMode: false,
+      renderMode: 'progressive',
+      textAlign: 'center',
+      burnInSubtitles: true,
+      animation: {
+        type: 'fade',
+        duration: 450,
+        delay: 130,
+        intensity: 0.4
+      }
+    },
+    tags: ['progressive', 'lowercase', 'calm', 'green'],
+    popularity: 76
   }
 ];
 
