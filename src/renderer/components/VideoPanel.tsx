@@ -395,10 +395,15 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
         setScaleFactor(newScaleFactor);
       };
       
+      // Set initial canvas size if video already has metadata
+      if (video.videoWidth > 0 && video.videoHeight > 0) {
+        handleLoadedMetadata();
+      }
+      
       video.addEventListener('loadedmetadata', handleLoadedMetadata);
       return () => video.removeEventListener('loadedmetadata', handleLoadedMetadata);
-    } else if (canvas && videoLoadError && videoFile) {
-      // Fallback canvas size when video fails to load but we have video file metadata
+    } else if (canvas && (videoLoadError || !video) && videoFile) {
+      // Fallback canvas size when video fails to load or isn't ready but we have video file metadata
       const fallbackWidth = videoFile.width || 1920;
       const fallbackHeight = videoFile.height || 1080;
       canvas.width = fallbackWidth;
@@ -433,6 +438,9 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     const ctx = canvas?.getContext('2d');
     
     if (!canvas || !ctx) return;
+    
+    // Don't render if canvas doesn't have valid dimensions yet
+    if (canvas.width === 0 || canvas.height === 0) return;
 
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -473,6 +481,9 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     const ctx = canvas?.getContext('2d');
     
     if (!canvas || !ctx) return;
+    
+    // Don't render if canvas doesn't have valid dimensions yet
+    if (canvas.width === 0 || canvas.height === 0) return;
 
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
