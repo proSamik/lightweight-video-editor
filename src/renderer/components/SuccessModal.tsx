@@ -8,13 +8,15 @@ interface SuccessModalProps {
   onClose: () => void;
   filePath: string;
   onShowInFinder: () => void;
+  elapsedSeconds?: number;
 }
 
 const SuccessModal: React.FC<SuccessModalProps> = ({
   isOpen,
   onClose,
   filePath,
-  onShowInFinder
+  onShowInFinder,
+  elapsedSeconds
 }) => {
   const { theme } = useTheme();
   if (!isOpen) return null;
@@ -155,6 +157,31 @@ const SuccessModal: React.FC<SuccessModalProps> = ({
               }}>
                 {fileName}
               </div>
+
+              {typeof elapsedSeconds === 'number' && (
+                <>
+                  <div style={{
+                    fontSize: '13px',
+                    color: theme.colors.textSecondary,
+                    margin: '20px 0 10px',
+                    fontWeight: '600',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.8px',
+                    opacity: 0.8
+                  }}>
+                    Time Taken
+                  </div>
+                  <div style={{
+                    fontSize: '16px',
+                    color: theme.colors.text,
+                    fontFamily: 'ui-monospace, "SF Mono", "Monaco", "Cascadia Code", "Roboto Mono", monospace',
+                    lineHeight: '1.5',
+                    fontWeight: '600'
+                  }}>
+                    {Math.floor(elapsedSeconds / 60)}:{(elapsedSeconds % 60).toString().padStart(2, '0')}
+                  </div>
+                </>
+              )}
               
               <div style={{
                 fontSize: '13px',
