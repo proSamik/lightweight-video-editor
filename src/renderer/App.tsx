@@ -1677,6 +1677,7 @@ const AppContent: React.FC = () => {
         isOpen={showSuccessModal}
         onClose={() => setShowSuccessModal(false)}
         filePath={exportedFilePath}
+        elapsedSeconds={elapsedTime}
         onShowInFinder={async () => {
           try {
             await window.electronAPI.showItemInFolder(exportedFilePath);
