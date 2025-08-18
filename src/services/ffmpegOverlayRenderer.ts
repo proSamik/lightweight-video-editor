@@ -146,16 +146,9 @@ export class FFmpegOverlayRenderer {
       const metadata = await this.getVideoMetadata(videoPath);
       console.log('Video metadata:', metadata);
       
-      // Determine rendering mode based on video size and system resources
-      const shouldUseStreaming = this.shouldUseStreamingMode(metadata, captions);
-      
-      if (shouldUseStreaming) {
-        console.log('Using streaming mode for large video');
-        return await this.renderVideoStreaming(videoPath, captions, outputPath, metadata, onProgress, exportSettings);
-      } else {
-        console.log('Using optimized two-phase processing');
-        return await this.renderVideoOptimized(videoPath, captions, outputPath, metadata, onProgress, exportSettings);
-      }
+      // Always use streaming mode with smart chunking for consistent performance across all lengths
+      console.log('Using streaming mode (standardized)');
+      return await this.renderVideoStreaming(videoPath, captions, outputPath, metadata, onProgress, exportSettings);
     } catch (error) {
       // Check if this is a cancellation (expected behavior)
       if (error instanceof Error && (error.message.includes('cancelled') || this.isCancelled)) {
@@ -248,45 +241,16 @@ export class FFmpegOverlayRenderer {
     const videoDurationSeconds = metadata.duration || 0;
     const fiveMinutesInSeconds = 5 * 60; // 5 minutes
 
-    // For videos longer than 5 minutes, use smart chunking
-    if (videoDurationSeconds > fiveMinutesInSeconds) {
-      console.log(`Video is ${Math.round(videoDurationSeconds/60)}min long, using smart chunking approach`);
-      return await this.applyOverlaysWithSmartChunking(
-        videoPath,
-        overlayFiles,
-        outputPath,
-        metadata,
-        onProgress,
-        exportSettings
-      );
-    }
-
-    // For shorter videos, use the existing approach
-    const sortedOverlays = [...overlayFiles].sort((a, b) => a.startTime - b.startTime);
-    const maxOverlaysPerBatch = this.calculateOptimalOverlayBatchSize(sortedOverlays);
-    
-    console.log(`Short video: Applying ${sortedOverlays.length} overlays with batch size: ${maxOverlaysPerBatch}`);
-
-    if (sortedOverlays.length <= maxOverlaysPerBatch) {
-      return await this.applySingleBatchOverlays(
-        videoPath,
-        sortedOverlays,
-        outputPath,
-        metadata,
-        onProgress,
-        exportSettings
-      );
-    } else {
-      return await this.applyMultiBatchOverlays(
-        videoPath,
-        sortedOverlays,
-        outputPath,
-        metadata,
-        maxOverlaysPerBatch,
-        onProgress,
-        exportSettings
-      );
-    }
+    // Standardize: always use smart chunking path regardless of duration
+    console.log(`Standardized path: using smart chunking for ${Math.round(videoDurationSeconds)}s video`);
+    return await this.applyOverlaysWithSmartChunking(
+      videoPath,
+      overlayFiles,
+      outputPath,
+      metadata,
+      onProgress,
+      exportSettings
+    );
   }
 
   /**
@@ -309,12 +273,14 @@ export class FFmpegOverlayRenderer {
     console.log(`Created ${chunks.length} smart chunks (${chunks.filter(c => c.hasSubtitles).length} with subtitles)`);
     
     const processedChunks: string[] = [];
+    const allChunkPaths: string[] = [];
     
     try {
       // Process each chunk
       for (let i = 0; i < chunks.length; i++) {
         const chunk = chunks[i];
         const chunkOutputPath = path.join(tempDir, `smart_chunk_${i}.mp4`);
+        allChunkPaths.push(chunkOutputPath);
         
         console.log(`Processing chunk ${i + 1}/${chunks.length}: ${(chunk.startTime/1000).toFixed(1)}s - ${(chunk.endTime/1000).toFixed(1)}s (${chunk.hasSubtitles ? 'HAS' : 'NO'} subtitles)`);
         
@@ -370,10 +336,13 @@ export class FFmpegOverlayRenderer {
       return outputPath;
       
     } finally {
-      // Clean up temporary chunk files
-      for (const chunkPath of processedChunks) {
+      // Clean up any chunk files created (processed or partial) – covers cancellation too
+      const uniquePaths = Array.from(new Set([...processedChunks, ...allChunkPaths]));
+      for (const chunkPath of uniquePaths) {
         try {
-          await fs.promises.unlink(chunkPath);
+          if (fs.existsSync(chunkPath)) {
+            await fs.promises.unlink(chunkPath);
+          }
         } catch (error) {
           console.warn(`Failed to cleanup chunk file ${chunkPath}:`, error);
         }
