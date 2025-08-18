@@ -7,6 +7,7 @@ import TranscriptionSettings from './components/TranscriptionSettings';
 import ProjectManagerModal from './components/ProjectManager';
 import SuccessModal from './components/SuccessModal';
 import LoadingScreen from './components/LoadingScreen';
+import ExportProcessingModal from './components/ExportProcessingModal';
 import AISettingsModal from './components/AISettingsModal';
 import AIContentModal from './components/AIContentModal';
 import ExportSettingsModal from './components/ExportSettings';
@@ -1230,14 +1231,7 @@ const AppContent: React.FC = () => {
     };
   }, [isLoading]);
 
-  if (isLoading) {
-    return <LoadingScreen 
-      message={loadingMessage} 
-      progress={loadingProgress} 
-      onCancel={cancelController ? handleCancel : undefined}
-      elapsedTime={elapsedTime}
-    />;
-  }
+  // Keep app visible; show LiquidModal overlay during processing instead of full-screen takeover
 
   return (
     <div style={{ 
@@ -1732,6 +1726,15 @@ const AppContent: React.FC = () => {
         }}
         replacementAudioPath={replacementAudioPath}
         captions={captions}
+      />
+
+      {/* Export Processing Modal (Liquid) */}
+      <ExportProcessingModal
+        isOpen={isLoading}
+        message={loadingMessage}
+        progress={loadingProgress}
+        elapsedTime={elapsedTime}
+        onCancel={cancelController ? handleCancel : undefined}
       />
 
       {/* SRT Export Success Modal */}
