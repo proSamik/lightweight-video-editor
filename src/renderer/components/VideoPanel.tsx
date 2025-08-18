@@ -263,6 +263,32 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     setIsDragging(false);
   }, [selectedSegmentId, onCaptionUpdate, captions]);
 
+    // Render captions on canvas (same logic as export)
+    const renderCaptionsOnCanvas = useCallback(() => {
+      const canvas = canvasRef.current;
+      const ctx = canvas?.getContext('2d');
+      
+      if (!canvas || !ctx) return;
+      
+      // Don't render if canvas doesn't have valid dimensions yet
+      if (canvas.width === 0 || canvas.height === 0) return;
+  
+      // Clear canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+      // Get all current captions (for potential overlapping)
+      const currentCaptions = captions.filter(
+        caption => currentTime >= caption.startTime && currentTime <= caption.endTime
+      );
+  
+      if (currentCaptions.length === 0) return;
+  
+      // Render all captions using cached scale factor
+      currentCaptions.forEach(caption => {
+        renderCaptionOnCanvas(ctx, caption, canvas.width, canvas.height, currentTime, scaleFactor);
+      });
+    }, [captions, currentTime, selectedSegmentId, scaleFactor]);
+
   // Set up global mouse event listeners for dragging
   useEffect(() => {
     if (isDragging) {
@@ -380,19 +406,55 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     const video = videoRef.current;
     const canvas = canvasRef.current;
     
+    // Always set initial canvas dimensions from videoFile metadata if available
+    if (canvas && videoFile && canvas.width === 0) {
+      const initialWidth = videoFile.width || 1920;
+      const initialHeight = videoFile.height || 1080;
+      canvas.width = initialWidth;
+      canvas.height = initialHeight;
+      setCanvasSize({ width: initialWidth, height: initialHeight });
+      
+      // Calculate initial scale factor
+      const canvasRect = canvas.getBoundingClientRect();
+      const scaleX = canvasRect.width / canvas.width;
+      const scaleY = canvasRect.height / canvas.height;
+      const newScaleFactor = Math.min(scaleX, scaleY);
+      setScaleFactor(newScaleFactor);
+      
+      console.log(`Canvas initialized with dimensions: ${initialWidth}x${initialHeight}`);
+      
+      // Force immediate re-render after initial canvas setup
+      setTimeout(() => {
+        renderCaptionsOnCanvas();
+      }, 20);
+    }
+    
     if (video && canvas) {
       const handleLoadedMetadata = () => {
-        // Set canvas size to match video dimensions
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        setCanvasSize({ width: video.videoWidth, height: video.videoHeight });
+        // Update canvas size to match actual video dimensions
+        const actualWidth = video.videoWidth;
+        const actualHeight = video.videoHeight;
         
-        // Calculate and cache scale factor
-        const canvasRect = canvas.getBoundingClientRect();
-        const scaleX = canvasRect.width / canvas.width;
-        const scaleY = canvasRect.height / canvas.height;
-        const newScaleFactor = Math.min(scaleX, scaleY);
-        setScaleFactor(newScaleFactor);
+        // Only update if dimensions actually changed
+        if (canvas.width !== actualWidth || canvas.height !== actualHeight) {
+          canvas.width = actualWidth;
+          canvas.height = actualHeight;
+          setCanvasSize({ width: actualWidth, height: actualHeight });
+          
+          // Calculate and cache scale factor
+          const canvasRect = canvas.getBoundingClientRect();
+          const scaleX = canvasRect.width / canvas.width;
+          const scaleY = canvasRect.height / canvas.height;
+          const newScaleFactor = Math.min(scaleX, scaleY);
+          setScaleFactor(newScaleFactor);
+          
+          console.log(`Canvas updated with video metadata: ${actualWidth}x${actualHeight}`);
+          
+          // Force immediate re-render after canvas dimension update
+          setTimeout(() => {
+            renderCaptionsOnCanvas();
+          }, 20);
+        }
       };
       
       // Set initial canvas size if video already has metadata
@@ -402,8 +464,8 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
       
       video.addEventListener('loadedmetadata', handleLoadedMetadata);
       return () => video.removeEventListener('loadedmetadata', handleLoadedMetadata);
-    } else if (canvas && (videoLoadError || !video) && videoFile) {
-      // Fallback canvas size when video fails to load or isn't ready but we have video file metadata
+    } else if (canvas && videoLoadError && videoFile) {
+      // Fallback canvas size when video fails to load
       const fallbackWidth = videoFile.width || 1920;
       const fallbackHeight = videoFile.height || 1080;
       canvas.width = fallbackWidth;
@@ -416,9 +478,16 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
       const scaleY = canvasRect.height / canvas.height;
       const newScaleFactor = Math.min(scaleX, scaleY);
       setScaleFactor(newScaleFactor);
+      
+      console.log(`Canvas fallback dimensions: ${fallbackWidth}x${fallbackHeight}`);
+      
+      // Force immediate re-render after fallback canvas setup
+      setTimeout(() => {
+        renderCaptionsOnCanvas();
+      }, 20);
     }
     return undefined;
-  }, [videoFile, videoLoadError]);
+  }, [videoFile, videoLoadError, renderCaptionsOnCanvas]);
 
   // Update scale factor when canvas size changes
   useEffect(() => {
@@ -475,32 +544,6 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     });
   }, [captions, currentTime, selectedSegmentId, scaleFactor]);
 
-  // Render captions on canvas (same logic as export)
-  const renderCaptionsOnCanvas = useCallback(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext('2d');
-    
-    if (!canvas || !ctx) return;
-    
-    // Don't render if canvas doesn't have valid dimensions yet
-    if (canvas.width === 0 || canvas.height === 0) return;
-
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Get all current captions (for potential overlapping)
-    const currentCaptions = captions.filter(
-      caption => currentTime >= caption.startTime && currentTime <= caption.endTime
-    );
-
-    if (currentCaptions.length === 0) return;
-
-    // Render all captions using cached scale factor
-    currentCaptions.forEach(caption => {
-      renderCaptionOnCanvas(ctx, caption, canvas.width, canvas.height, currentTime, scaleFactor);
-    });
-  }, [captions, currentTime, selectedSegmentId, scaleFactor]);
-
   // Force re-render when caption styles change - optimized
   useEffect(() => {
     // Only re-render if not currently dragging to avoid constant updates during drag
@@ -515,6 +558,17 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
       renderCaptionsOnCanvas();
     }
   }, [renderCaptionsOnCanvas, isDragging]);
+
+  // CRITICAL: Force re-render when canvas dimensions change to fix font truncation
+  useEffect(() => {
+    if (canvasSize.width > 0 && canvasSize.height > 0 && !isDragging) {
+      console.log(`Canvas dimensions changed to ${canvasSize.width}x${canvasSize.height}, re-rendering captions`);
+      // Small delay to ensure canvas has been updated
+      setTimeout(() => {
+        renderCaptionsOnCanvas();
+      }, 10);
+    }
+  }, [canvasSize, renderCaptionsOnCanvas, isDragging]);
 
   // Handle play/pause functionality
   const handlePlayPause = useCallback(() => {
