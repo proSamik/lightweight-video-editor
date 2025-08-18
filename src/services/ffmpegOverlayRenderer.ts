@@ -117,6 +117,18 @@ export class FFmpegOverlayRenderer {
       console.log('Export settings:', exportSettings);
       console.log('Using worker threads:', this.maxWorkers);
       
+      // Check for captions with burn-in enabled
+      const captionsWithBurnIn = captions.filter(caption => 
+        caption.style?.burnInSubtitles !== false
+      );
+      console.log('Captions with burn-in enabled:', captionsWithBurnIn.length);
+      
+      if (captionsWithBurnIn.length === 0) {
+        throw new Error(
+          'No captions are set to burn-in. Please enable "Burn-in Subtitles" in the styling panel to export video with embedded captions, or export as SRT file instead.'
+        );
+      }
+      
       // Check if cancelled before starting
       if (this.isCancelled) {
         throw new Error('Rendering cancelled');
@@ -159,6 +171,684 @@ export class FFmpegOverlayRenderer {
       
       // Fallback to copying original video
       return await this.copyVideo(videoPath, outputPath);
+    }
+  }
+
+  /**
+   * Render video with direct PNG overlays - no intermediate video creation
+   */
+  private async renderVideoWithDirectOverlays(
+    videoPath: string,
+    captions: any[],
+    outputPath: string,
+    metadata: any,
+    tempDir: string,
+    onProgress?: (progress: number) => void,
+    exportSettings?: { framerate: number; quality: string }
+  ): Promise<string> {
+    try {
+      // Phase 1: Generate PNG overlays (0-50%)
+      console.log('=== PHASE 1: Generating PNG overlays ===');
+      const allOverlayFiles = await this.generateOverlayImagesParallel(captions, metadata, tempDir, (progress) => {
+        if (onProgress) {
+          // Overlay generation is 50% of total progress
+          const overallProgress = Math.min(50, (progress / 100) * 50);
+          onProgress(Math.round(overallProgress));
+        }
+      });
+
+      console.log(`Generated ${allOverlayFiles.length} overlay images, applying directly to video...`);
+
+      // Check if cancelled before applying overlays
+      if (this.isCancelled) {
+        throw new Error('Rendering cancelled before applying overlays');
+      }
+
+      // Phase 2: Apply overlays directly to video (50-100%)
+      console.log('=== PHASE 2: Applying overlays directly to video ===');
+      const result = await this.applyDirectOverlaysToVideo(
+        videoPath,
+        allOverlayFiles,
+        outputPath,
+        metadata,
+        (progress) => {
+          if (onProgress) {
+            // Overlay application is 50% of total progress (50-100%)
+            const overallProgress = Math.min(100, Math.max(50, 50 + (progress / 100) * 50));
+            onProgress(Math.round(overallProgress));
+          }
+        },
+        exportSettings
+      );
+
+      return result;
+    } catch (error) {
+      console.error('Direct overlay rendering failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Apply PNG overlays directly to video with smart batching and precise timing
+   */
+  private async applyDirectOverlaysToVideo(
+    videoPath: string,
+    overlayFiles: Array<{ file: string; startTime: number; endTime: number }>,
+    outputPath: string,
+    metadata: any,
+    onProgress?: (progress: number) => void,
+    exportSettings?: { framerate: number; quality: string }
+  ): Promise<string> {
+    if (overlayFiles.length === 0) {
+      // No overlays to apply, just copy the video
+      console.log('No overlays to apply, copying video');
+      return await this.copyVideo(videoPath, outputPath);
+    }
+
+    const videoDurationSeconds = metadata.duration || 0;
+    const fiveMinutesInSeconds = 5 * 60; // 5 minutes
+
+    // For videos longer than 5 minutes, use smart chunking
+    if (videoDurationSeconds > fiveMinutesInSeconds) {
+      console.log(`Video is ${Math.round(videoDurationSeconds/60)}min long, using smart chunking approach`);
+      return await this.applyOverlaysWithSmartChunking(
+        videoPath,
+        overlayFiles,
+        outputPath,
+        metadata,
+        onProgress,
+        exportSettings
+      );
+    }
+
+    // For shorter videos, use the existing approach
+    const sortedOverlays = [...overlayFiles].sort((a, b) => a.startTime - b.startTime);
+    const maxOverlaysPerBatch = this.calculateOptimalOverlayBatchSize(sortedOverlays);
+    
+    console.log(`Short video: Applying ${sortedOverlays.length} overlays with batch size: ${maxOverlaysPerBatch}`);
+
+    if (sortedOverlays.length <= maxOverlaysPerBatch) {
+      return await this.applySingleBatchOverlays(
+        videoPath,
+        sortedOverlays,
+        outputPath,
+        metadata,
+        onProgress,
+        exportSettings
+      );
+    } else {
+      return await this.applyMultiBatchOverlays(
+        videoPath,
+        sortedOverlays,
+        outputPath,
+        metadata,
+        maxOverlaysPerBatch,
+        onProgress,
+        exportSettings
+      );
+    }
+  }
+
+  /**
+   * Apply overlays using smart chunking for long videos
+   * Only processes video segments that contain subtitles
+   */
+  private async applyOverlaysWithSmartChunking(
+    videoPath: string,
+    overlayFiles: Array<{ file: string; startTime: number; endTime: number }>,
+    outputPath: string,
+    metadata: any,
+    onProgress?: (progress: number) => void,
+    exportSettings?: { framerate: number; quality: string }
+  ): Promise<string> {
+    const tempDir = path.dirname(outputPath);
+    const videoDurationMs = (metadata.duration || 0) * 1000; // Convert to milliseconds
+    
+    // Analyze subtitle distribution and create smart chunks
+    const chunks = this.createSmartVideoChunks(overlayFiles, videoDurationMs);
+    console.log(`Created ${chunks.length} smart chunks (${chunks.filter(c => c.hasSubtitles).length} with subtitles)`);
+    
+    const processedChunks: string[] = [];
+    
+    try {
+      // Process each chunk
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        const chunkOutputPath = path.join(tempDir, `smart_chunk_${i}.mp4`);
+        
+        console.log(`Processing chunk ${i + 1}/${chunks.length}: ${(chunk.startTime/1000).toFixed(1)}s - ${(chunk.endTime/1000).toFixed(1)}s (${chunk.hasSubtitles ? 'HAS' : 'NO'} subtitles)`);
+        
+        const chunkStartTime = Date.now();
+        
+        if (chunk.hasSubtitles) {
+          // Extract chunk and apply overlays
+          await this.processChunkWithOverlays(
+            videoPath,
+            chunk,
+            chunkOutputPath,
+            metadata,
+            exportSettings
+          );
+        } else {
+          // Just extract the chunk without processing
+          await this.extractVideoChunk(
+            videoPath,
+            chunkOutputPath,
+            chunk.startTime / 1000, // Convert to seconds
+            chunk.endTime / 1000
+          );
+        }
+        
+        const chunkEndTime = Date.now();
+        const chunkDurationMs = chunkEndTime - chunkStartTime;
+        const chunkDurationMins = (chunkDurationMs / 60000).toFixed(2);
+        console.log(`Chunk ${i + 1} completed in ${chunkDurationMs}ms (${chunkDurationMins}min)`);
+        
+        processedChunks.push(chunkOutputPath);
+        
+        // Report progress (0-90% for chunk processing, 10% reserved for merge)
+        if (onProgress && chunks.length > 0) {
+          const progress = Math.min(90, Math.max(0, ((i + 1) / chunks.length) * 90));
+          onProgress(Math.round(progress));
+        }
+        
+        // Check for cancellation
+        if (this.isCancelled) {
+          throw new Error('Rendering cancelled during chunk processing');
+        }
+      }
+      
+      // Merge all processed chunks
+      console.log(`Merging ${processedChunks.length} processed chunks...`);
+      await this.mergeVideoChunks(processedChunks, outputPath);
+      
+      // Final merge completed
+      if (onProgress) {
+        onProgress(100);
+      }
+      
+      return outputPath;
+      
+    } finally {
+      // Clean up temporary chunk files
+      for (const chunkPath of processedChunks) {
+        try {
+          await fs.promises.unlink(chunkPath);
+        } catch (error) {
+          console.warn(`Failed to cleanup chunk file ${chunkPath}:`, error);
+        }
+      }
+    }
+  }
+
+  /**
+   * Create smart video chunks based on subtitle distribution
+   */
+  private createSmartVideoChunks(
+    overlayFiles: Array<{ file: string; startTime: number; endTime: number }>,
+    videoDurationMs: number
+  ): Array<{ startTime: number; endTime: number; hasSubtitles: boolean; overlays: typeof overlayFiles }> {
+    const chunkDurationMs = 90 * 1000; // 90 second chunks
+    const chunks: Array<{ startTime: number; endTime: number; hasSubtitles: boolean; overlays: typeof overlayFiles }> = [];
+    
+    // Sort overlays by start time
+    const sortedOverlays = [...overlayFiles].sort((a, b) => a.startTime - b.startTime);
+    
+    for (let currentTime = 0; currentTime < videoDurationMs; currentTime += chunkDurationMs) {
+      const chunkStart = currentTime;
+      const chunkEnd = Math.min(currentTime + chunkDurationMs, videoDurationMs);
+      
+      // Find overlays that intersect with this chunk
+      const chunkOverlays = sortedOverlays.filter(overlay =>
+        !(overlay.endTime <= chunkStart || overlay.startTime >= chunkEnd)
+      );
+      
+      // Adjust overlay times relative to chunk start
+      const adjustedOverlays = chunkOverlays.map(overlay => ({
+        ...overlay,
+        startTime: Math.max(0, overlay.startTime - chunkStart),
+        endTime: Math.min(chunkEnd - chunkStart, overlay.endTime - chunkStart)
+      }));
+      
+      chunks.push({
+        startTime: chunkStart,
+        endTime: chunkEnd,
+        hasSubtitles: chunkOverlays.length > 0,
+        overlays: adjustedOverlays
+      });
+    }
+    
+    // Merge adjacent chunks without subtitles for efficiency
+    return this.mergeAdjacentEmptyChunks(chunks);
+  }
+
+  /**
+   * Merge adjacent chunks that don't have subtitles
+   */
+  private mergeAdjacentEmptyChunks(
+    chunks: Array<{ startTime: number; endTime: number; hasSubtitles: boolean; overlays: any[] }>
+  ): Array<{ startTime: number; endTime: number; hasSubtitles: boolean; overlays: any[] }> {
+    const merged: typeof chunks = [];
+    let i = 0;
+    
+    while (i < chunks.length) {
+      const currentChunk = chunks[i];
+      
+      if (!currentChunk.hasSubtitles) {
+        // Merge consecutive chunks without subtitles
+        let endTime = currentChunk.endTime;
+        let j = i + 1;
+        
+        while (j < chunks.length && !chunks[j].hasSubtitles) {
+          endTime = chunks[j].endTime;
+          j++;
+        }
+        
+        merged.push({
+          startTime: currentChunk.startTime,
+          endTime: endTime,
+          hasSubtitles: false,
+          overlays: []
+        });
+        
+        i = j;
+      } else {
+        merged.push(currentChunk);
+        i++;
+      }
+    }
+    
+    return merged;
+  }
+
+  /**
+   * Process a single chunk by extracting it and applying overlays
+   */
+  private async processChunkWithOverlays(
+    videoPath: string,
+    chunk: { startTime: number; endTime: number; overlays: Array<{ file: string; startTime: number; endTime: number }> },
+    outputPath: string,
+    metadata: any,
+    exportSettings?: { framerate: number; quality: string }
+  ): Promise<void> {
+    const tempDir = path.dirname(outputPath);
+    const chunkVideoPath = path.join(tempDir, `temp_chunk_${Date.now()}.mp4`);
+    
+    try {
+      // Extract the chunk from original video
+      await this.extractVideoChunk(
+        videoPath,
+        chunkVideoPath,
+        chunk.startTime / 1000, // Convert to seconds
+        chunk.endTime / 1000
+      );
+      
+      // Apply overlays to the chunk
+      if (chunk.overlays.length > 0) {
+        await this.applySingleBatchOverlays(
+          chunkVideoPath,
+          chunk.overlays,
+          outputPath,
+          metadata,
+          undefined, // No progress callback for individual chunks
+          exportSettings
+        );
+      } else {
+        // No overlays, just copy the chunk
+        await this.copyVideo(chunkVideoPath, outputPath);
+      }
+      
+    } finally {
+      // Clean up temporary chunk video
+      try {
+        await fs.promises.unlink(chunkVideoPath);
+      } catch (error) {
+        console.warn(`Failed to cleanup temp chunk video ${chunkVideoPath}:`, error);
+      }
+    }
+  }
+
+  /**
+   * Extract a video chunk using FFmpeg
+   */
+  private async extractVideoChunk(
+    inputPath: string,
+    outputPath: string,
+    startTimeSeconds: number,
+    endTimeSeconds: number
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const duration = endTimeSeconds - startTimeSeconds;
+      
+      const command = ffmpeg(inputPath)
+        .seekInput(startTimeSeconds)
+        .duration(duration)
+        .outputOptions([
+          '-c', 'copy', // Copy streams without re-encoding
+          '-avoid_negative_ts', 'make_zero' // Ensure timestamps start from 0
+        ])
+        .output(outputPath)
+        .on('start', () => {
+          console.log(`Extracting chunk: ${startTimeSeconds.toFixed(1)}s - ${endTimeSeconds.toFixed(1)}s`);
+        })
+        .on('end', () => {
+          resolve();
+        })
+        .on('error', (err: any) => {
+          console.error('Chunk extraction failed:', err);
+          reject(new Error(`Chunk extraction failed: ${err.message}`));
+        });
+
+      command.run();
+    });
+  }
+
+  /**
+   * Merge multiple video chunks into final output
+   */
+  private async mergeVideoChunks(chunkPaths: string[], outputPath: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      // Create concat file
+      const concatFile = path.join(path.dirname(outputPath), 'chunks_concat.txt');
+      const concatContent = chunkPaths.map(file => `file '${path.resolve(file)}'`).join('\n');
+      
+      fs.writeFileSync(concatFile, concatContent);
+      
+      const command = ffmpeg()
+        .input(concatFile)
+        .inputOptions(['-f', 'concat', '-safe', '0'])
+        .outputOptions([
+          '-c', 'copy' // Copy without re-encoding
+        ])
+        .output(outputPath)
+        .on('start', () => {
+          console.log(`Merging ${chunkPaths.length} chunks...`);
+        })
+        .on('end', () => {
+          // Clean up concat file
+          try {
+            fs.unlinkSync(concatFile);
+          } catch (error) {
+            console.warn('Failed to cleanup concat file:', error);
+          }
+          resolve();
+        })
+        .on('error', (err: any) => {
+          console.error('Chunk merging failed:', err);
+          try {
+            fs.unlinkSync(concatFile);
+          } catch (error) {
+            console.warn('Failed to cleanup concat file:', error);
+          }
+          reject(new Error(`Chunk merging failed: ${err.message}`));
+        });
+
+      command.run();
+    });
+  }
+
+  /**
+   * Calculate optimal batch size for overlay filters based on system resources and overlay characteristics
+   */
+  private calculateOptimalOverlayBatchSize(overlayFiles: Array<{ file: string; startTime: number; endTime: number }>): number {
+    const totalOverlays = overlayFiles.length;
+    const memoryGB = os.totalmem() / (1024 ** 3);
+    const cpuCores = os.cpus().length;
+    
+    // Analyze overlay characteristics
+    const averageDuration = overlayFiles.reduce((sum, overlay) => 
+      sum + (overlay.endTime - overlay.startTime), 0) / totalOverlays;
+    const maxConcurrentOverlays = this.calculateMaxConcurrentOverlays(overlayFiles);
+    
+    // Base batch size calculation
+    let batchSize = 30; // Conservative base
+    
+    // Adjust for system resources
+    if (memoryGB >= 16) batchSize = 50;
+    if (memoryGB >= 32) batchSize = 75;
+    if (cpuCores >= 8) batchSize = Math.floor(batchSize * 1.2);
+    
+    // Adjust for overlay characteristics
+    if (averageDuration < 1000) batchSize = Math.floor(batchSize * 1.3); // Short overlays are lighter
+    if (maxConcurrentOverlays > 3) batchSize = Math.floor(batchSize * 0.7); // Many concurrent overlays are heavier
+    
+    // Dynamic adjustment based on total count
+    if (totalOverlays < 50) batchSize = Math.min(batchSize, totalOverlays);
+    if (totalOverlays > 500) batchSize = Math.floor(batchSize * 0.8); // Be more conservative with large sets
+    
+    // Hard limits
+    batchSize = Math.min(batchSize, 100); // FFmpeg command line length limit
+    batchSize = Math.max(batchSize, 5);   // Minimum for efficiency
+    
+    console.log(`Dynamic batch size: ${batchSize} (Memory: ${Math.round(memoryGB)}GB, CPUs: ${cpuCores}, Total: ${totalOverlays}, Max concurrent: ${maxConcurrentOverlays}, Avg duration: ${Math.round(averageDuration)}ms)`);
+    return batchSize;
+  }
+
+  /**
+   * Calculate maximum number of overlays that are active at the same time
+   */
+  private calculateMaxConcurrentOverlays(overlayFiles: Array<{ file: string; startTime: number; endTime: number }>): number {
+    if (overlayFiles.length === 0) return 0;
+    
+    // Create timeline events
+    const events: Array<{ time: number; type: 'start' | 'end' }> = [];
+    overlayFiles.forEach(overlay => {
+      events.push({ time: overlay.startTime, type: 'start' });
+      events.push({ time: overlay.endTime, type: 'end' });
+    });
+    
+    // Sort events by time
+    events.sort((a, b) => a.time - b.time);
+    
+    // Calculate maximum concurrent overlays
+    let current = 0;
+    let max = 0;
+    
+    events.forEach(event => {
+      if (event.type === 'start') {
+        current++;
+        max = Math.max(max, current);
+      } else {
+        current--;
+      }
+    });
+    
+    return max;
+  }
+
+  /**
+   * Apply overlays in a single batch using FFmpeg overlay filter chain
+   */
+  private async applySingleBatchOverlays(
+    videoPath: string,
+    overlayFiles: Array<{ file: string; startTime: number; endTime: number }>,
+    outputPath: string,
+    metadata: any,
+    onProgress?: (progress: number) => void,
+    exportSettings?: { framerate: number; quality: string }
+  ): Promise<string> {
+    return new Promise((resolve, reject) => {
+      console.log(`Applying ${overlayFiles.length} overlays in single batch`);
+      
+      // Build FFmpeg overlay filter chain
+      const { filterComplex } = this.buildOverlayFilterChain(overlayFiles);
+      
+      const fps = exportSettings?.framerate || metadata.fps || 30;
+      const quality = exportSettings?.quality || 'high';
+      
+      // Create FFmpeg command with all inputs and complex filter
+      const command = ffmpeg(videoPath);
+      
+      // Add all overlay images as inputs
+      overlayFiles.forEach(overlay => {
+        command.input(overlay.file);
+      });
+      
+      command
+        .complexFilter(filterComplex)
+        .outputOptions([
+          '-map', '[final]', // Use the final output from filter chain
+          '-map', '0:a?', // Map audio from original video (? means optional)
+          '-c:a', 'copy', // Copy audio without re-encoding
+          '-c:v', 'libx264', // Encode video
+          '-r', fps.toString(),
+          '-preset', this.getPresetForQuality(quality),
+          '-crf', this.getCRFForQuality(quality),
+          '-pix_fmt', 'yuv420p'
+        ])
+        .output(outputPath)
+        .on('start', (commandLine: string) => {
+          console.log('Single batch overlay started');
+          this.activeFFmpegProcesses.add(command);
+        })
+        .on('progress', (progress: any) => {
+          if (onProgress) {
+            const percent = Math.min(100, Math.max(0, progress.percent || 0));
+            onProgress(Math.round(percent));
+          }
+        })
+        .on('end', () => {
+          console.log('Single batch overlay completed successfully');
+          this.activeFFmpegProcesses.delete(command);
+          resolve(outputPath);
+        })
+        .on('error', (err: any) => {
+          console.error('Single batch overlay failed:', err);
+          this.activeFFmpegProcesses.delete(command);
+          reject(new Error(`Single batch overlay failed: ${err.message}`));
+        });
+      
+      command.run();
+    });
+  }
+
+  /**
+   * Apply overlays in multiple batches for large overlay sets
+   */
+  private async applyMultiBatchOverlays(
+    videoPath: string,
+    overlayFiles: Array<{ file: string; startTime: number; endTime: number }>,
+    outputPath: string,
+    metadata: any,
+    batchSize: number,
+    onProgress?: (progress: number) => void,
+    exportSettings?: { framerate: number; quality: string }
+  ): Promise<string> {
+    console.log(`Applying ${overlayFiles.length} overlays in batches of ${batchSize}`);
+    
+    const tempDir = path.dirname(outputPath);
+    const batches = [];
+    
+    // Split overlays into batches
+    for (let i = 0; i < overlayFiles.length; i += batchSize) {
+      batches.push(overlayFiles.slice(i, i + batchSize));
+    }
+    
+    console.log(`Created ${batches.length} batches for processing`);
+    
+    let currentVideoPath = videoPath;
+    
+    // Process each batch sequentially
+    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+      const batch = batches[batchIndex];
+      const isLastBatch = batchIndex === batches.length - 1;
+      const batchOutputPath = isLastBatch ? outputPath : path.join(tempDir, `batch_${batchIndex}_output.mp4`);
+      
+      console.log(`Processing batch ${batchIndex + 1}/${batches.length} with ${batch.length} overlays`);
+      
+      await this.applySingleBatchOverlays(
+        currentVideoPath,
+        batch,
+        batchOutputPath,
+        metadata,
+        (batchProgress) => {
+          if (onProgress && batches.length > 0) {
+            // Calculate overall progress safely
+            const completedBatches = batchIndex;
+            const currentBatchProgress = batchProgress / 100;
+            const totalProgress = Math.min(100, Math.max(0, (completedBatches + currentBatchProgress) / batches.length * 100));
+            onProgress(Math.round(totalProgress));
+          }
+        },
+        exportSettings
+      );
+      
+      // Clean up previous intermediate file (except original video)
+      if (currentVideoPath !== videoPath) {
+        try {
+          await fs.promises.unlink(currentVideoPath);
+        } catch (error) {
+          console.warn(`Failed to cleanup intermediate file ${currentVideoPath}:`, error);
+        }
+      }
+      
+      currentVideoPath = batchOutputPath;
+      
+      // Check for cancellation between batches
+      if (this.isCancelled) {
+        throw new Error('Rendering cancelled during batch processing');
+      }
+    }
+    
+    return outputPath;
+  }
+
+  /**
+   * Build FFmpeg overlay filter chain for multiple PNG overlays with precise timing
+   */
+  private buildOverlayFilterChain(overlayFiles: Array<{ file: string; startTime: number; endTime: number }>): {
+    filterComplex: string;
+  } {
+    const filters: string[] = [];
+    
+    let currentInput = '[0:v]'; // Main video input
+    
+    overlayFiles.forEach((overlay, index) => {
+      const inputIndex = index + 1; // Input indices start from 1 (0 is main video)
+      const outputLabel = index === overlayFiles.length - 1 ? '[final]' : `[v${index + 1}]`;
+      
+      // Convert milliseconds to seconds with microsecond precision
+      // Add tiny offset to prevent exact timing conflicts between overlays
+      const startTimeMs = overlay.startTime + (index * 0.001); // Add 0.001ms offset per overlay
+      const endTimeMs = overlay.endTime + (index * 0.001);
+      const startTimeSeconds = (startTimeMs / 1000).toFixed(6);
+      const endTimeSeconds = (endTimeMs / 1000).toFixed(6);
+      
+      // Create overlay filter with precise timing using 'enable' parameter
+      const overlayFilter = `${currentInput}[${inputIndex}:v]overlay=enable='between(t,${startTimeSeconds},${endTimeSeconds})'${outputLabel}`;
+      
+      filters.push(overlayFilter);
+      currentInput = outputLabel;
+    });
+    
+    return {
+      filterComplex: filters.join(';')
+    };
+  }
+
+  /**
+   * Get FFmpeg preset based on quality setting
+   */
+  private getPresetForQuality(quality: string): string {
+    switch (quality) {
+      case 'low': return 'fast';
+      case 'medium': return 'medium';
+      case 'high': return 'slow';
+      case 'ultra': return 'veryslow';
+      default: return 'medium';
+    }
+  }
+
+  /**
+   * Get CRF (Constant Rate Factor) based on quality setting
+   */
+  private getCRFForQuality(quality: string): string {
+    switch (quality) {
+      case 'low': return '28';
+      case 'medium': return '23';
+      case 'high': return '18';
+      case 'ultra': return '15';
+      default: return '23';
     }
   }
 
@@ -291,32 +981,56 @@ export class FFmpegOverlayRenderer {
       // Sort overlays by start time
       const sortedOverlays = [...overlayFiles].sort((a, b) => a.startTime - b.startTime);
       
-      // Create a concat file for the overlay images with proper duration handling
+      // Create a transparent placeholder image for gaps between subtitles
+      const transparentImagePath = path.join(path.dirname(outputPath), 'transparent.png');
+      const Canvas = require('canvas');
+      const canvas = Canvas.createCanvas(width, height);
+      const ctx = canvas.getContext('2d');
+      // Create transparent canvas
+      ctx.clearRect(0, 0, width, height);
+      const buffer = canvas.toBuffer('image/png');
+      fs.writeFileSync(transparentImagePath, buffer);
+      
+      // Create a concat file with proper timeline including gaps
       const concatFile = path.join(path.dirname(outputPath), 'overlay_concat.txt');
       let concatContent = '';
       
-      // Create concat file with proper duration for each overlay
+      let currentTime = 0; // in milliseconds
+      const videoDurationMs = duration * 1000; // Convert video duration to milliseconds
+      
+      // Create timeline with overlays and transparent gaps
       for (let i = 0; i < sortedOverlays.length; i++) {
         const overlay = sortedOverlays[i];
-        const nextOverlay = sortedOverlays[i + 1];
         
-        // Calculate duration for this overlay
-        let segmentDuration: number;
-        if (nextOverlay) {
-          segmentDuration = nextOverlay.startTime - overlay.startTime;
-        } else {
-          // For the last overlay, use remaining duration
-          segmentDuration = Math.max(0.1, duration - overlay.startTime);
+        // Add transparent segment if there's a gap before this overlay
+        if (overlay.startTime > currentTime) {
+          const gapDurationMs = overlay.startTime - currentTime;
+          const gapDurationSec = gapDurationMs / 1000; // Convert to seconds for FFmpeg
+          concatContent += `file '${transparentImagePath}'\n`;
+          concatContent += `duration ${gapDurationSec}\n`;
         }
         
+        // Add the overlay segment
+        const overlayDurationMs = overlay.endTime - overlay.startTime;
+        const overlayDurationSec = overlayDurationMs / 1000; // Convert to seconds for FFmpeg
         concatContent += `file '${overlay.file}'\n`;
-        concatContent += `duration ${segmentDuration}\n`;
+        concatContent += `duration ${overlayDurationSec}\n`;
+        
+        currentTime = overlay.endTime;
+      }
+      
+      // Add final transparent segment if needed to reach video duration
+      if (currentTime < videoDurationMs) {
+        const finalGapDurationMs = videoDurationMs - currentTime;
+        const finalGapDurationSec = finalGapDurationMs / 1000; // Convert to seconds for FFmpeg
+        concatContent += `file '${transparentImagePath}'\n`;
+        concatContent += `duration ${finalGapDurationSec}\n`;
       }
       
       // FFmpeg concat demuxer needs the last file repeated for the last duration
-      if (sortedOverlays.length > 0) {
-        const lastOverlay = sortedOverlays[sortedOverlays.length - 1];
-        concatContent += `file '${lastOverlay.file}'\n`;
+      if (concatContent) {
+        // Add the final frame
+        concatContent += `file '${transparentImagePath}'\n`;
       }
       
       fs.writeFileSync(concatFile, concatContent);
@@ -341,29 +1055,31 @@ export class FFmpegOverlayRenderer {
         })
         .on('progress', (progress: any) => {
           if (onProgress) {
-            const percent = Math.min(100, progress.percent || 0);
+            const percent = Math.min(100, Math.max(0, progress.percent || 0));
             onProgress(Math.round(percent));
           }
         })
         .on('end', () => {
           console.log('Caption video creation completed successfully');
           this.activeFFmpegProcesses.delete(command);
-          // Clean up concat file
+          // Clean up concat file and transparent image
           try {
             fs.unlinkSync(concatFile);
+            fs.unlinkSync(transparentImagePath);
           } catch (error) {
-            console.warn('Failed to cleanup concat file:', error);
+            console.warn('Failed to cleanup temporary files:', error);
           }
           resolve();
         })
         .on('error', (err: any) => {
           console.error('Caption video creation failed:', err);
           this.activeFFmpegProcesses.delete(command);
-          // Clean up concat file
+          // Clean up concat file and transparent image
           try {
             fs.unlinkSync(concatFile);
+            fs.unlinkSync(transparentImagePath);
           } catch (error) {
-            console.warn('Failed to cleanup concat file:', error);
+            console.warn('Failed to cleanup temporary files:', error);
           }
           reject(new Error(`Caption video creation failed: ${err.message}`));
         });
@@ -474,7 +1190,7 @@ export class FFmpegOverlayRenderer {
         })
         .on('progress', (progress: any) => {
           if (onProgress) {
-            const percent = Math.min(100, progress.percent || 0);
+            const percent = Math.min(100, Math.max(0, progress.percent || 0));
             onProgress(Math.round(percent));
           }
         })
@@ -749,40 +1465,15 @@ export class FFmpegOverlayRenderer {
         onProgress(0);
       }
       
-      // Phase 1: Generate caption video (0-40%)
-      console.log('=== STREAMING PHASE 1: Generating caption video ===');
-      const captionVideoPath = await this.generateCaptionVideo(
-        captions,
-        metadata,
-        tempDir,
-        (progress) => {
-          if (onProgress) {
-            // Phase 1 is 40% of total progress
-            const overallProgress = (progress / 100) * 40;
-            onProgress(Math.round(overallProgress));
-          }
-        }
-      );
-      
-      // Check if cancelled before streaming
-      if (this.isCancelled) {
-        throw new Error('Rendering cancelled before streaming');
-      }
-      
-      // Phase 2: Overlay caption video on main video (40-100%)
-      console.log('=== STREAMING PHASE 2: Overlaying caption video ===');
-      const result = await this.overlayCaptionVideo(
+      // Direct PNG overlay approach - no intermediate video
+      console.log('=== DIRECT PNG OVERLAY RENDERING ===');
+      const result = await this.renderVideoWithDirectOverlays(
         videoPath,
-        captionVideoPath,
+        captions,
         outputPath,
         metadata,
-        (progress) => {
-          if (onProgress) {
-            // Phase 2 is 60% of total progress (40-100%)
-            const overallProgress = 40 + (progress / 100) * 60;
-            onProgress(Math.round(overallProgress));
-          }
-        },
+        tempDir,
+        onProgress,
         exportSettings
       );
       
@@ -947,12 +1638,16 @@ export class FFmpegOverlayRenderer {
         const inputIndex = index + 1; // Overlay inputs start at index 1
         const outputLabel = index === segmentOverlays.length - 1 ? '[outv]' : `[tmp${index}]`;
         
-        // Adjust overlay timing for segment
-        const adjustedStartTime = overlay.startTime - startTime;
-        const adjustedEndTime = overlay.endTime - startTime;
+        // Adjust overlay timing for segment (milliseconds), add tiny offset to prevent
+        // exact timing conflicts between overlays that start/end at the same moment,
+        // then convert to seconds with microsecond precision
+        const adjustedStartTimeMs = (overlay.startTime - startTime) + (index * 0.001);
+        const adjustedEndTimeMs = (overlay.endTime - startTime) + (index * 0.001);
+        const adjustedStartTimeSeconds = (adjustedStartTimeMs / 1000).toFixed(6);
+        const adjustedEndTimeSeconds = (adjustedEndTimeMs / 1000).toFixed(6);
         
         // Create overlay filter with microsecond precision
-        const overlayFilter = `${currentInput}[${inputIndex}:v]overlay=enable='between(t,${adjustedStartTime.toFixed(6)},${adjustedEndTime.toFixed(6)})'${outputLabel}`;
+        const overlayFilter = `${currentInput}[${inputIndex}:v]overlay=enable='between(t,${adjustedStartTimeSeconds},${adjustedEndTimeSeconds})'${outputLabel}`;
         
         if (filterComplex) {
           filterComplex += ';';
@@ -1038,8 +1733,8 @@ export class FFmpegOverlayRenderer {
             const segmentStartProgress = (segmentIndex / totalSegments) * 100;
             const segmentEndProgress = ((segmentIndex + 1) / totalSegments) * 100;
             const segmentProgressRange = segmentEndProgress - segmentStartProgress;
-            const currentSegmentProgress = segmentStartProgress + (progress.percent || 0) * segmentProgressRange / 100;
-            onProgress(Math.round(currentSegmentProgress));
+            const currentSegmentProgress = segmentStartProgress + Math.max(0, progress.percent || 0) * segmentProgressRange / 100;
+            onProgress(Math.round(Math.min(100, Math.max(0, currentSegmentProgress))));
           }
         })
         .on('end', () => {
@@ -1096,40 +1791,15 @@ export class FFmpegOverlayRenderer {
         onProgress(0);
       }
       
-      // Step 1: Generate caption video using parallel processing (0-50%)
-      console.log('Generating caption video with parallel processing...');
-      const captionVideoPath = await this.generateCaptionVideo(
-        captions, 
-        metadata, 
-        tempDir, 
-        (progress) => {
-          if (onProgress) {
-            // Caption video generation is 50% of total progress
-            const overallProgress = (progress / 100) * 50;
-            onProgress(Math.round(overallProgress));
-          }
-        }
-      );
-      
-      // Check if cancelled before FFmpeg processing
-      if (this.isCancelled) {
-        throw new Error('Rendering cancelled before FFmpeg processing');
-      }
-      
-      // Step 2: Overlay caption video on main video (50-100%)
-      console.log('Overlaying caption video on main video...');
-      const result = await this.overlayCaptionVideo(
-        videoPath, 
-        captionVideoPath, 
-        outputPath, 
-        metadata, 
-        (progress) => {
-          if (onProgress) {
-            // Overlay processing is 50% of total progress (50-100%)
-            const overallProgress = 50 + (progress / 100) * 50;
-            onProgress(Math.round(overallProgress));
-          }
-        }, 
+      // Use direct overlay approach for better performance
+      console.log('Using direct overlay approach for standard rendering...');
+      const result = await this.renderVideoWithDirectOverlays(
+        videoPath,
+        captions,
+        outputPath,
+        metadata,
+        tempDir,
+        onProgress,
         exportSettings
       );
       
@@ -1312,40 +1982,6 @@ export class FFmpegOverlayRenderer {
     }
   }
 
-  /**
-   * Extract a chunk of video using FFmpeg
-   */
-  private async extractVideoChunk(
-    videoPath: string,
-    outputPath: string,
-    startTime: number,
-    endTime: number
-  ): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const duration = endTime - startTime;
-      
-      const command = ffmpeg(videoPath)
-        .inputOptions([
-          '-ss', startTime.toString(),
-          '-t', duration.toString()
-        ])
-        .videoCodec('copy')
-        .audioCodec('copy')
-        .output(outputPath)
-        .on('start', () => {
-          this.activeFFmpegProcesses.add(command);
-        })
-        .on('end', () => {
-          this.activeFFmpegProcesses.delete(command);
-          resolve();
-        })
-        .on('error', (err: any) => {
-          this.activeFFmpegProcesses.delete(command);
-          reject(err);
-        })
-        .run();
-    });
-  }
 
   /**
    * Concatenate video chunks into final output
@@ -1374,7 +2010,7 @@ export class FFmpegOverlayRenderer {
         .on('progress', (progress: any) => {
           if (onProgress) {
             // Concatenation is the final 10% of progress (90-100%)
-            const concatProgress = 90 + (progress.percent || 0) * 0.1;
+            const concatProgress = Math.min(100, Math.max(90, 90 + (progress.percent || 0) * 0.1));
             onProgress(Math.round(concatProgress));
           }
         })
@@ -1419,8 +2055,10 @@ export class FFmpegOverlayRenderer {
     
     console.log(`Created ${batches.length} batches with ${batchSize} captions per batch`);
     
+    // Track progress across all batches
+    const batchProgressTracker = new Array(batches.length).fill(0);
+    
     // Process batches in parallel using worker threads
-    let completedBatches = 0;
     const batchPromises = batches.map((batch, batchIndex) => {
       return this.processCaptionBatch(
         batch,
@@ -1428,18 +2066,15 @@ export class FFmpegOverlayRenderer {
         metadata,
         tempDir,
         (batchProgress) => {
-          if (onProgress) {
-            // Calculate overall progress based on completed batches
-            const completedProgress = (completedBatches / batches.length) * 100;
-            const currentBatchProgress = (batchProgress / 100) * (100 / batches.length);
-            const totalProgress = Math.min(100, completedProgress + currentBatchProgress);
-            onProgress(Math.round(totalProgress));
+          if (onProgress && batches.length > 0) {
+            // Update this batch's progress
+            batchProgressTracker[batchIndex] = batchProgress;
+            // Calculate overall progress as average of all batches
+            const totalProgress = batchProgressTracker.reduce((sum, progress) => sum + progress, 0) / batches.length;
+            onProgress(Math.min(95, Math.round(totalProgress)));
           }
         }
-      ).then(result => {
-        completedBatches++;
-        return result;
-      });
+      );
     });
     
     // Wait for all batches to complete in parallel
@@ -1475,6 +2110,15 @@ export class FFmpegOverlayRenderer {
           isWorker: true
         }
       });
+      
+      // Send cancellation updates to worker
+      const checkCancellation = () => {
+        if (this.isCancelled) {
+          worker.postMessage({ type: 'cancel' });
+        }
+      };
+      
+      const cancellationInterval = setInterval(checkCancellation, 100); // Check every 100ms
 
       this.activeWorkers.add(worker);
 
@@ -1485,10 +2129,17 @@ export class FFmpegOverlayRenderer {
           }
         } else if (message.type === 'complete') {
           console.log(`Batch ${batchIndex} completed: ${message.overlayFiles.length} overlays`);
+          clearInterval(cancellationInterval);
           this.activeWorkers.delete(worker);
           resolve(message.overlayFiles);
+        } else if (message.type === 'cancelled') {
+          console.log(`Batch ${batchIndex} cancelled gracefully`);
+          clearInterval(cancellationInterval);
+          this.activeWorkers.delete(worker);
+          resolve([]); // Return empty array for cancelled batch
         } else if (message.type === 'error') {
           console.error(`Batch ${batchIndex} error:`, message.error);
+          clearInterval(cancellationInterval);
           this.activeWorkers.delete(worker);
           reject(new Error(message.error));
         }
@@ -1496,14 +2147,16 @@ export class FFmpegOverlayRenderer {
 
       worker.on('error', (error) => {
         console.error(`Worker ${batchIndex} error:`, error);
+        clearInterval(cancellationInterval);
         this.activeWorkers.delete(worker);
         reject(error);
       });
 
       worker.on('exit', (code) => {
+        clearInterval(cancellationInterval);
+        this.activeWorkers.delete(worker);
         if (code !== 0) {
           console.error(`Worker ${batchIndex} exited with code ${code}`);
-          this.activeWorkers.delete(worker);
           reject(new Error(`Worker exited with code ${code}`));
         }
       });
@@ -1677,8 +2330,13 @@ export class FFmpegOverlayRenderer {
         const inputIndex = index + 1; // Overlay inputs start at index 1
         const outputLabel = index === overlayFiles.length - 1 ? '[outv]' : `[tmp${index}]`;
         
-        // Create overlay filter with microsecond precision
-        const overlayFilter = `${currentInput}[${inputIndex}:v]overlay=enable='between(t,${overlay.startTime.toFixed(6)},${overlay.endTime.toFixed(6)})'${outputLabel}`;
+        // Create overlay filter with microsecond precision (convert ms to seconds)
+        // Add tiny offset to prevent exact timing conflicts between overlays  
+        const startTimeMs = overlay.startTime + (index * 0.001); // Add 0.001ms offset per overlay
+        const endTimeMs = overlay.endTime + (index * 0.001);
+        const startTimeSeconds = (startTimeMs / 1000).toFixed(6);
+        const endTimeSeconds = (endTimeMs / 1000).toFixed(6);
+        const overlayFilter = `${currentInput}[${inputIndex}:v]overlay=enable='between(t,${startTimeSeconds},${endTimeSeconds})'${outputLabel}`;
         
         if (filterComplex) {
           filterComplex += ';';
@@ -1759,8 +2417,8 @@ export class FFmpegOverlayRenderer {
         .on('progress', (progress: any) => {
           if (onProgress) {
             // FFmpeg progress is 100% of this phase
-            const ffmpegProgress = progress.percent || 0;
-            onProgress(ffmpegProgress);
+            const ffmpegProgress = Math.min(100, Math.max(0, progress.percent || 0));
+            onProgress(Math.round(ffmpegProgress));
           }
         })
         .on('end', () => {
@@ -1886,504 +2544,6 @@ export class FFmpegOverlayRenderer {
     }
   }
 
-  /**
-   * Generate overlay images for each word highlight state
-   * Creates one image per word that shows that specific word highlighted
-   */
-  private async generateOverlayImages(
-    captions: any[],
-    metadata: any,
-    tempDir: string,
-    onProgress?: (progress: number) => void
-  ): Promise<Array<{ file: string; startTime: number; endTime: number }>> {
-    const overlayFiles: Array<{ file: string; startTime: number; endTime: number }> = [];
-    
-    console.log(`Generating overlay images for ${captions.length} captions...`);
-    
-    let totalImages = 0;
-    let processedImages = 0;
-    
-    // Count total images needed
-    for (const caption of captions) {
-      if (caption.words && caption.words.length > 0) {
-        totalImages += caption.words.length; // One image per word
-      } else {
-        totalImages += 1; // One image for simple text caption
-      }
-    }
-    
-    for (let captionIndex = 0; captionIndex < captions.length; captionIndex++) {
-      if (this.isCancelled) {
-        throw new Error('Overlay generation cancelled');
-      }
-      
-      const caption = captions[captionIndex];
-      const captionStart = caption.startTime !== undefined ? caption.startTime : caption.start;
-      const captionEnd = caption.endTime !== undefined ? caption.endTime : caption.end;
-      
-      // Skip captions with invalid timing
-      if (captionStart === undefined || captionEnd === undefined || captionStart >= captionEnd) {
-        console.warn('Skipping caption with invalid timing:', caption);
-        continue;
-      }
-      
-      // Check if subtitles should be burned in (default: true)
-      const shouldBurnIn = caption.style?.burnInSubtitles !== false;
-      if (!shouldBurnIn) {
-        continue; // Skip this caption if burnInSubtitles is false
-      }
-      
-      if (caption.words && caption.words.length > 0) {
-        // Generate one image per word highlight state
-        for (let wordIndex = 0; wordIndex < caption.words.length; wordIndex++) {
-          const word = caption.words[wordIndex];
-          const wordStart = word.start;
-          const wordEnd = word.end;
-          
-          if (wordStart === undefined || wordEnd === undefined || wordStart >= wordEnd) {
-            console.warn('Skipping word with invalid timing:', word);
-            continue;
-          }
-          
-          // Generate overlay image for this word highlight state
-          const overlayFileName = `caption_${String(captionIndex).padStart(3, '0')}_word_${String(wordIndex).padStart(3, '0')}.png`;
-          const overlayPath = path.join(tempDir, overlayFileName);
-          
-          // Create PNG with this specific word highlighted
-          await this.renderWordHighlightImage(
-            caption,
-            wordIndex,
-            metadata.width,
-            metadata.height,
-            overlayPath
-          );
-          
-          // Calculate precise timing with microsecond precision
-          const startTimeSeconds = wordStart / 1000;
-          const endTimeSeconds = wordEnd / 1000;
-          
-          // Ensure no overlap with next word
-          let adjustedEndTime = endTimeSeconds;
-          if (wordIndex < caption.words.length - 1) {
-            const nextWordStart = caption.words[wordIndex + 1].start / 1000;
-            // If next word starts immediately after this one, reduce by 1 microsecond
-            if (Math.abs(endTimeSeconds - nextWordStart) < 0.001) { // Within 1ms = adjacent words
-              adjustedEndTime = nextWordStart - 0.000001; // 1 microsecond before next word
-            }
-          }
-          
-          overlayFiles.push({
-            file: overlayPath,
-            startTime: startTimeSeconds,
-            endTime: adjustedEndTime
-          });
-          
-          // Debug timing with microsecond precision
-          const gap = overlayFiles.length > 1 ? startTimeSeconds - overlayFiles[overlayFiles.length - 2].endTime : 0;
-          const gapMicroseconds = Math.round(gap * 1000000);
-          console.log(`Word "${word.word}": ${startTimeSeconds.toFixed(6)}s - ${adjustedEndTime.toFixed(6)}s [Gap: ${gapMicroseconds}μs]`);
-          
-          processedImages++;
-          
-          // Report progress (overlay generation is 50% of total progress)
-          if (onProgress) {
-            onProgress((processedImages / totalImages) * 50);
-          }
-        }
-      } else {
-        // Simple text caption (no word timing) - just one static image
-        const overlayFileName = `caption_${String(captionIndex).padStart(3, '0')}_static.png`;
-        const overlayPath = path.join(tempDir, overlayFileName);
-        
-        // Generate static PNG overlay for this caption
-        await this.renderStaticCaptionImage(
-          caption,
-          metadata.width,
-          metadata.height,
-          overlayPath
-        );
-        
-        overlayFiles.push({
-          file: overlayPath,
-          startTime: captionStart / 1000, // Convert to seconds for FFmpeg
-          endTime: captionEnd / 1000
-        });
-        
-        processedImages++;
-        
-        // Report progress (overlay generation is 50% of total progress)
-        if (onProgress) {
-          onProgress((processedImages / totalImages) * 50);
-        }
-      }
-      
-      // Log progress every 10 captions
-      if ((captionIndex + 1) % 10 === 0) {
-        console.log(`Processed ${captionIndex + 1}/${captions.length} captions (${processedImages} images)`);
-      }
-    }
-    
-    console.log(`Generated ${overlayFiles.length} overlay images`);
-    return overlayFiles;
-  }
-
-  /**
-   * Render word highlight overlay image (shows specific word highlighted)
-   */
-  private async renderWordHighlightImage(
-    caption: any,
-    highlightedWordIndex: number,
-    videoWidth: number,
-    videoHeight: number,
-    outputPath: string
-  ): Promise<void> {
-    // Create canvas with video dimensions
-    const canvas = new Canvas(videoWidth, videoHeight);
-    const ctx = canvas.getContext('2d');
-    
-    // Set transparent background
-    ctx.clearRect(0, 0, videoWidth, videoHeight);
-    
-    // Render caption with specific word highlighted
-    if (caption.style.renderMode === 'progressive') {
-      await this.renderProgressiveWordHighlight(ctx, caption.words, caption, highlightedWordIndex, videoWidth, videoHeight);
-    } else {
-      await this.renderKaraokeWordHighlight(ctx, caption.words, caption, highlightedWordIndex, videoWidth, videoHeight);
-    }
-    
-    // Save as PNG with transparency
-    const buffer = canvas.toBuffer('image/png');
-    await fs.promises.writeFile(outputPath, buffer);
-  }
-
-  /**
-   * Render static caption image (for captions without word timing)
-   */
-  private async renderStaticCaptionImage(
-    caption: any,
-    videoWidth: number,
-    videoHeight: number,
-    outputPath: string
-  ): Promise<void> {
-    // Create canvas with video dimensions
-    const canvas = new Canvas(videoWidth, videoHeight);
-    const ctx = canvas.getContext('2d');
-    
-    // Set transparent background
-    ctx.clearRect(0, 0, videoWidth, videoHeight);
-    
-    // Render simple text overlay
-    await this.renderSimpleTextOverlay(ctx, caption.text, caption, videoWidth, videoHeight);
-    
-    // Save as PNG with transparency
-    const buffer = canvas.toBuffer('image/png');
-    await fs.promises.writeFile(outputPath, buffer);
-  }
-
-  /**
-   * Render simple text overlay on transparent canvas
-   */
-  private async renderSimpleTextOverlay(
-    ctx: CanvasRenderingContext2D,
-    text: string,
-    caption: any,
-    canvasWidth: number,
-    canvasHeight: number
-  ): Promise<void> {
-    const baseFontSize = caption.style?.fontSize || 32;
-    const scale = caption.style?.scale || 1;
-    const fontSize = baseFontSize * scale;
-    const fontFamily = this.mapFontName(caption.style?.font || 'Arial');
-    const textColor = this.parseColor(caption.style?.textColor || '#ffffff');
-    const backgroundColor = this.parseColor(caption.style?.backgroundColor || 'transparent');
-    const strokeColor = this.parseColor(caption.style?.strokeColor || 'transparent');
-    const strokeWidth = caption.style?.strokeWidth || 0;
-    
-    // Apply text transformation
-    const displayText = this.applyTextTransform(text, caption.style?.textTransform || 'none');
-    
-    // Set font
-    ctx.font = `bold ${fontSize}px ${fontFamily}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    
-    // Calculate position
-    const x = (canvasWidth * caption.style.position.x) / 100;
-    const y = (canvasHeight * caption.style.position.y) / 100;
-    
-    // Measure text for background box
-    const textMetrics = ctx.measureText(displayText);
-    const textWidth = textMetrics.width;
-    const textHeight = fontSize;
-    
-    // Calculate background box
-    const boxX = x - (textWidth / 2) - 12;
-    const boxY = y - (textHeight / 2) - 12;
-    const boxWidth = textWidth + 24;
-    const boxHeight = textHeight + 24;
-    
-    // Draw background box if not transparent
-    if (backgroundColor.a > 0) {
-      ctx.fillStyle = `rgba(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b}, ${backgroundColor.a})`;
-      ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
-    }
-    
-    // Add text shadow for better visibility
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
-    ctx.shadowBlur = 4;
-    ctx.shadowOffsetX = 2;
-    ctx.shadowOffsetY = 2;
-    
-    // Draw stroke if specified
-    if (strokeWidth > 0 && strokeColor.a > 0) {
-      ctx.strokeStyle = `rgba(${strokeColor.r}, ${strokeColor.g}, ${strokeColor.b}, ${strokeColor.a})`;
-      ctx.lineWidth = strokeWidth;
-      ctx.lineJoin = 'round';
-      ctx.lineCap = 'round';
-      ctx.strokeText(displayText, x, y);
-    }
-    
-    // Draw text
-    ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
-    ctx.fillText(displayText, x, y);
-    
-    // Reset shadow
-    ctx.shadowColor = 'transparent';
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
-  }
-
-  /**
-   * Render karaoke word highlight (specific word highlighted in single line)
-   */
-  private async renderKaraokeWordHighlight(
-    ctx: CanvasRenderingContext2D,
-    words: any[],
-    caption: any,
-    highlightedWordIndex: number,
-    canvasWidth: number,
-    canvasHeight: number
-  ): Promise<void> {
-    const baseFontSize = caption.style?.fontSize || 32;
-    const scale = caption.style?.scale || 1;
-    const fontSize = baseFontSize * scale;
-    const fontFamily = this.mapFontName(caption.style?.font || 'Arial');
-    const textColor = this.parseColor(caption.style?.textColor || '#ffffff');
-    const highlighterColor = this.parseColor(caption.style?.highlighterColor || '#ffff00');
-    const backgroundColor = this.parseColor(caption.style?.backgroundColor || 'transparent');
-    const strokeColor = this.parseColor(caption.style?.strokeColor || 'transparent');
-    const strokeWidth = caption.style?.strokeWidth || 0;
-    const textTransform = caption.style?.textTransform || 'none';
-    
-    // Set font
-    ctx.font = `bold ${fontSize}px ${fontFamily}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    
-    const x = (canvasWidth * caption.style.position.x) / 100;
-    const y = (canvasHeight * caption.style.position.y) / 100;
-    
-    // Calculate total width for single line
-    const wordSpacing = 12 * scale;
-    const wordPadding = 4 * scale;
-    
-    let totalWidth = 0;
-    const wordWidths: number[] = [];
-    
-    for (const word of words) {
-      const transformedWord = this.applyTextTransform(word.word, textTransform);
-      const wordWidth = ctx.measureText(transformedWord).width;
-      wordWidths.push(wordWidth);
-      totalWidth += wordWidth + (wordPadding * 2) + wordSpacing;
-    }
-    totalWidth -= wordSpacing; // Remove last spacing
-    
-    // Calculate background box
-    const boxX = x - (totalWidth / 2) - 12;
-    const boxY = y - (fontSize / 2) - 12;
-    const boxWidth = totalWidth + 24;
-    const boxHeight = fontSize + 24;
-    
-    // Draw main background box if not transparent
-    if (backgroundColor.a > 0) {
-      ctx.fillStyle = `rgba(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b}, ${backgroundColor.a})`;
-      ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
-    }
-    
-    // Add text shadow
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
-    ctx.shadowBlur = 4;
-    ctx.shadowOffsetX = 2;
-    ctx.shadowOffsetY = 2;
-    
-    // Draw words in single line with specific word highlighted
-    let currentX = x - (totalWidth / 2) + wordPadding;
-    
-    for (let i = 0; i < words.length; i++) {
-      const word = words[i];
-      const displayWord = this.applyTextTransform(word.word, textTransform);
-      const wordWidth = wordWidths[i];
-      const isHighlighted = i === highlightedWordIndex;
-      
-      const wordBoxWidth = wordWidth + (wordPadding * 2);
-      const wordBoxHeight = fontSize + (wordPadding * 2);
-      const wordBoxX = currentX - wordPadding;
-      const wordBoxY = y - (fontSize / 2) - wordPadding;
-      
-      // Handle highlighting for the specific word
-      if (isHighlighted) {
-        if (caption.style.emphasizeMode) {
-          // Emphasis mode: increase font size and use highlighter color
-          const emphasizedFontSize = fontSize * 1.05;
-          ctx.font = `bold ${emphasizedFontSize}px ${fontFamily}`;
-          ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.a})`;
-        } else {
-          // Background highlight mode
-          ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.a})`;
-          ctx.fillRect(wordBoxX, wordBoxY, wordBoxWidth, wordBoxHeight);
-          ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
-        }
-      } else {
-        // Normal text color
-        ctx.font = `bold ${fontSize}px ${fontFamily}`;
-        ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
-      }
-      
-      // Clear shadow for stroke
-      ctx.shadowColor = 'transparent';
-      ctx.shadowBlur = 0;
-      ctx.shadowOffsetX = 0;
-      ctx.shadowOffsetY = 0;
-      
-      // Draw stroke if enabled
-      if (strokeWidth > 0 && strokeColor.a > 0) {
-        ctx.strokeStyle = `rgba(${strokeColor.r}, ${strokeColor.g}, ${strokeColor.b}, ${strokeColor.a})`;
-        ctx.lineWidth = strokeWidth;
-        ctx.lineJoin = 'round';
-        ctx.lineCap = 'round';
-        ctx.strokeText(displayWord, currentX + wordWidth/2, y);
-      }
-      
-      // Add shadow for text fill
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
-      ctx.shadowBlur = 4;
-      ctx.shadowOffsetX = 2;
-      ctx.shadowOffsetY = 2;
-      
-      // Draw the word
-      ctx.fillText(displayWord, currentX + wordWidth/2, y);
-      
-      // Reset font size if changed
-      if (isHighlighted && caption.style.emphasizeMode) {
-        ctx.font = `bold ${fontSize}px ${fontFamily}`;
-      }
-      
-      // Move to next word position
-      currentX += wordWidth + (wordPadding * 2) + wordSpacing;
-    }
-    
-    // Reset shadow
-    ctx.shadowColor = 'transparent';
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
-  }
-
-  /**
-   * Render progressive word highlight (words revealed progressively with specific word highlighted)
-   */
-  private async renderProgressiveWordHighlight(
-    ctx: CanvasRenderingContext2D,
-    words: any[],
-    caption: any,
-    highlightedWordIndex: number,
-    canvasWidth: number,
-    canvasHeight: number
-  ): Promise<void> {
-    const baseFontSize = caption.style?.fontSize || 32;
-    const scale = caption.style?.scale || 1;
-    const fontSize = baseFontSize * scale;
-    const fontFamily = this.mapFontName(caption.style?.font || 'Arial');
-    const textColor = this.parseColor(caption.style?.textColor || '#ffffff');
-    const highlighterColor = this.parseColor(caption.style?.highlighterColor || '#ffff00');
-    const backgroundColor = this.parseColor(caption.style?.backgroundColor || 'transparent');
-    
-    // Set font
-    ctx.font = `bold ${fontSize}px ${fontFamily}`;
-    ctx.textAlign = caption.style?.textAlign || 'center';
-    ctx.textBaseline = 'bottom';
-    
-    const x = (canvasWidth * caption.style.position.x) / 100;
-    const y = (canvasHeight * caption.style.position.y) / 100;
-    
-    // Show words progressively up to the highlighted word
-    const visibleWords = words.slice(0, highlightedWordIndex + 1);
-    const lineHeight = fontSize + 8;
-    const firstWordY = y;
-    
-    // Draw each word vertically
-    for (let wordIndex = 0; wordIndex < visibleWords.length; wordIndex++) {
-      const word = visibleWords[wordIndex];
-      const wordY = firstWordY + (wordIndex * lineHeight);
-      const isHighlighted = wordIndex === highlightedWordIndex;
-      
-      const displayWord = this.applyTextTransform(word.word, caption.style?.textTransform || 'none');
-      
-      // Measure word for background
-      const wordWidth = ctx.measureText(displayWord).width;
-      const boxX = x - (wordWidth / 2) - 8;
-      const boxY = wordY - fontSize - 8;
-      const boxWidth = wordWidth + 16;
-      const boxHeight = fontSize + 16;
-      
-      // Draw background for each word if not transparent
-      if (backgroundColor.a > 0) {
-        ctx.fillStyle = `rgba(${backgroundColor.r}, ${backgroundColor.g}, ${backgroundColor.b}, ${backgroundColor.a})`;
-        ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
-      }
-      
-      // Handle highlighting
-      if (isHighlighted) {
-        if (caption.style.emphasizeMode) {
-          // Emphasis mode: increase font size and use highlighter color
-          const emphasizedFontSize = fontSize * 1.05;
-          ctx.font = `bold ${emphasizedFontSize}px ${fontFamily}`;
-          ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.a})`;
-        } else {
-          // Background highlighting
-          ctx.fillStyle = `rgba(${highlighterColor.r}, ${highlighterColor.g}, ${highlighterColor.b}, ${highlighterColor.a})`;
-          ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
-          ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
-        }
-      } else {
-        // Normal text color
-        ctx.font = `bold ${fontSize}px ${fontFamily}`;
-        ctx.fillStyle = `rgba(${textColor.r}, ${textColor.g}, ${textColor.b}, ${textColor.a})`;
-      }
-      
-      // Add text shadow
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
-      ctx.shadowBlur = 4;
-      ctx.shadowOffsetX = 2;
-      ctx.shadowOffsetY = 2;
-      
-      // Draw the word
-      ctx.fillText(displayWord, x, wordY);
-      
-      // Reset font size if changed
-      if (isHighlighted && caption.style.emphasizeMode) {
-        ctx.font = `bold ${fontSize}px ${fontFamily}`;
-      }
-      
-      // Reset shadow
-      ctx.shadowColor = 'transparent';
-      ctx.shadowBlur = 0;
-      ctx.shadowOffsetX = 0;
-      ctx.shadowOffsetY = 0;
-    }
-  }
-
   // Helper methods
   private async validateInputs(videoPath: string, captions: any[], outputPath: string): Promise<void> {
     if (!videoPath || !fs.existsSync(videoPath)) {
@@ -2452,61 +2612,6 @@ export class FFmpegOverlayRenderer {
       console.warn('Failed to cleanup temporary overlay files:', error);
     }
   }
-
-  private mapFontName(fontName: string): string {
-    // Map font names to available system fonts
-    switch (fontName) {
-      case 'Inter':
-      case 'Roboto':
-      case 'Open Sans':
-      case 'Source Sans Pro':
-      case 'Noto Sans':
-      case 'Ubuntu':
-      case 'Montserrat':
-      case 'Poppins':
-      case 'Raleway':
-      case 'Lato':
-      case 'Nunito':
-      case 'Quicksand':
-        return `${fontName}, Arial, sans-serif`;
-      case 'SF Pro Display':
-      case 'Segoe UI':
-        return 'Arial, sans-serif';
-      case 'Arial':
-        return 'Arial, sans-serif';
-      case 'Helvetica':
-        return 'Helvetica, Arial, sans-serif';
-      default:
-        return 'Arial, sans-serif';
-    }
-  }
-
-  private parseColor(color: string): { r: number; g: number; b: number; a: number } {
-    if (color === 'transparent') {
-      return { r: 0, g: 0, b: 0, a: 0 };
-    }
-    
-    const hex = color.replace('#', '');
-    const r = parseInt(hex.substr(0, 2), 16);
-    const g = parseInt(hex.substr(2, 2), 16);
-    const b = parseInt(hex.substr(4, 2), 16);
-    const a = hex.length === 8 ? parseInt(hex.substr(6, 2), 16) / 255 : 1;
-    
-    return { r, g, b, a };
-  }
-
-  private applyTextTransform(text: string, transform?: string): string {
-    switch (transform) {
-      case 'uppercase':
-        return text.toUpperCase();
-      case 'lowercase':
-        return text.toLowerCase();
-      case 'capitalize':
-        return text.replace(/\b\w/g, l => l.toUpperCase());
-      default:
-        return text;
-    }
-  }
 }
 
 // Worker thread execution logic
@@ -2519,6 +2624,20 @@ if (!isMainThread && workerData?.isWorker) {
   const path = require('path');
   const { Canvas } = require('canvas');
   
+  // Worker cancellation state
+  let workerCancelled = false;
+  
+  // Listen for cancellation messages
+  const { parentPort } = require('worker_threads');
+  if (parentPort) {
+    parentPort.on('message', (message: any) => {
+      if (message.type === 'cancel') {
+        workerCancelled = true;
+        console.log(`Worker ${batchIndex} received cancellation request`);
+      }
+    });
+  }
+  
   /**
    * Worker thread caption processing function
    */
@@ -2528,6 +2647,15 @@ if (!isMainThread && workerData?.isWorker) {
     
     try {
       for (const caption of captions) {
+        // Check for cancellation before processing each caption
+        if (workerCancelled) {
+          console.log(`Worker ${batchIndex} stopping due to cancellation`);
+          if (parentPort) {
+            parentPort.postMessage({ type: 'cancelled' });
+          }
+          return;
+        }
+        
         const captionStart = caption.startTime !== undefined ? caption.startTime : caption.start;
         const captionEnd = caption.endTime !== undefined ? caption.endTime : caption.end;
         
@@ -2582,8 +2710,8 @@ if (!isMainThread && workerData?.isWorker) {
             
             overlayFiles.push({
               file: overlayPath,
-              startTime: startTimeSeconds,
-              endTime: adjustedEndTime
+              startTime: wordStart, // Keep in milliseconds
+              endTime: wordEnd // Keep in milliseconds
             });
           }
         } else {
@@ -2601,8 +2729,8 @@ if (!isMainThread && workerData?.isWorker) {
           
           overlayFiles.push({
             file: overlayPath,
-            startTime: captionStart / 1000, // Convert to seconds for FFmpeg
-            endTime: captionEnd / 1000
+            startTime: captionStart, // Keep in milliseconds
+            endTime: captionEnd // Keep in milliseconds
           });
         }
         
@@ -2624,12 +2752,18 @@ if (!isMainThread && workerData?.isWorker) {
       });
       
     } catch (error) {
-      // Report error
+      // Check if this is a cancellation error
       const errorMessage = error instanceof Error ? error.message : String(error);
-      parentPort?.postMessage({
-        type: 'error',
-        error: errorMessage
-      });
+      if (errorMessage.includes('Worker cancelled')) {
+        console.log(`Worker ${batchIndex} cancelled during processing`);
+        parentPort?.postMessage({ type: 'cancelled' });
+      } else {
+        // Report other errors
+        parentPort?.postMessage({
+          type: 'error',
+          error: errorMessage
+        });
+      }
     }
   }
   
@@ -2643,6 +2777,11 @@ if (!isMainThread && workerData?.isWorker) {
     videoHeight: number,
     outputPath: string
   ): Promise<void> => {
+    // Check for cancellation before starting Canvas operations
+    if (workerCancelled) {
+      throw new Error('Worker cancelled before Canvas operation');
+    }
+    
     // Create canvas with video dimensions
     const canvas = new Canvas(videoWidth, videoHeight);
     const ctx = canvas.getContext('2d');
@@ -2655,6 +2794,11 @@ if (!isMainThread && workerData?.isWorker) {
       await renderProgressiveWordHighlightInWorker(ctx, caption.words, caption, highlightedWordIndex, videoWidth, videoHeight);
     } else {
       await renderKaraokeWordHighlightInWorker(ctx, caption.words, caption, highlightedWordIndex, videoWidth, videoHeight);
+    }
+    
+    // Check for cancellation before expensive toBuffer operation
+    if (workerCancelled) {
+      throw new Error('Worker cancelled before buffer creation');
     }
     
     // Save as PNG with transparency
@@ -2671,6 +2815,11 @@ if (!isMainThread && workerData?.isWorker) {
     videoHeight: number,
     outputPath: string
   ): Promise<void> => {
+    // Check for cancellation before starting Canvas operations
+    if (workerCancelled) {
+      throw new Error('Worker cancelled before Canvas operation');
+    }
+    
     // Create canvas with video dimensions
     const canvas = new Canvas(videoWidth, videoHeight);
     const ctx = canvas.getContext('2d');
@@ -2680,6 +2829,11 @@ if (!isMainThread && workerData?.isWorker) {
     
     // Render simple text overlay
     await renderSimpleTextOverlayInWorker(ctx, caption.text, caption, videoWidth, videoHeight);
+    
+    // Check for cancellation before expensive toBuffer operation
+    if (workerCancelled) {
+      throw new Error('Worker cancelled before buffer creation');
+    }
     
     // Save as PNG with transparency
     const buffer = canvas.toBuffer('image/png');
