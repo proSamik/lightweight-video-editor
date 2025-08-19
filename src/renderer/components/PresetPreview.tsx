@@ -56,9 +56,8 @@ export const PresetPreview: React.FC<PresetPreviewProps> = ({
 }) => {
   const { theme } = useTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationRef = useRef<number>();
-  const [isAnimating, setIsAnimating] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
+  const animationRef = useRef<number | null>(null);
+  const [isAnimating, setIsAnimating] = useState<boolean>(false);
 
   const sizeConfig = {
     small: { width: 220, height: 100, fontSize: 18 },
