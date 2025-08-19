@@ -205,39 +205,106 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
     return undefined;
   }, []);
 
+  // Store the relative playhead position within viewport when zoom changes
+  const [playheadViewportRatio, setPlayheadViewportRatio] = React.useState<number | null>(null);
+  
   /**
-   * Auto-scroll timeline to keep playhead visible when zoomed
+   * Auto-scroll timeline to maintain playhead position during zoom
    */
   useEffect(() => {
-    if (timelineContainerRef.current && timelineRef.current && zoomLevel > 1) {
+    if (timelineContainerRef.current && timelineRef.current && zoomLevel > 0.1) {
       const container = timelineContainerRef.current;
       const timeline = timelineRef.current;
-      
-      const playheadPosition = (currentTime / actualDuration) * timeline.offsetWidth;
       const containerWidth = container.offsetWidth;
-      const scrollLeft = container.scrollLeft;
-      const scrollRight = scrollLeft + containerWidth;
       
-      // Check if playhead is outside visible area
-      const margin = containerWidth * 0.1; // 10% margin from edges
+      // If we have a stored viewport ratio (from zoom change), use it to maintain position
+      if (playheadViewportRatio !== null) {
+        const newTimelineWidth = timeline.offsetWidth;
+        const playheadPixelPosition = (currentTime / actualDuration) * newTimelineWidth;
+        
+        // Calculate target scroll to maintain the playhead in the same viewport position
+        let targetScroll;
+        if (newTimelineWidth <= containerWidth) {
+          // Timeline fits in container, no scrolling needed
+          targetScroll = 0;
+        } else {
+          // Calculate scroll to maintain viewport ratio
+          targetScroll = playheadPixelPosition - (playheadViewportRatio * containerWidth);
+          targetScroll = Math.max(0, Math.min(newTimelineWidth - containerWidth, targetScroll));
+        }
+        
+        // Apply scroll immediately without any animation
+        container.style.scrollBehavior = 'auto';
+        container.scrollLeft = targetScroll;
+        
+        // Reset scroll behavior after a tick
+        requestAnimationFrame(() => {
+          container.style.scrollBehavior = '';
+        });
+        
+        // Clear the stored ratio after applying
+        setPlayheadViewportRatio(null);
+        return;
+      }
       
-      if (playheadPosition < scrollLeft + margin) {
-        // Playhead is too far left, scroll left to center it
-        const targetScroll = Math.max(0, playheadPosition - containerWidth / 2);
-        container.scrollTo({
-          left: targetScroll,
-          behavior: 'smooth'
-        });
-      } else if (playheadPosition > scrollRight - margin) {
-        // Playhead is too far right, scroll right to center it
-        const targetScroll = playheadPosition - containerWidth / 2;
-        container.scrollTo({
-          left: targetScroll,
-          behavior: 'smooth'
-        });
+      // Normal auto-scroll behavior for playback (not zoom)
+      if (zoomLevel > 1) {
+        const playheadPosition = (currentTime / actualDuration) * timeline.offsetWidth;
+        const scrollLeft = container.scrollLeft;
+        const scrollRight = scrollLeft + containerWidth;
+        
+        // Check if playhead is outside visible area (only for playback, not zoom)
+        const margin = containerWidth * 0.05; // Smaller margin to reduce unnecessary scrolling
+        
+        if (playheadPosition < scrollLeft + margin) {
+          // Playhead is too far left, scroll left to show it
+          const targetScroll = Math.max(0, playheadPosition - containerWidth * 0.2);
+          container.scrollTo({
+            left: targetScroll,
+            behavior: 'smooth'
+          });
+        } else if (playheadPosition > scrollRight - margin) {
+          // Playhead is too far right, scroll right to show it
+          const targetScroll = playheadPosition - containerWidth * 0.8;
+          container.scrollTo({
+            left: targetScroll,
+            behavior: 'smooth'
+          });
+        }
       }
     }
-  }, [currentTime, actualDuration, zoomLevel]);
+  }, [currentTime, actualDuration, zoomLevel, playheadViewportRatio]);
+
+  /**
+   * Store playhead viewport position before zoom changes
+   */
+  const handleZoomChange = (newZoomLevel: number) => {
+    if (timelineContainerRef.current && timelineRef.current && Math.abs(newZoomLevel - zoomLevel) > 0.01) {
+      const container = timelineContainerRef.current;
+      const containerWidth = container.offsetWidth;
+      const scrollLeft = container.scrollLeft;
+      
+      // Use current zoom level for accurate position calculation
+      const currentTimelineWidth = timelineRef.current.offsetWidth;
+      const playheadPixelPosition = (currentTime / actualDuration) * currentTimelineWidth;
+      
+      // Calculate where the playhead appears in the viewport (0 = left edge, 1 = right edge)
+      let viewportRatio;
+      if (currentTimelineWidth <= containerWidth) {
+        // When timeline fits in container, playhead position relative to container
+        viewportRatio = playheadPixelPosition / containerWidth;
+      } else {
+        // When timeline is scrolled, playhead position relative to visible area
+        viewportRatio = Math.max(0, Math.min(1, (playheadPixelPosition - scrollLeft) / containerWidth));
+      }
+      
+      // Store the ratio for the useEffect to use
+      setPlayheadViewportRatio(viewportRatio);
+    }
+    
+    // Always update zoom level immediately
+    setZoomLevel(newZoomLevel);
+  };
 
   /**
    * Handle segment double click to select and seek to middle
@@ -430,7 +497,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
               max="100"
               step="0.1"
               value={zoomLevel}
-              onChange={(e) => setZoomLevel(parseFloat(e.target.value))}
+              onChange={(e) => handleZoomChange(parseFloat(e.target.value))}
               style={{
                 width: '80px',
                 height: '20px',
