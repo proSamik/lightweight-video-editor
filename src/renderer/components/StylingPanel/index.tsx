@@ -318,7 +318,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
               onClick={() => setIsTimelineModalOpen(true)}
               disabled={!selectedSegment}
             >
-              Apply to Timeline
+              Apply to Selected Timeline 
             </Button>
           </HStack>
           
