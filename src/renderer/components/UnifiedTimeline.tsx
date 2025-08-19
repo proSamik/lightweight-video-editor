@@ -762,7 +762,9 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                     fontSize: '11px',
                     display: '-webkit-box',
                     WebkitLineClamp: 3,
-                    WebkitBoxOrient: 'vertical'
+                    WebkitBoxOrient: 'vertical',
+                    textDecoration: segment.style.burnInSubtitles === false ? 'line-through' : 'none',
+                    opacity: segment.style.burnInSubtitles === false ? 0.6 : 1
                   }}>
                     {segment.text}
                   </span>
