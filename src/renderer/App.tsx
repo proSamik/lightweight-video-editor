@@ -1023,6 +1023,29 @@ const AppContent: React.FC = () => {
     markProjectModified();
   };
 
+  const handleApplyToTimeline = (startTime: number, endTime: number, styleUpdates: Partial<CaptionSegment['style']>) => {
+    // Save current state to history before making changes
+    saveToHistory();
+    
+    setCaptions(prev => 
+      prev.map(segment => {
+        // Check if segment overlaps with the selected time range
+        const segmentOverlaps = segment.startTime < endTime && segment.endTime > startTime;
+        
+        if (segmentOverlaps) {
+          return {
+            ...segment,
+            style: { ...segment.style, ...styleUpdates }
+          };
+        }
+        return segment;
+      })
+    );
+    
+    // Mark project as modified
+    markProjectModified();
+  };
+
   const handlePlayPause = () => {
     if ((window as any).videoPlayPause) {
       (window as any).videoPlayPause();
@@ -1611,6 +1634,7 @@ const AppContent: React.FC = () => {
                   onSegmentUpdate={handleCaptionUpdate}
                   captions={captions}
                   onApplyToAll={handleApplyToAll}
+                  onApplyToTimeline={handleApplyToTimeline}
                   onTimeSeek={setCurrentTime}
                   transcriptionStatus={transcriptionStatus}
                   selectedSegmentId={selectedSegmentId}
