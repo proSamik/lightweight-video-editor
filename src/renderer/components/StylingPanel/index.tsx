@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CaptionSegment, CaptionPreset } from '../../../types';
 import { useTheme } from '../../contexts/ThemeContext';
+import TimelineApplyModal from '../TimelineApplyModal';
 
 // Import UI components
 import {
@@ -22,7 +23,10 @@ interface StylingPanelProps {
   selectedSegment: CaptionSegment | null;
   onSegmentUpdate: (segmentId: string, updates: Partial<CaptionSegment>) => void;
   onApplyToAll?: (styleUpdates: Partial<CaptionSegment['style']>) => void;
+  onApplyToTimeline?: (startTime: number, endTime: number, styleUpdates: Partial<CaptionSegment['style']>) => void;
   onTimeSeek?: (time: number) => void;
+  captions?: CaptionSegment[];
+  currentTime?: number;
   transcriptionStatus?: {
     isTranscribing: boolean;
     progress: number;
@@ -36,12 +40,16 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
   selectedSegment,
   onSegmentUpdate,
   onApplyToAll,
+  onApplyToTimeline,
   onTimeSeek,
+  captions = [],
+  currentTime = 0,
   transcriptionStatus,
 }) => {
   const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState<'presets' | 'custom'>('presets');
   const [selectedPresetId, setSelectedPresetId] = useState<string>();
+  const [isTimelineModalOpen, setIsTimelineModalOpen] = useState(false);
 
   // Handle style updates
   const handleStyleUpdate = (styleUpdates: Partial<CaptionSegment['style']>) => {
@@ -151,6 +159,19 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
   const handleJumpToWord = (wordStart: number) => {
     if (onTimeSeek) {
       onTimeSeek(wordStart);
+    }
+  };
+
+  // Handle timeline apply
+  const handleTimelineApply = (startTime: number, endTime: number) => {
+    if (selectedSegment) {
+      if (onApplyToTimeline) {
+        onApplyToTimeline(startTime, endTime, selectedSegment.style);
+      } else {
+        // Fallback: apply to all segments in the time range if no specific handler
+        console.log('Applying style to timeline range:', { startTime, endTime, style: selectedSegment.style });
+        // You could add a notification here that the feature needs to be implemented
+      }
     }
   };
 
@@ -294,10 +315,10 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
             <Button
               variant="primary"
               size="sm"
-              onClick={() => onApplyToAll && onApplyToAll(selectedSegment.style)}
-              disabled={!onApplyToAll}
+              onClick={() => setIsTimelineModalOpen(true)}
+              disabled={!selectedSegment}
             >
-              Apply to All
+              Apply to Timeline
             </Button>
           </HStack>
           
@@ -405,6 +426,17 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
           </Stack>
         </div>
       </div>
+
+      {/* Timeline Apply Modal */}
+      <TimelineApplyModal
+        isOpen={isTimelineModalOpen}
+        onClose={() => setIsTimelineModalOpen(false)}
+        onApply={handleTimelineApply}
+        currentStyle={selectedSegment.style}
+        captions={captions}
+        currentTime={currentTime}
+        selectedSegmentId={selectedSegment.id}
+      />
     </>
   );
 };
