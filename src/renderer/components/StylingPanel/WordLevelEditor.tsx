@@ -54,9 +54,14 @@ export const WordLevelEditor: React.FC<WordLevelEditorProps> = ({
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
+    // Stop propagation to prevent global keyboard shortcuts from firing
+    e.stopPropagation();
+    
     if (e.key === 'Enter') {
+      e.preventDefault();
       saveEdit();
     } else if (e.key === 'Escape') {
+      e.preventDefault();
       cancelEdit();
     }
   };
@@ -211,8 +216,13 @@ export const WordLevelEditor: React.FC<WordLevelEditorProps> = ({
                       <HStack gap="xs" style={{ width: '100%', minWidth: 0 }}>
                         <Input
                           value={editingValue}
-                          onChange={(e) => setEditingValue(e.target.value)}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            setEditingValue(e.target.value);
+                          }}
                           onKeyDown={handleKeyPress}
+                          onKeyUp={(e) => e.stopPropagation()}
+                          onKeyPress={(e) => e.stopPropagation()}
                           size="sm"
                           style={{ flex: 1, minWidth: 0 }}
                           autoFocus
