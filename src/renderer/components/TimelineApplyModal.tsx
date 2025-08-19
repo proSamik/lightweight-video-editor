@@ -24,6 +24,15 @@ const TimelineApplyModal: React.FC<TimelineApplyModalProps> = ({
 }) => {
   const { theme } = useTheme();
   
+    // Format time as MM:SS.ms
+    const formatTime = (ms: number) => {
+      const totalSeconds = ms / 1000;
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = Math.floor(totalSeconds % 60);
+      const milliseconds = Math.floor((ms % 1000) / 10);
+      return `${minutes}:${seconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(2, '0')}`;
+    };
+
   // Find the selected segment to get default range
   const selectedSegment = captions.find(c => c.id === selectedSegmentId);
   const totalDuration = captions.length > 0 ? Math.max(...captions.map(c => c.endTime)) : 60000;
@@ -34,23 +43,41 @@ const TimelineApplyModal: React.FC<TimelineApplyModalProps> = ({
   
   const [startTime, setStartTime] = useState(defaultStartTime);
   const [endTime, setEndTime] = useState(defaultEndTime);
+  const [startTimeInput, setStartTimeInput] = useState(formatTime(defaultStartTime));
+  const [endTimeInput, setEndTimeInput] = useState(formatTime(defaultEndTime));
+  const [isEditingStartTime, setIsEditingStartTime] = useState(false);
+  const [isEditingEndTime, setIsEditingEndTime] = useState(false);
 
   // Update times when selectedSegment changes
   React.useEffect(() => {
     if (selectedSegment) {
-      setStartTime(selectedSegment.startTime);
-      setEndTime(selectedSegment.endTime);
+      const newStartTime = selectedSegment.startTime;
+      const newEndTime = selectedSegment.endTime;
+      
+      setStartTime(newStartTime);
+      setEndTime(newEndTime);
+      
+      if (!isEditingStartTime) {
+        setStartTimeInput(formatTime(newStartTime));
+      }
+      if (!isEditingEndTime) {
+        setEndTimeInput(formatTime(newEndTime));
+      }
     }
-  }, [selectedSegment]);
+  }, [selectedSegment?.id]); // Only depend on segment ID to avoid infinite loops
 
-  // Format time as MM:SS.ms
-  const formatTime = (ms: number) => {
-    const totalSeconds = ms / 1000;
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = Math.floor(totalSeconds % 60);
-    const milliseconds = Math.floor((ms % 1000) / 10);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(2, '0')}`;
-  };
+  // Update input fields when times change (from slider)
+  React.useEffect(() => {
+    if (!isEditingStartTime) {
+      setStartTimeInput(formatTime(startTime));
+    }
+  }, [startTime, isEditingStartTime]);
+
+  React.useEffect(() => {
+    if (!isEditingEndTime) {
+      setEndTimeInput(formatTime(endTime));
+    }
+  }, [endTime, isEditingEndTime]);
 
   // Parse time from MM:SS.ms format
   const parseTime = (timeStr: string): number => {
@@ -75,19 +102,49 @@ const TimelineApplyModal: React.FC<TimelineApplyModalProps> = ({
     setEndTime(newEndTime);
   }, [startTime, totalDuration]);
 
-  const handleStartTimeInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleStartTimeInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     e.stopPropagation();
+    setStartTimeInput(e.target.value);
+    
+    // Try to parse and update time, but don't force format
     const parsedTime = parseTime(e.target.value);
     if (!isNaN(parsedTime)) {
       handleStartTimeChange(parsedTime);
     }
   };
 
-  const handleEndTimeInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleEndTimeInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     e.stopPropagation();
+    setEndTimeInput(e.target.value);
+    
+    // Try to parse and update time, but don't force format
     const parsedTime = parseTime(e.target.value);
     if (!isNaN(parsedTime)) {
       handleEndTimeChange(parsedTime);
+    }
+  };
+
+  const handleStartTimeInputBlur = () => {
+    setIsEditingStartTime(false);
+    const parsedTime = parseTime(startTimeInput);
+    if (!isNaN(parsedTime)) {
+      handleStartTimeChange(parsedTime);
+      setStartTimeInput(formatTime(parsedTime));
+    } else {
+      // Reset to current time if invalid
+      setStartTimeInput(formatTime(startTime));
+    }
+  };
+
+  const handleEndTimeInputBlur = () => {
+    setIsEditingEndTime(false);
+    const parsedTime = parseTime(endTimeInput);
+    if (!isNaN(parsedTime)) {
+      handleEndTimeChange(parsedTime);
+      setEndTimeInput(formatTime(parsedTime));
+    } else {
+      // Reset to current time if invalid
+      setEndTimeInput(formatTime(endTime));
     }
   };
 
@@ -95,6 +152,15 @@ const TimelineApplyModal: React.FC<TimelineApplyModalProps> = ({
     onApply(startTime, endTime);
     onClose();
   };
+
+  // Cleanup mouse events on unmount
+  React.useEffect(() => {
+    return () => {
+      // Remove any lingering event listeners
+      document.removeEventListener('mousemove', () => {});
+      document.removeEventListener('mouseup', () => {});
+    };
+  }, []);
 
   if (!isOpen) return null;
 
@@ -259,6 +325,24 @@ const TimelineApplyModal: React.FC<TimelineApplyModalProps> = ({
                     transform: 'translateY(-50%)'
                   }} />
                   
+                  {/* Time interval markers */}
+                  {Array.from({ length: 9 }, (_, i) => i + 1).map(marker => (
+                    <div
+                      key={marker}
+                      style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: `${(marker / 10) * 100}%`,
+                        width: '1px',
+                        height: '10px',
+                        backgroundColor: theme.colors.textSecondary,
+                        opacity: 0.3,
+                        transform: 'translate(-50%, -50%)',
+                        zIndex: 1
+                      }}
+                    />
+                  ))}
+                  
                   {/* Active track */}
                   <div style={{
                     position: 'absolute',
@@ -268,7 +352,8 @@ const TimelineApplyModal: React.FC<TimelineApplyModalProps> = ({
                     height: '6px',
                     backgroundColor: theme.colors.primary,
                     borderRadius: '3px',
-                    transform: 'translateY(-50%)'
+                    transform: 'translateY(-50%)',
+                    zIndex: 2
                   }} />
                   
                   {/* Clickable track for direct positioning */}
@@ -288,14 +373,26 @@ const TimelineApplyModal: React.FC<TimelineApplyModalProps> = ({
                       const percentage = clickX / rect.width;
                       const clickTime = percentage * totalDuration;
                       
-                      // Determine which thumb is closer to the click
-                      const distanceToStart = Math.abs(clickTime - startTime);
-                      const distanceToEnd = Math.abs(clickTime - endTime);
+                      // If clicking within the active range, move the nearest thumb
+                      const isWithinRange = clickTime >= startTime && clickTime <= endTime;
                       
-                      if (distanceToStart < distanceToEnd) {
-                        handleStartTimeChange(clickTime);
+                      if (isWithinRange) {
+                        // Calculate distances to both thumbs
+                        const distanceToStart = Math.abs(clickTime - startTime);
+                        const distanceToEnd = Math.abs(clickTime - endTime);
+                        
+                        if (distanceToStart < distanceToEnd) {
+                          handleStartTimeChange(clickTime);
+                        } else {
+                          handleEndTimeChange(clickTime);
+                        }
                       } else {
-                        handleEndTimeChange(clickTime);
+                        // If outside range, move the nearest thumb
+                        if (clickTime < startTime) {
+                          handleStartTimeChange(clickTime);
+                        } else {
+                          handleEndTimeChange(clickTime);
+                        }
                       }
                     }}
                   />
@@ -314,27 +411,42 @@ const TimelineApplyModal: React.FC<TimelineApplyModalProps> = ({
                       transform: 'translate(-50%, -50%)',
                       boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
                       cursor: 'grab',
-                      zIndex: 4,
+                      zIndex: 5,
                       transition: 'transform 0.1s ease'
                     }}
                     onMouseDown={(e) => {
                       e.preventDefault();
+                      e.stopPropagation(); // Prevent track click
+                      
+                      const thumb = e.currentTarget as HTMLElement;
+                      thumb.style.cursor = 'grabbing';
+                      
+                      const container = thumb.parentElement;
+                      if (!container) return;
+                      
+                      const containerRect = container.getBoundingClientRect();
+                      
                       const handleMouseMove = (moveEvent: MouseEvent) => {
-                        if (!e.currentTarget.parentElement) return;
-                        const rect = e.currentTarget.parentElement.getBoundingClientRect();
-                        const mouseX = moveEvent.clientX - rect.left;
-                        const percentage = Math.max(0, Math.min(1, mouseX / rect.width));
+                        const mouseX = moveEvent.clientX - containerRect.left;
+                        const percentage = Math.max(0, Math.min(1, mouseX / containerRect.width));
                         const newTime = percentage * totalDuration;
                         handleStartTimeChange(newTime);
                       };
                       
                       const handleMouseUp = () => {
+                        thumb.style.cursor = 'grab';
                         document.removeEventListener('mousemove', handleMouseMove);
                         document.removeEventListener('mouseup', handleMouseUp);
                       };
                       
                       document.addEventListener('mousemove', handleMouseMove);
                       document.addEventListener('mouseup', handleMouseUp);
+                      
+                      // Ensure cleanup on component unmount
+                      return () => {
+                        document.removeEventListener('mousemove', handleMouseMove);
+                        document.removeEventListener('mouseup', handleMouseUp);
+                      };
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1.1)';
@@ -358,27 +470,42 @@ const TimelineApplyModal: React.FC<TimelineApplyModalProps> = ({
                       transform: 'translate(-50%, -50%)',
                       boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
                       cursor: 'grab',
-                      zIndex: 3,
+                      zIndex: 4,
                       transition: 'transform 0.1s ease'
                     }}
                     onMouseDown={(e) => {
                       e.preventDefault();
+                      e.stopPropagation(); // Prevent track click
+                      
+                      const thumb = e.currentTarget as HTMLElement;
+                      thumb.style.cursor = 'grabbing';
+                      
+                      const container = thumb.parentElement;
+                      if (!container) return;
+                      
+                      const containerRect = container.getBoundingClientRect();
+                      
                       const handleMouseMove = (moveEvent: MouseEvent) => {
-                        if (!e.currentTarget.parentElement) return;
-                        const rect = e.currentTarget.parentElement.getBoundingClientRect();
-                        const mouseX = moveEvent.clientX - rect.left;
-                        const percentage = Math.max(0, Math.min(1, mouseX / rect.width));
+                        const mouseX = moveEvent.clientX - containerRect.left;
+                        const percentage = Math.max(0, Math.min(1, mouseX / containerRect.width));
                         const newTime = percentage * totalDuration;
                         handleEndTimeChange(newTime);
                       };
                       
                       const handleMouseUp = () => {
+                        thumb.style.cursor = 'grab';
                         document.removeEventListener('mousemove', handleMouseMove);
                         document.removeEventListener('mouseup', handleMouseUp);
                       };
                       
                       document.addEventListener('mousemove', handleMouseMove);
                       document.addEventListener('mouseup', handleMouseUp);
+                      
+                      // Ensure cleanup on component unmount
+                      return () => {
+                        document.removeEventListener('mousemove', handleMouseMove);
+                        document.removeEventListener('mouseup', handleMouseUp);
+                      };
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1.1)';
@@ -395,9 +522,27 @@ const TimelineApplyModal: React.FC<TimelineApplyModalProps> = ({
                   marginTop: '8px',
                   fontSize: '10px',
                   color: theme.colors.textSecondary,
-                  fontWeight: '500'
+                  fontWeight: '500',
+                  position: 'relative'
                 }}>
                   <span>{formatTime(0)}</span>
+                  
+                  {/* Time interval labels */}
+                  {[0.25, 0.5, 0.75].map(fraction => (
+                    <span
+                      key={fraction}
+                      style={{
+                        position: 'absolute',
+                        left: `${fraction * 100}%`,
+                        transform: 'translateX(-50%)',
+                        fontSize: '9px',
+                        opacity: 0.6
+                      }}
+                    >
+                      {formatTime(fraction * totalDuration)}
+                    </span>
+                  ))}
+                  
                   <span>{formatTime(totalDuration)}</span>
                 </div>
               </div>
@@ -417,8 +562,8 @@ const TimelineApplyModal: React.FC<TimelineApplyModalProps> = ({
                 </label>
                 <input
                   type="text"
-                  value={formatTime(startTime)}
-                  onChange={handleStartTimeInput}
+                  value={startTimeInput}
+                  onChange={handleStartTimeInputChange}
                   onKeyDown={(e) => {
                     // Prevent global keyboard shortcuts
                     e.stopPropagation();
@@ -428,7 +573,12 @@ const TimelineApplyModal: React.FC<TimelineApplyModalProps> = ({
                     }
                   }}
                   onKeyUp={(e) => e.stopPropagation()}
-                  onKeyPress={(e) => e.stopPropagation()}
+                  onFocus={() => setIsEditingStartTime(true)}
+                  onBlur={(e) => {
+                    handleStartTimeInputBlur();
+                    e.currentTarget.style.borderColor = theme.colors.primary;
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
                   placeholder="MM:SS.ms"
                   style={{
                     width: '120px',
@@ -443,13 +593,9 @@ const TimelineApplyModal: React.FC<TimelineApplyModalProps> = ({
                     outline: 'none',
                     textAlign: 'center'
                   }}
-                  onFocus={(e) => {
+                  onFocusCapture={(e) => {
                     e.currentTarget.style.borderColor = theme.colors.borderFocus;
                     e.currentTarget.style.boxShadow = `0 0 0 2px ${theme.colors.primary}20`;
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = theme.colors.primary;
-                    e.currentTarget.style.boxShadow = 'none';
                   }}
                 />
               </div>
@@ -466,8 +612,8 @@ const TimelineApplyModal: React.FC<TimelineApplyModalProps> = ({
                 </label>
                 <input
                   type="text"
-                  value={formatTime(endTime)}
-                  onChange={handleEndTimeInput}
+                  value={endTimeInput}
+                  onChange={handleEndTimeInputChange}
                   onKeyDown={(e) => {
                     // Prevent global keyboard shortcuts
                     e.stopPropagation();
@@ -477,7 +623,12 @@ const TimelineApplyModal: React.FC<TimelineApplyModalProps> = ({
                     }
                   }}
                   onKeyUp={(e) => e.stopPropagation()}
-                  onKeyPress={(e) => e.stopPropagation()}
+                  onFocus={() => setIsEditingEndTime(true)}
+                  onBlur={(e) => {
+                    handleEndTimeInputBlur();
+                    e.currentTarget.style.borderColor = theme.colors.primary;
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
                   placeholder="MM:SS.ms"
                   style={{
                     width: '120px',
@@ -492,13 +643,9 @@ const TimelineApplyModal: React.FC<TimelineApplyModalProps> = ({
                     outline: 'none',
                     textAlign: 'center'
                   }}
-                  onFocus={(e) => {
+                  onFocusCapture={(e) => {
                     e.currentTarget.style.borderColor = theme.colors.borderFocus;
                     e.currentTarget.style.boxShadow = `0 0 0 2px ${theme.colors.primary}20`;
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = theme.colors.primary;
-                    e.currentTarget.style.boxShadow = 'none';
                   }}
                 />
               </div>
