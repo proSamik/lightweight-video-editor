@@ -10,6 +10,7 @@ interface TabbedRightPanelProps {
   onSegmentUpdate: (segmentId: string, updates: Partial<CaptionSegment>) => void;
   captions: CaptionSegment[];
   onApplyToAll: (styleUpdates: Partial<CaptionSegment['style']>) => void;
+  onApplyToTimeline?: (startTime: number, endTime: number, styleUpdates: Partial<CaptionSegment['style']>) => void;
   onTimeSeek: (time: number) => void;
   transcriptionStatus: {
     isTranscribing: boolean;
@@ -31,6 +32,7 @@ const TabbedRightPanel: React.FC<TabbedRightPanelProps> = ({
   onSegmentUpdate,
   captions,
   onApplyToAll,
+  onApplyToTimeline,
   onTimeSeek,
   transcriptionStatus,
   selectedSegmentId,
@@ -98,7 +100,10 @@ const TabbedRightPanel: React.FC<TabbedRightPanelProps> = ({
             selectedSegment={selectedSegment}
             onSegmentUpdate={onSegmentUpdate}
             onApplyToAll={onApplyToAll}
+            onApplyToTimeline={onApplyToTimeline}
             onTimeSeek={onTimeSeek}
+            captions={captions}
+            currentTime={currentTime}
             transcriptionStatus={transcriptionStatus}
           />
         ) : (
