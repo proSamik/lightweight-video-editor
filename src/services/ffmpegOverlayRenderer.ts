@@ -763,28 +763,71 @@ export class FFmpegOverlayRenderer {
   }
 
   /**
+   * Ensure proper timing gaps between overlays to prevent overlaps
+   * Input times are in milliseconds
+   */
+  private ensureNoOverlaps(overlayFiles: Array<{ file: string; startTime: number; endTime: number }>): Array<{ file: string; startTime: number; endTime: number }> {
+    if (overlayFiles.length <= 1) return overlayFiles;
+    
+    // Sort by start time to process chronologically
+    const sortedOverlays = [...overlayFiles].sort((a, b) => a.startTime - b.startTime);
+    const adjustedOverlays: Array<{ file: string; startTime: number; endTime: number }> = [];
+    
+    for (let i = 0; i < sortedOverlays.length; i++) {
+      const current = { ...sortedOverlays[i] };
+      
+      // If this is not the last overlay, ensure it doesn't overlap with the next one
+      if (i < sortedOverlays.length - 1) {
+        const nextStartTime = sortedOverlays[i + 1].startTime;
+        
+        // If current overlay would overlap or touch the next one, trim it by 1ms
+        if (current.endTime >= nextStartTime) {
+          current.endTime = nextStartTime - 1; // 1ms gap
+          console.log(`Adjusted overlay ${i} end time from ${sortedOverlays[i].endTime}ms to ${current.endTime}ms to prevent overlap`);
+        }
+      }
+      
+      // Only add overlays with valid duration (at least 1ms)
+      if (current.endTime > current.startTime) {
+        adjustedOverlays.push(current);
+      } else {
+        console.warn(`Skipping overlay ${i} with invalid duration: ${current.startTime}ms - ${current.endTime}ms`);
+      }
+    }
+    
+    return adjustedOverlays;
+  }
+
+  /**
+   * Convert milliseconds to seconds for FFmpeg with 3 decimal precision
+   */
+  private msToSeconds(milliseconds: number): string {
+    return (milliseconds / 1000).toFixed(3);
+  }
+
+  /**
    * Build FFmpeg overlay filter chain for multiple PNG overlays with precise timing
    */
   private buildOverlayFilterChain(overlayFiles: Array<{ file: string; startTime: number; endTime: number }>): {
     filterComplex: string;
   } {
+    // First ensure no overlaps between overlay files
+    const adjustedOverlays = this.ensureNoOverlaps(overlayFiles);
     const filters: string[] = [];
     
     let currentInput = '[0:v]'; // Main video input
     
-    overlayFiles.forEach((overlay, index) => {
+    adjustedOverlays.forEach((overlay, index) => {
       const inputIndex = index + 1; // Input indices start from 1 (0 is main video)
-      const outputLabel = index === overlayFiles.length - 1 ? '[final]' : `[v${index + 1}]`;
+      const outputLabel = index === adjustedOverlays.length - 1 ? '[final]' : `[v${index + 1}]`;
       
-      // Convert milliseconds to seconds with microsecond precision
-      // Add tiny offset to prevent exact timing conflicts between overlays
-      const startTimeMs = overlay.startTime + (index * 0.001); // Add 0.001ms offset per overlay
-      const endTimeMs = overlay.endTime + (index * 0.001);
-      const startTimeSeconds = (startTimeMs / 1000).toFixed(6);
-      const endTimeSeconds = (endTimeMs / 1000).toFixed(6);
+      // Convert milliseconds to seconds (no artificial offsets needed)
+      const startTimeSeconds = this.msToSeconds(overlay.startTime);
+      const endTimeSeconds = this.msToSeconds(overlay.endTime);
       
-      // Create overlay filter with precise timing using 'enable' parameter
-      const overlayFilter = `${currentInput}[${inputIndex}:v]overlay=enable='between(t,${startTimeSeconds},${endTimeSeconds})'${outputLabel}`;
+      // Create overlay filter with exclusive timing (gte for start, lt for end)
+      // This ensures only one overlay is visible at any given time
+      const overlayFilter = `${currentInput}[${inputIndex}:v]overlay=enable='gte(t,${startTimeSeconds})*lt(t,${endTimeSeconds})'${outputLabel}`;
       
       filters.push(overlayFilter);
       currentInput = outputLabel;
@@ -1599,24 +1642,30 @@ export class FFmpegOverlayRenderer {
         command = command.input(overlay.file);
       });
       
-      // Build filter chain for overlays
+      // Build filter chain for overlays with proper timing
+      // First adjust overlay times relative to segment start and ensure no overlaps
+      const segmentAdjustedOverlays = segmentOverlays.map(overlay => ({
+        file: overlay.file,
+        startTime: overlay.startTime - startTime, // Adjust to segment-relative time in ms
+        endTime: overlay.endTime - startTime     // Adjust to segment-relative time in ms
+      }));
+      
+      // Ensure no overlaps between adjusted overlays
+      const adjustedSegmentOverlays = this.ensureNoOverlaps(segmentAdjustedOverlays);
+      
       let filterComplex = '';
       let currentInput = '[0:v]'; // Start with main video
       
-      segmentOverlays.forEach((overlay, index) => {
+      adjustedSegmentOverlays.forEach((overlay, index) => {
         const inputIndex = index + 1; // Overlay inputs start at index 1
-        const outputLabel = index === segmentOverlays.length - 1 ? '[outv]' : `[tmp${index}]`;
+        const outputLabel = index === adjustedSegmentOverlays.length - 1 ? '[outv]' : `[tmp${index}]`;
         
-        // Adjust overlay timing for segment (milliseconds), add tiny offset to prevent
-        // exact timing conflicts between overlays that start/end at the same moment,
-        // then convert to seconds with microsecond precision
-        const adjustedStartTimeMs = (overlay.startTime - startTime) + (index * 0.001);
-        const adjustedEndTimeMs = (overlay.endTime - startTime) + (index * 0.001);
-        const adjustedStartTimeSeconds = (adjustedStartTimeMs / 1000).toFixed(6);
-        const adjustedEndTimeSeconds = (adjustedEndTimeMs / 1000).toFixed(6);
+        // Convert milliseconds to seconds for FFmpeg
+        const adjustedStartTimeSeconds = this.msToSeconds(overlay.startTime);
+        const adjustedEndTimeSeconds = this.msToSeconds(overlay.endTime);
         
-        // Create overlay filter with microsecond precision
-        const overlayFilter = `${currentInput}[${inputIndex}:v]overlay=enable='between(t,${adjustedStartTimeSeconds},${adjustedEndTimeSeconds})'${outputLabel}`;
+        // Create overlay filter with exclusive timing (gte for start, lt for end)
+        const overlayFilter = `${currentInput}[${inputIndex}:v]overlay=enable='gte(t,${adjustedStartTimeSeconds})*lt(t,${adjustedEndTimeSeconds})'${outputLabel}`;
         
         if (filterComplex) {
           filterComplex += ';';
@@ -2286,8 +2335,11 @@ export class FFmpegOverlayRenderer {
       let command = ffmpeg()
         .input(videoPath);
       
+      // Ensure no overlaps between overlay files before processing
+      const adjustedOverlays = this.ensureNoOverlaps(overlayFiles);
+      
       // Add all overlay images as inputs
-      overlayFiles.forEach(overlay => {
+      adjustedOverlays.forEach(overlay => {
         command = command.input(overlay.file);
       });
       
@@ -2295,17 +2347,16 @@ export class FFmpegOverlayRenderer {
       let filterComplex = '';
       let currentInput = '[0:v]'; // Start with main video
       
-      overlayFiles.forEach((overlay, index) => {
+      adjustedOverlays.forEach((overlay, index) => {
         const inputIndex = index + 1; // Overlay inputs start at index 1
-        const outputLabel = index === overlayFiles.length - 1 ? '[outv]' : `[tmp${index}]`;
+        const outputLabel = index === adjustedOverlays.length - 1 ? '[outv]' : `[tmp${index}]`;
         
-        // Create overlay filter with microsecond precision (convert ms to seconds)
-        // Add tiny offset to prevent exact timing conflicts between overlays  
-        const startTimeMs = overlay.startTime + (index * 0.001); // Add 0.001ms offset per overlay
-        const endTimeMs = overlay.endTime + (index * 0.001);
-        const startTimeSeconds = (startTimeMs / 1000).toFixed(6);
-        const endTimeSeconds = (endTimeMs / 1000).toFixed(6);
-        const overlayFilter = `${currentInput}[${inputIndex}:v]overlay=enable='between(t,${startTimeSeconds},${endTimeSeconds})'${outputLabel}`;
+        // Convert milliseconds to seconds for FFmpeg (no artificial offsets needed)
+        const startTimeSeconds = this.msToSeconds(overlay.startTime);
+        const endTimeSeconds = this.msToSeconds(overlay.endTime);
+        
+        // Create overlay filter with exclusive timing (gte for start, lt for end)
+        const overlayFilter = `${currentInput}[${inputIndex}:v]overlay=enable='gte(t,${startTimeSeconds})*lt(t,${endTimeSeconds})'${outputLabel}`;
         
         if (filterComplex) {
           filterComplex += ';';
@@ -2663,25 +2714,26 @@ if (!isMainThread && workerData?.isWorker) {
               overlayPath
             );
             
-            // Calculate precise timing with microsecond precision
-            const startTimeSeconds = wordStart / 1000;
-            const endTimeSeconds = wordEnd / 1000;
-            
-            // Ensure no overlap with next word
-            let adjustedEndTime = endTimeSeconds;
+            // Calculate timing and ensure no overlap with next word (all in milliseconds)
+            let adjustedEndTime = wordEnd;
             if (wordIndex < caption.words.length - 1) {
-              const nextWordStart = caption.words[wordIndex + 1].start / 1000;
-              // If next word starts immediately after this one, reduce by 1 microsecond
-              if (Math.abs(endTimeSeconds - nextWordStart) < 0.001) { // Within 1ms = adjacent words
-                adjustedEndTime = nextWordStart - 0.000001; // 1 microsecond before next word
+              const nextWordStart = caption.words[wordIndex + 1].start;
+              // If next word starts at or before this word ends, trim by 1ms
+              if (adjustedEndTime >= nextWordStart) {
+                adjustedEndTime = nextWordStart - 1; // 1ms gap
               }
             }
             
-            overlayFiles.push({
-              file: overlayPath,
-              startTime: wordStart, // Keep in milliseconds
-              endTime: wordEnd // Keep in milliseconds
-            });
+            // Only add overlay if it has valid duration (at least 1ms)
+            if (adjustedEndTime > wordStart) {
+              overlayFiles.push({
+                file: overlayPath,
+                startTime: wordStart, // Keep in milliseconds
+                endTime: adjustedEndTime // Use adjusted end time in milliseconds
+              });
+            } else {
+              console.warn(`Skipping word ${wordIndex} with invalid duration: ${wordStart}ms - ${adjustedEndTime}ms`);
+            }
           }
         } else {
           // Simple text caption (no word timing) - just one static image
