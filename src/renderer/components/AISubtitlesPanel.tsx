@@ -74,6 +74,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
   
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   // AI Subtitles are now the primary data source - no conversion needed
 
@@ -315,26 +316,30 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     }
   }, [aiSubtitleData?.frames, selectedFrameId, onFrameSelect]);
 
-  // Auto-scroll to the frame that contains the current playhead time
+  // Auto-scroll to active/selected frame with stronger tracking
   useEffect(() => {
-    if (!containerRef.current || !aiSubtitleData?.frames?.length) return;
+    const container = listRef.current;
+    if (!container || !aiSubtitleData?.frames?.length) return;
     const currentSec = currentTime / 1000;
-    const activeFrame = aiSubtitleData.frames.find(f => currentSec >= f.startTime && currentSec <= f.endTime);
-    const targetId = activeFrame?.id || selectedFrameId;
+    const active = aiSubtitleData.frames.find(f => currentSec >= f.startTime && currentSec <= f.endTime);
+    const targetId = active?.id || selectedFrameId;
     if (!targetId) return;
 
-    const el = containerRef.current.querySelector(`[data-frame-id="${targetId}"]`) as HTMLElement | null;
-    if (el) {
-      const container = containerRef.current;
-      const elTop = el.offsetTop;
-      const elBottom = elTop + el.offsetHeight;
-      const viewTop = container.scrollTop;
-      const viewBottom = viewTop + container.clientHeight;
-      if (elTop < viewTop || elBottom > viewBottom) {
-        container.scrollTo({ top: elTop - 24, behavior: 'smooth' });
-      }
+    const el = container.querySelector(`[data-frame-id="${targetId}"]`) as HTMLElement | null;
+    if (!el) return;
+
+    const elTop = el.offsetTop;
+    const elBottom = elTop + el.offsetHeight;
+    const viewTop = container.scrollTop;
+    const viewBottom = viewTop + container.clientHeight;
+    const padding = 32;
+
+    if (elTop < viewTop + padding) {
+      container.scrollTo({ top: Math.max(0, elTop - padding), behavior: 'smooth' });
+    } else if (elBottom > viewBottom - padding) {
+      container.scrollTo({ top: elBottom - container.clientHeight + padding, behavior: 'smooth' });
     }
-  }, [currentTime, selectedFrameId, aiSubtitleData?.frames]);
+  }, [currentTime, selectedFrameId, aiSubtitleData?.frames?.length]);
 
   // Handle word click
   const handleWordClick = (e: React.MouseEvent, wordId: string, frameId: string) => {
@@ -747,26 +752,28 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
       </div>
 
       {/* Subtitle Frames */}
-      <div style={{
-        flex: 1,
-        overflow: 'auto',
-        padding: '16px'
-      }}>
+      <div
+        ref={listRef as any}
+        style={{
+          flex: 1,
+          overflow: 'auto',
+          padding: '8px'
+        }}
+      >
         {renderFrames.map((frame, frameIndex) => (
           <div
             key={frame.id}
             data-frame-id={frame.id}
             onClick={() => handleFrameClick(frame.id)}
             style={{
-              marginBottom: '24px',
-              padding: '16px',
-              backgroundColor: selectedFrameId === frame.id ? theme.colors.primary + '20' : theme.colors.surface,
-              borderRadius: '8px',
-              border: selectedFrameId === frame.id 
-                ? `2px solid ${theme.colors.primary}` 
-                : `1px solid ${theme.colors.border}`,
+              marginBottom: '8px',
+              padding: '10px',
+              backgroundColor: theme.colors.surface,
+              borderRadius: '6px',
+              border: `1px solid ${selectedFrameId === frame.id ? theme.colors.primary : theme.colors.border}`,
               cursor: 'pointer',
-              transition: 'all 0.2s ease'
+              transition: 'all 0.15s ease',
+              lineHeight: 1.4
             }}
           >
             {/* Frame timing and controls */}
