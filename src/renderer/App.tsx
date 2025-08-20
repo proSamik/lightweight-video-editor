@@ -1333,6 +1333,7 @@ const AppContent: React.FC = () => {
                   aiSubtitleData={aiSubtitleData}
                   selectedFrameId={selectedFrameId}
                   onFrameSelect={setSelectedFrameId}
+                  onAISubtitleUpdate={handleAISubtitleUpdate}
                 />
                 
                 {/* Unified Timeline - Only show when video is loaded */}
