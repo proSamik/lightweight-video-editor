@@ -5,7 +5,7 @@ import * as os from 'os';
 import { 
   SubtitleFrame, 
   WordSegment, 
-  CaptionStyle, 
+  SubtitleStyle, 
   WordEditState,
   AISubtitleData 
 } from '../types';
@@ -38,7 +38,7 @@ export class AISubtitleRenderer {
   public renderFrame(
     frame: SubtitleFrame,
     currentTime: number,
-    baseStyle: CaptionStyle,
+    baseStyle: SubtitleStyle,
     canvasWidth: number,
     canvasHeight: number
   ): Canvas {
@@ -85,7 +85,7 @@ export class AISubtitleRenderer {
    */
   private calculateTextLayout(
     words: WordSegment[],
-    baseStyle: CaptionStyle,
+    baseStyle: SubtitleStyle,
     ctx: CanvasRenderingContext2D,
     canvasWidth: number,
     canvasHeight: number
@@ -146,7 +146,7 @@ export class AISubtitleRenderer {
   /**
    * Get computed style for a word based on its state and customizations
    */
-  private getWordStyle(word: WordSegment, baseStyle: CaptionStyle, isHighlighted: boolean): CaptionStyle {
+  private getWordStyle(word: WordSegment, baseStyle: SubtitleStyle, isHighlighted: boolean): SubtitleStyle {
     const style = { ...baseStyle };
 
     // Apply custom word style if present
@@ -193,7 +193,7 @@ export class AISubtitleRenderer {
     ctx: CanvasRenderingContext2D,
     word: WordSegment,
     layout: { x: number; y: number; width: number; height: number },
-    style: CaptionStyle,
+    style: SubtitleStyle,
     isHighlighted: boolean
   ): void {
     const fontSize = style.fontSize * (style.scale || 1);
@@ -236,7 +236,7 @@ export class AISubtitleRenderer {
    */
   public async generateFrameOverlays(
     aiSubtitleData: AISubtitleData,
-    baseStyle: CaptionStyle,
+    baseStyle: SubtitleStyle,
     videoWidth: number,
     videoHeight: number,
     outputDir: string
@@ -267,7 +267,7 @@ export class AISubtitleRenderer {
    */
   private async generateFrameWordOverlays(
     frame: SubtitleFrame,
-    baseStyle: CaptionStyle,
+    baseStyle: SubtitleStyle,
     videoWidth: number,
     videoHeight: number,
     outputDir: string,
@@ -320,7 +320,7 @@ export class AISubtitleRenderer {
   public renderPreviewFrame(
     frames: SubtitleFrame[],
     currentTime: number,
-    baseStyle: CaptionStyle,
+    baseStyle: SubtitleStyle,
     canvasWidth: number,
     canvasHeight: number
   ): Canvas | null {
@@ -341,7 +341,7 @@ export class AISubtitleRenderer {
    */
   public exportFrameData(
     aiSubtitleData: AISubtitleData,
-    baseStyle: CaptionStyle
+    baseStyle: SubtitleStyle
   ): Array<{
     startTime: number;
     endTime: number;
@@ -349,7 +349,7 @@ export class AISubtitleRenderer {
       text: string;
       startTime: number;
       endTime: number;
-      style: CaptionStyle;
+      style: SubtitleStyle;
       isVisible: boolean;
     }>;
   }> {

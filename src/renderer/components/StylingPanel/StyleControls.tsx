@@ -12,11 +12,11 @@ import {
   typography, 
   borderRadius 
 } from '../ui';
-import { CaptionStyle } from '../../../types';
+import { SubtitleStyle } from '../../../types';
 
 interface StyleControlsProps {
-  style: CaptionStyle;
-  onStyleUpdate: (updates: Partial<CaptionStyle>) => void;
+  style: SubtitleStyle;
+  onStyleUpdate: (updates: Partial<SubtitleStyle>) => void;
 }
 
 export const StyleControls: React.FC<StyleControlsProps> = ({

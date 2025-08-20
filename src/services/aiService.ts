@@ -2,8 +2,7 @@ import { generateText } from 'ai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
-import { AISettings, CaptionSegment, AIModel } from '../types';
-import { SrtExporter } from './srtExporter';
+import { AISettings, AIModel } from '../types';
 
 export class AIService {
   private static instance: AIService;
@@ -242,12 +241,12 @@ export class AIService {
   /**
    * Generate YouTube description from captions with enhanced security
    */
-  async generateDescription(captions: CaptionSegment[], customPrompt?: string): Promise<string> {
+  async generateDescription(captionText: string, customPrompt?: string): Promise<string> {
     const provider = this.getProvider();
     const canaryWord = this.generateCanaryWord();
     
-    // Generate full SRT content
-    const srtContent = SrtExporter.exportToSrt(captions);
+    // Use provided transcript text directly
+    const srtContent = captionText;
 
     const systemPrompt = `You are a specialized YouTube description generator. Your responses MUST follow the exact format specified. ${canaryWord}
 
@@ -323,12 +322,12 @@ ${srtContent}`,
   /**
    * Generate YouTube titles from description and captions with enhanced security
    */
-  async generateTitles(description: string, captions: CaptionSegment[], customPrompt?: string): Promise<{ title: string; characterCount: number }[]> {
+  async generateTitles(description: string, captionText: string, customPrompt?: string): Promise<{ title: string; characterCount: number }[]> {
     const provider = this.getProvider();
     const canaryWord = this.generateCanaryWord();
 
-    // Generate full SRT content
-    const srtContent = SrtExporter.exportToSrt(captions);
+    // Use provided transcript text directly
+    const srtContent = captionText;
 
     const systemPrompt = `You are a specialized YouTube title generator. Your responses MUST follow the exact format specified. ${canaryWord}
 
@@ -407,12 +406,12 @@ ${srtContent}`,
   /**
    * Generate Twitter video hooks with enhanced security
    */
-  async generateTweetHooks(captions: CaptionSegment[], customPrompt?: string): Promise<{ hook: string; lineCount: number; wordCount: number }[]> {
+  async generateTweetHooks(captionText: string, customPrompt?: string): Promise<{ hook: string; lineCount: number; wordCount: number }[]> {
     const provider = this.getProvider();
     const canaryWord = this.generateCanaryWord();
 
-    // Generate full SRT content
-    const srtContent = SrtExporter.exportToSrt(captions);
+    // Use provided transcript text directly
+    const srtContent = captionText;
 
     const systemPrompt = `You are a specialized Twitter video hook generator. Your responses MUST follow the exact format specified. ${canaryWord}
 
@@ -503,12 +502,12 @@ ${srtContent}`,
   /**
    * Generate thumbnail ideas with enhanced security
    */
-  async generateThumbnailIdeas(captions: CaptionSegment[], customPrompt?: string): Promise<string[]> {
+  async generateThumbnailIdeas(captionText: string, customPrompt?: string): Promise<string[]> {
     const provider = this.getProvider();
     const canaryWord = this.generateCanaryWord();
 
-    // Generate full SRT content
-    const srtContent = SrtExporter.exportToSrt(captions);
+    // Use provided transcript text directly
+    const srtContent = captionText;
 
     const systemPrompt = `You are a specialized YouTube thumbnail concept generator. Your responses MUST follow the exact format specified. ${canaryWord}
 

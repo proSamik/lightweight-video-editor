@@ -1,10 +1,16 @@
-import { CaptionSegment } from '../types';
+// Local caption type used for SRT export to decouple from renderer types
+interface SrtCaption {
+  id?: string;
+  startTime: number; // milliseconds
+  endTime: number; // milliseconds
+  text: string;
+}
 
 export class SrtExporter {
   /**
    * Converts caption segments to SRT format string
    */
-  static exportToSrt(captions: CaptionSegment[]): string {
+  static exportToSrt(captions: SrtCaption[]): string {
     return captions
       .filter(caption => caption.text.trim()) // Filter empty captions
       .map((caption, index) => {
@@ -24,7 +30,7 @@ export class SrtExporter {
   /**
    * Updates SRT content with edited captions, maintaining sync
    */
-  static updateSrtFromCaptions(captions: CaptionSegment[]): string {
+  static updateSrtFromCaptions(captions: SrtCaption[]): string {
     // Re-index captions after text edits to maintain proper SRT sequence
     const filteredCaptions = captions.filter(caption => 
       caption.text && caption.text.trim().length > 0

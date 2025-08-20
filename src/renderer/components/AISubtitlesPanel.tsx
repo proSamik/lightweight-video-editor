@@ -1,29 +1,22 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { 
-  CaptionSegment, 
   WordSegment, 
   SubtitleFrame, 
   AISubtitleData, 
   WordEditState,
-  CaptionStyle,
-  AudioSegment
 } from '../../types';
 import { Copy, Edit3, Star, VolumeX, Hash, FileX, Trash2, RotateCcw, ChevronUp, ChevronDown, Merge } from 'lucide-react';
 
 interface AISubtitlesPanelProps {
-  captions: CaptionSegment[];
   currentTime: number;
   onTimeSeek: (time: number) => void;
-  onCaptionUpdate: (segmentId: string, updates: Partial<CaptionSegment>) => void;
-  onSegmentDelete: (segmentId: string) => void;
   maxWordsPerFrame?: number;
   maxCharsPerFrame?: number;
   aiSubtitleData?: AISubtitleData | null;
   onAISubtitleUpdate?: (data: AISubtitleData | null) => void;
   selectedFrameId?: string | null;
   onFrameSelect?: (frameId: string) => void;
-  onCaptionsSync?: (updatedCaptions: CaptionSegment[]) => void;
 }
 
 interface WordContextMenu {
@@ -37,18 +30,14 @@ interface WordContextMenu {
 }
 
 const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
-  captions,
   currentTime,
   onTimeSeek,
-  onCaptionUpdate,
-  onSegmentDelete,
   maxWordsPerFrame = 5,
   maxCharsPerFrame = 30,
   aiSubtitleData: propAiSubtitleData,
   onAISubtitleUpdate,
   selectedFrameId,
-  onFrameSelect,
-  onCaptionsSync
+  onFrameSelect
 }) => {
   const { theme } = useTheme();
   const [internalAiSubtitleData, setInternalAiSubtitleData] = useState<AISubtitleData | null>(null);
@@ -65,77 +54,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     }
   }, [onAISubtitleUpdate]);
 
-  // Convert AI Subtitle data back to regular caption segments
-  const convertAISubtitlesToCaptions = useCallback((aiData: AISubtitleData): CaptionSegment[] => {
-    const captionMap = new Map<string, CaptionSegment>();
-
-    // Group frames by original segment ID
-    aiData.frames.forEach(frame => {
-      if (!captionMap.has(frame.segmentId)) {
-        // Find the original caption to preserve its style
-        const originalCaption = captions.find(c => c.id === frame.segmentId);
-        if (originalCaption) {
-          captionMap.set(frame.segmentId, {
-            ...originalCaption,
-            words: [],
-            text: ''
-          });
-        }
-      }
-
-      const caption = captionMap.get(frame.segmentId);
-      if (caption) {
-        // Add visible words from this frame
-        const visibleWords = frame.words.filter(word => 
-          word.editState !== 'strikethrough' && 
-          word.editState !== 'removedCaption' &&
-          !word.isPause
-        );
-
-        caption.words = caption.words || [];
-        caption.words.push(...visibleWords.map(word => ({
-          word: word.word,
-          start: word.start * 1000, // Convert seconds to milliseconds for caption format
-          end: word.end * 1000 // Convert seconds to milliseconds for caption format
-        })));
-      }
-    });
-
-    // Convert map back to array and update text content
-    const updatedCaptions = Array.from(captionMap.values()).map(caption => {
-      // Sort words by start time
-      if (caption.words) {
-        caption.words.sort((a, b) => a.start - b.start);
-        // Update text content based on visible words
-        caption.text = caption.words.map(w => w.word).join(' ');
-        
-        // Update timing based on first and last words
-        if (caption.words.length > 0) {
-          caption.startTime = caption.words[0].start;
-          caption.endTime = caption.words[caption.words.length - 1].end;
-        }
-      }
-      return caption;
-    });
-
-    return updatedCaptions;
-  }, [captions]);
-
-  // Sync captions whenever AI subtitle data changes
-  useEffect(() => {
-    if (aiSubtitleData && onCaptionsSync) {
-      const syncedCaptions = convertAISubtitlesToCaptions(aiSubtitleData);
-      onCaptionsSync(syncedCaptions);
-    }
-  }, [aiSubtitleData, convertAISubtitlesToCaptions, onCaptionsSync]);
-
-  // Force sync captions after frame operations
-  const forceSyncCaptions = useCallback(() => {
-    if (aiSubtitleData && onCaptionsSync) {
-      const syncedCaptions = convertAISubtitlesToCaptions(aiSubtitleData);
-      onCaptionsSync(syncedCaptions);
-    }
-  }, [aiSubtitleData, convertAISubtitlesToCaptions, onCaptionsSync]);
+  // No more conversion needed - AI Subtitles are the single source of truth
 
   const [selectedWordIds, setSelectedWordIds] = useState<Set<string>>(new Set());
   const [contextMenu, setContextMenu] = useState<WordContextMenu>({
@@ -156,106 +75,13 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Convert existing captions to AI subtitle format
-  const convertToAISubtitles = useCallback((): AISubtitleData => {
-    const frames: SubtitleFrame[] = [];
-    const audioSegments: AudioSegment[] = [];
-    
-    captions.forEach((caption, segmentIndex) => {
-      if (caption.words && caption.words.length > 0) {
-        // Create word segments from existing words (convert milliseconds to seconds for AI format)
-        const wordSegments: WordSegment[] = caption.words.map((word, wordIndex) => ({
-          ...word,
-          start: word.start / 1000, // Convert milliseconds to seconds
-          end: word.end / 1000, // Convert milliseconds to seconds
-          id: `${caption.id}-word-${wordIndex}`,
-          editState: 'normal' as WordEditState,
-          originalWord: word.word,
-          isPause: word.word === '[.]'
-        }));
+  // AI Subtitles are now the primary data source - no conversion needed
 
-        // Split words into frames based on maxWordsPerFrame and maxCharsPerFrame
-        let currentFrame: SubtitleFrame | null = null;
-        let currentWords: WordSegment[] = [];
-        let currentCharCount = 0;
-
-        wordSegments.forEach((wordSegment, index) => {
-          const wordLength = wordSegment.word.length + 1; // +1 for space
-          
-          // Check if we need to start a new frame
-          if (
-            currentWords.length >= maxWordsPerFrame ||
-            currentCharCount + wordLength > maxCharsPerFrame ||
-            currentFrame === null
-          ) {
-            // Save previous frame if exists
-            if (currentFrame !== null && currentWords.length > 0) {
-              (currentFrame as SubtitleFrame).words = [...currentWords];
-              const lastWord = currentWords[currentWords.length - 1];
-              if (lastWord) {
-                (currentFrame as SubtitleFrame).endTime = lastWord.end;
-              }
-              frames.push(currentFrame as SubtitleFrame);
-            }
-
-            // Start new frame
-            currentFrame = {
-              id: `frame-${segmentIndex}-${Math.floor(index / maxWordsPerFrame)}`,
-              startTime: wordSegment.start,
-              endTime: wordSegment.end,
-              words: [],
-              segmentId: caption.id,
-              isCustomBreak: false
-            };
-            currentWords = [] as WordSegment[];
-            currentCharCount = 0;
-          }
-
-          currentWords.push(wordSegment);
-          currentCharCount += wordLength;
-        });
-
-        // Add the last frame if it has words
-        if (currentFrame !== null && currentWords.length > 0) {
-          (currentFrame as SubtitleFrame).words = currentWords;
-          const lastWord = currentWords[currentWords.length - 1];
-          if (lastWord) {
-            (currentFrame as SubtitleFrame).endTime = lastWord.end;
-          }
-          frames.push(currentFrame as SubtitleFrame);
-        }
-
-        // Create audio segment for this caption (convert milliseconds to seconds)
-        audioSegments.push({
-          id: `audio-${caption.id}`,
-          startTime: caption.startTime / 1000, // Convert milliseconds to seconds
-          endTime: caption.endTime / 1000, // Convert milliseconds to seconds
-          isRemoved: false
-        });
-      }
-    });
-
-    return {
-      frames,
-      audioSegments,
-      maxWordsPerFrame,
-      maxCharsPerFrame,
-      lastModified: Date.now()
-    };
-  }, [captions, maxWordsPerFrame, maxCharsPerFrame]);
-
-  // Initialize AI subtitle data when captions change (only if no prop data)
-  useEffect(() => {
-    if (captions.length > 0 && !propAiSubtitleData) {
-      const newData = convertToAISubtitles();
-      setInternalAiSubtitleData(newData);
-      
-      // If we have an update callback, call it
-      if (onAISubtitleUpdate) {
-        onAISubtitleUpdate(newData);
-      }
-    }
-  }, [captions, convertToAISubtitles, propAiSubtitleData, onAISubtitleUpdate]);
+  // Always use sorted frames directly from aiSubtitleData - no local state needed
+  const renderFrames = useMemo(() => {
+    if (!aiSubtitleData) return [] as SubtitleFrame[];
+    return [...aiSubtitleData.frames].sort((a, b) => a.startTime - b.startTime);
+  }, [aiSubtitleData?.frames]);
 
   // Get currently highlighted words based on current time
   const currentlyHighlightedWords = useMemo(() => {
@@ -316,14 +142,22 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
       ...aiSubtitleData.frames.slice(frameIndex + 1)
     ];
 
-    updateAISubtitleData({
-      ...aiSubtitleData,
-      frames: updatedFrames,
-      lastModified: Date.now()
-    });
+    // Ensure frames are always ordered by time for immediate correct UI order
+    const sortedFrames = [...updatedFrames].sort((a, b) => a.startTime - b.startTime);
 
-    // Force sync captions after frame split
-    setTimeout(() => forceSyncCaptions(), 0);
+
+    const newAIData = {
+      ...aiSubtitleData,
+      frames: sortedFrames,
+      lastModified: Date.now()
+    };
+    
+    updateAISubtitleData(newAIData);
+
+    // Update selection to the first split frame to maintain continuity
+    if (onFrameSelect) {
+      onFrameSelect(updatedFirstFrame.id);
+    }
   };
 
   // Handle frame merging
@@ -363,19 +197,22 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     const insertIndex = Math.min(frameIndex, targetIndex);
     updatedFrames.splice(insertIndex, 0, mergedFrame);
 
-    updateAISubtitleData({
+    // Ensure frames are always ordered by time for immediate correct UI order
+    const sortedFrames = [...updatedFrames].sort((a, b) => a.startTime - b.startTime);
+
+
+    const newAIData = {
       ...aiSubtitleData,
-      frames: updatedFrames,
+      frames: sortedFrames,
       lastModified: Date.now()
-    });
+    };
+    
+    updateAISubtitleData(newAIData);
     
     // Update selection to merged frame
     if (onFrameSelect) {
       onFrameSelect(mergedFrame.id);
     }
-
-    // Force sync captions after frame merge
-    setTimeout(() => forceSyncCaptions(), 0);
   };
 
   // Keyboard event handlers
@@ -468,6 +305,16 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     return () => {}; // Return empty cleanup function when contextMenu is not shown
   }, [contextMenu.show]);
 
+  // Auto-select first frame when AI subtitle data loads
+  useEffect(() => {
+    if (aiSubtitleData?.frames && aiSubtitleData.frames.length > 0 && !selectedFrameId && onFrameSelect) {
+      const firstFrameId = aiSubtitleData.frames[0].id;
+      if (firstFrameId) {
+        onFrameSelect(firstFrameId);
+      }
+    }
+  }, [aiSubtitleData?.frames, selectedFrameId, onFrameSelect]);
+
   // Handle word click
   const handleWordClick = (e: React.MouseEvent, wordId: string, frameId: string) => {
     e.preventDefault();
@@ -523,6 +370,13 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     setEditingValue('');
   };
 
+  // Handle frame click for selection
+  const handleFrameClick = (frameId: string) => {
+    if (onFrameSelect) {
+      onFrameSelect(frameId);
+    }
+  };
+
   // Update word in frames
   const updateWordInFrames = (wordId: string, newWord: string, newState: WordEditState) => {
     if (!aiSubtitleData) return;
@@ -536,14 +390,13 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
       )
     }));
 
-    updateAISubtitleData({
+    const newAIData = {
       ...aiSubtitleData,
       frames: updatedFrames,
       lastModified: Date.now()
-    });
-
-    // Force sync captions after word update
-    setTimeout(() => forceSyncCaptions(), 0);
+    };
+    
+    updateAISubtitleData(newAIData);
   };
 
   // Export AI subtitles
@@ -616,16 +469,15 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
       };
     });
 
-    updateAISubtitleData({
+    const newAIData = {
       ...aiSubtitleData,
       frames: updatedFrames,
       lastModified: Date.now()
-    });
+    };
+    
+    updateAISubtitleData(newAIData);
 
     setSelectedWordIds(new Set([combinedWord.id]));
-
-    // Force sync captions after combining words
-    setTimeout(() => forceSyncCaptions(), 0);
   };
 
   // Context menu actions
@@ -656,8 +508,8 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
               w.id === wordId ? { ...w, isKeyword: !w.isKeyword } : w
             )
           }));
-          updateAISubtitleData({ ...aiSubtitleData, frames: updatedFrames, lastModified: Date.now() });
-          setTimeout(() => forceSyncCaptions(), 0);
+          const newAIData = { ...aiSubtitleData, frames: updatedFrames, lastModified: Date.now() };
+          updateAISubtitleData(newAIData);
           break;
         case 'silence':
           // Keep word visible but remove audio (placeholder for future implementation)
@@ -909,15 +761,20 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
         overflow: 'auto',
         padding: '16px'
       }}>
-        {aiSubtitleData.frames.map((frame, frameIndex) => (
+        {renderFrames.map((frame, frameIndex) => (
           <div
             key={frame.id}
+            onClick={() => handleFrameClick(frame.id)}
             style={{
               marginBottom: '24px',
               padding: '16px',
-              backgroundColor: theme.colors.surface,
+              backgroundColor: selectedFrameId === frame.id ? theme.colors.primary + '20' : theme.colors.surface,
               borderRadius: '8px',
-              border: `1px solid ${theme.colors.border}`
+              border: selectedFrameId === frame.id 
+                ? `2px solid ${theme.colors.primary}` 
+                : `1px solid ${theme.colors.border}`,
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
             }}
           >
             {/* Frame timing and controls */}
@@ -949,7 +806,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
               {/* Merge Controls */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 {/* Merge Up Button */}
-                {frameIndex > 0 && aiSubtitleData.frames[frameIndex - 1]?.segmentId === frame.segmentId && (
+                {frameIndex > 0 && renderFrames[frameIndex - 1]?.segmentId === frame.segmentId && (
                   <button
                     onClick={() => handleFrameMerge(frame.id, 'up')}
                     style={{
@@ -976,12 +833,12 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
                     }}
                     title="Merge with frame above"
                   >
-                    <ChevronUp size={12} />
+                    <ChevronUp size={16} />
                   </button>
                 )}
                 
                 {/* Merge Down Button */}
-                {frameIndex < aiSubtitleData.frames.length - 1 && aiSubtitleData.frames[frameIndex + 1]?.segmentId === frame.segmentId && (
+                {frameIndex < renderFrames.length - 1 && renderFrames[frameIndex + 1]?.segmentId === frame.segmentId && (
                   <button
                     onClick={() => handleFrameMerge(frame.id, 'down')}
                     style={{
@@ -1008,7 +865,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
                     }}
                     title="Merge with frame below"
                   >
-                    <ChevronDown size={12} />
+                    <ChevronDown size={16} />
                   </button>
                 )}
               </div>

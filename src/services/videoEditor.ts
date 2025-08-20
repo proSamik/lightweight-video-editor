@@ -2,7 +2,20 @@ import ffmpeg from 'fluent-ffmpeg';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
-import { CaptionSegment } from '../types';
+// Minimal CaptionSegment shape needed for video editing in this service
+interface CaptionWord {
+  word: string;
+  start: number; // milliseconds
+  end: number; // milliseconds
+}
+
+interface CaptionSegment {
+  id: string;
+  startTime: number; // milliseconds
+  endTime: number; // milliseconds
+  text: string;
+  words?: CaptionWord[];
+}
 
 export interface VideoEditOperation {
   type: 'trim' | 'cut' | 'splice';
@@ -82,9 +95,9 @@ export class VideoEditor {
         const updatedWords = updatedSegment.words;
         
         // Only consider words actually deleted, not edited
-        originalWords.forEach(originalWord => {
+        originalWords.forEach((originalWord: CaptionWord) => {
           // Check if this word was completely removed (not just edited)
-          const wasActuallyDeleted = !updatedWords.some(updatedWord => {
+          const wasActuallyDeleted = !updatedWords.some((updatedWord: CaptionWord) => {
             // Match by timing rather than text content to allow text edits
             const timingMatch = Math.abs(updatedWord.start - originalWord.start) < 100; // 100ms tolerance
             return timingMatch && updatedWord.word.trim() !== ''; // Must have content

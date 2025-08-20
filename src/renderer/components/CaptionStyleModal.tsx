@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { CaptionSegment, CaptionStyle } from '../../types';
+import { SubtitleFrame, SubtitleStyle } from '../../types';
 import { useTheme } from '../contexts/ThemeContext';
 import { FiType, FiRotateCw, FiDroplet, FiAlignLeft, FiAlignCenter, FiAlignRight } from 'react-icons/fi';
 
 interface CaptionStyleModalProps {
   isOpen: boolean;
   onClose: () => void;
-  caption: CaptionSegment | null;
-  onUpdate: (updates: Partial<CaptionSegment>) => void;
+  caption: (Pick<SubtitleFrame, 'id' | 'style'> & { style: SubtitleStyle }) | null;
+  onUpdate: (updates: { style: SubtitleStyle }) => void;
   position?: { x: number; y: number };
 }
 
@@ -19,7 +19,7 @@ const CaptionStyleModal: React.FC<CaptionStyleModalProps> = ({
   position
 }) => {
   const { theme } = useTheme();
-  const [localStyle, setLocalStyle] = useState<CaptionStyle>({
+  const [localStyle, setLocalStyle] = useState<SubtitleStyle>({
     font: 'Segoe UI',
     fontSize: 85,
     textColor: '#ffffff',

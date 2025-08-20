@@ -15,6 +15,8 @@ const electronAPI = {
   testWhisperInstallation: () => ipcRenderer.invoke('test-whisper-installation'),
   renderVideoWithCaptions: (videoPath: string, captionsData: any[], outputPath: string, exportSettings?: any, replacementAudioPath?: string) => 
     ipcRenderer.invoke('render-video-with-captions', videoPath, captionsData, outputPath, exportSettings, replacementAudioPath),
+  renderVideoWithAISubtitles: (videoPath: string, aiSubtitleData: any, outputPath: string, exportSettings?: any, replacementAudioPath?: string) =>
+    ipcRenderer.invoke('render-video-with-ai-subtitles', videoPath, aiSubtitleData, outputPath, exportSettings, replacementAudioPath),
   exportVideoWithNewAudio: (videoPath: string, newAudioPath: string, outputPath: string) =>
     ipcRenderer.invoke('export-video-with-new-audio', videoPath, newAudioPath, outputPath),
   handleFileDrop: (filePath: string) => ipcRenderer.invoke('handle-file-drop', filePath),
@@ -73,14 +75,14 @@ const electronAPI = {
     ipcRenderer.invoke('save-ai-settings', settings),
   testAIConnection: (settings: any) =>
     ipcRenderer.invoke('test-ai-connection', settings),
-  generateDescription: (captions: any[], customPrompt?: string) =>
-    ipcRenderer.invoke('generate-description', captions, customPrompt),
-  generateTitles: (description: string, captions: any[], customPrompt?: string) =>
-    ipcRenderer.invoke('generate-titles', description, captions, customPrompt),
-  generateTweetHooks: (captions: any[], customPrompt?: string) =>
-    ipcRenderer.invoke('generate-tweet-hooks', captions, customPrompt),
-  generateThumbnailIdeas: (captions: any[], customPrompt?: string) =>
-    ipcRenderer.invoke('generate-thumbnail-ideas', captions, customPrompt),
+  generateDescription: (captionText: string, customPrompt?: string) =>
+    ipcRenderer.invoke('generate-description', captionText, customPrompt),
+  generateTitles: (description: string, captionText: string, customPrompt?: string) =>
+    ipcRenderer.invoke('generate-titles', description, captionText, customPrompt),
+  generateTweetHooks: (captionText: string, customPrompt?: string) =>
+    ipcRenderer.invoke('generate-tweet-hooks', captionText, customPrompt),
+  generateThumbnailIdeas: (captionText: string, customPrompt?: string) =>
+    ipcRenderer.invoke('generate-thumbnail-ideas', captionText, customPrompt),
   getAvailableModels: (settings: any) =>
     ipcRenderer.invoke('get-available-models', settings),
   cancelRendering: () =>

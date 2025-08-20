@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { CaptionPreset, CaptionSegment } from '../../types';
+import { CaptionPreset, SubtitleStyle } from '../../types';
 import { useTheme } from '../contexts/ThemeContext';
 
 interface PresetPreviewProps {
@@ -10,9 +10,18 @@ interface PresetPreviewProps {
 }
 
 // Import the same rendering functions from VideoPanel
+interface PreviewCaption {
+  id: string;
+  startTime: number;
+  endTime: number;
+  text: string;
+  words: Array<{ word: string; start: number; end: number }>;
+  style: SubtitleStyle;
+}
+
 declare function renderCaptionOnCanvas(
   ctx: CanvasRenderingContext2D,
-  caption: CaptionSegment,
+  caption: PreviewCaption,
   canvasWidth: number,
   canvasHeight: number,
   currentTime: number,
@@ -21,32 +30,9 @@ declare function renderCaptionOnCanvas(
 
 declare function parseColor(colorString: string): { r: number; g: number; b: number; a: number };
 declare function mapFontName(fontName: string): string;
-declare function renderSimpleTextOnCanvas(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  caption: CaptionSegment,
-  x: number,
-  y: number,
-  scaleFactor: number
-): void;
-declare function renderKaraokeTextOnCanvas(
-  ctx: CanvasRenderingContext2D,
-  words: any[],
-  caption: CaptionSegment,
-  frameTime: number,
-  centerX: number,
-  centerY: number,
-  scaleFactor: number
-): void;
-declare function renderProgressiveTextOnCanvas(
-  ctx: CanvasRenderingContext2D,
-  words: any[],
-  caption: CaptionSegment,
-  frameTime: number,
-  centerX: number,
-  centerY: number,
-  scaleFactor: number
-): void;
+declare function renderSimpleTextOnCanvas(ctx: CanvasRenderingContext2D, text: string, caption: PreviewCaption, x: number, y: number, scaleFactor: number): void;
+declare function renderKaraokeTextOnCanvas(ctx: CanvasRenderingContext2D, words: Array<{ word: string; start: number; end: number }>, caption: PreviewCaption, frameTime: number, centerX: number, centerY: number, scaleFactor: number): void;
+declare function renderProgressiveTextOnCanvas(ctx: CanvasRenderingContext2D, words: Array<{ word: string; start: number; end: number }>, caption: PreviewCaption, frameTime: number, centerX: number, centerY: number, scaleFactor: number): void;
 
 export const PresetPreview: React.FC<PresetPreviewProps> = ({
   preset,
@@ -84,7 +70,7 @@ export const PresetPreview: React.FC<PresetPreviewProps> = ({
   };
 
   // Create a mock caption segment from the preset
-  const createMockCaption = (timeOffset: number = 0): CaptionSegment => {
+  const createMockCaption = (timeOffset: number = 0): PreviewCaption => {
     const demoText = ['PREVIEW', 'YOUR', 'STYLE'];
     
     // Apply text transform to demo text first
@@ -184,7 +170,7 @@ export const PresetPreview: React.FC<PresetPreviewProps> = ({
   }, [preset, config, isAnimating]);
 
   // Fallback rendering function that matches VideoPanel spacing exactly
-  const renderFallbackCaption = (ctx: CanvasRenderingContext2D, caption: CaptionSegment, currentTime: number) => {
+  const renderFallbackCaption = (ctx: CanvasRenderingContext2D, caption: PreviewCaption, currentTime: number) => {
     const { width, height } = config;
     const x = (width * caption.style.position.x) / 100;
     const y = (height * caption.style.position.y) / 100;

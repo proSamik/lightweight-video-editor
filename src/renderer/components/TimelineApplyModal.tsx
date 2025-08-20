@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { CaptionSegment, CaptionStyle } from '../../types';
+import { SubtitleFrame, SubtitleStyle } from '../../types';
 import { useTheme } from '../contexts/ThemeContext';
 import { FiClock, FiSliders, FiCheck, FiX } from 'react-icons/fi';
 
@@ -7,8 +7,8 @@ interface TimelineApplyModalProps {
   isOpen: boolean;
   onClose: () => void;
   onApply: (startTime: number, endTime: number) => void;
-  currentStyle: CaptionStyle;
-  captions: CaptionSegment[];
+  currentStyle: SubtitleStyle;
+  captions: Array<Pick<SubtitleFrame, 'id' | 'startTime' | 'endTime'>>;
   currentTime?: number;
   selectedSegmentId?: string | null;
 }

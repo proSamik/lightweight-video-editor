@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
-import { CaptionSegment, GeneratedContent } from '../../types';
+import { AISubtitleData, GeneratedContent } from '../../types';
 import { Button, LiquidModal } from './ui';
 import { 
   FiCheckCircle, 
@@ -19,7 +19,7 @@ import {
 interface AIContentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  captions: CaptionSegment[];
+  aiSubtitleData: AISubtitleData | null;
   onSave: (content: GeneratedContent) => void;
   initialContent?: GeneratedContent;
 }
@@ -27,7 +27,7 @@ interface AIContentModalProps {
 const AIContentModal: React.FC<AIContentModalProps> = ({ 
   isOpen, 
   onClose, 
-  captions, 
+  aiSubtitleData, 
   onSave,
   initialContent 
 }) => {
@@ -98,7 +98,11 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
     setError(null);
     
     try {
-      const generatedDescription = await window.electronAPI.generateDescription(captions);
+      // Convert AI subtitle frames to text for description generation
+      const captionText = aiSubtitleData?.frames.map(frame => 
+        frame.words.map(w => w.word).join(' ')
+      ).join(' ') || '';
+      const generatedDescription = await window.electronAPI.generateDescription(captionText);
       setDescription(generatedDescription);
     } catch (error) {
       console.error('Failed to generate description:', error);
@@ -118,7 +122,11 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
     setError(null);
     
     try {
-      const generatedTitles = await window.electronAPI.generateTitles(description, captions);
+      // Convert AI subtitle frames to text for title generation
+      const captionText = aiSubtitleData?.frames.map(frame => 
+        frame.words.map(w => w.word).join(' ')
+      ).join(' ') || '';
+      const generatedTitles = await window.electronAPI.generateTitles(description, captionText);
       setTitles(generatedTitles);
     } catch (error) {
       console.error('Failed to generate titles:', error);
@@ -133,7 +141,11 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
     setError(null);
     
     try {
-      const generatedTweets = await window.electronAPI.generateTweetHooks(captions);
+      // Convert AI subtitle frames to text for tweet generation
+      const captionText = aiSubtitleData?.frames.map(frame => 
+        frame.words.map(w => w.word).join(' ')
+      ).join(' ') || '';
+      const generatedTweets = await window.electronAPI.generateTweetHooks(captionText);
       setTweets(generatedTweets);
     } catch (error) {
       console.error('Failed to generate tweet hooks:', error);
@@ -148,7 +160,11 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
     setError(null);
     
     try {
-      const generatedThumbnails = await window.electronAPI.generateThumbnailIdeas(captions);
+      // Convert AI subtitle frames to text for thumbnail generation
+      const captionText = aiSubtitleData?.frames.map(frame => 
+        frame.words.map(w => w.word).join(' ')
+      ).join(' ') || '';
+      const generatedThumbnails = await window.electronAPI.generateThumbnailIdeas(captionText);
       setThumbnails(generatedThumbnails);
     } catch (error) {
       console.error('Failed to generate thumbnail ideas:', error);
@@ -174,7 +190,19 @@ const AIContentModal: React.FC<AIContentModalProps> = ({
 
   const exportSRT = async () => {
     try {
-      const result = await window.electronAPI.exportSrt(captions, 'subtitles.srt');
+      // Convert AI subtitle frames to caption format for SRT export
+      const captionsForSrt = aiSubtitleData?.frames.map((frame, index) => ({
+        id: frame.id,
+        startTime: frame.startTime * 1000, // Convert to milliseconds
+        endTime: frame.endTime * 1000,
+        text: frame.words.map(w => w.word).join(' '),
+        words: frame.words.map(w => ({ 
+          word: w.word, 
+          start: w.start * 1000, 
+          end: w.end * 1000 
+        }))
+      })) || [];
+      const result = await window.electronAPI.exportSrt(captionsForSrt, 'subtitles.srt');
       if (result.success && !result.canceled) {
         setExportedSrtPath(result.filePath);
         setShowSrtSuccess(true);

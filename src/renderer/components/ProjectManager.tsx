@@ -537,9 +537,9 @@ const ProjectManagerModal: React.FC<ProjectManagerProps> = ({
                         alignItems: 'center',
                         gap: '8px'
                       }}>
-                        <span style={{ color: theme.colors.textSecondary }}>Captions:</span>
+                        <span style={{ color: theme.colors.textSecondary }}>AI Subtitles:</span>
                         <span style={{ color: theme.colors.text, fontWeight: '500' }}>
-                          {currentProject.captions.length} segments
+                          {currentProject.aiSubtitleData?.frames?.length || 0} frames
                         </span>
                       </div>
                       <div style={{ 

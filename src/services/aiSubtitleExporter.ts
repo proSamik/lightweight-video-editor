@@ -8,7 +8,7 @@ import {
   SubtitleFrame, 
   WordSegment, 
   AudioSegment,
-  CaptionStyle,
+  SubtitleStyle,
   ExportSettings
 } from '../types';
 
@@ -36,7 +36,7 @@ export class AISubtitleExporter {
     originalVideoPath: string,
     originalAudioPath: string,
     aiSubtitleData: AISubtitleData,
-    baseStyle: CaptionStyle,
+    baseStyle: SubtitleStyle,
     outputPath: string,
     exportSettings: ExportSettings,
     onProgress?: (progress: number, message: string) => void
@@ -94,7 +94,7 @@ export class AISubtitleExporter {
     originalVideoPath: string,
     originalAudioPath: string,
     aiSubtitleData: AISubtitleData,
-    baseStyle: CaptionStyle,
+    baseStyle: SubtitleStyle,
     outputPath: string,
     exportSettings: ExportSettings,
     tempDir: string,
@@ -151,7 +151,7 @@ export class AISubtitleExporter {
   private async exportCompleteVideo(
     originalVideoPath: string,
     aiSubtitleData: AISubtitleData,
-    baseStyle: CaptionStyle,
+    baseStyle: SubtitleStyle,
     outputPath: string,
     exportSettings: ExportSettings,
     tempDir: string,
@@ -293,7 +293,7 @@ export class AISubtitleExporter {
    */
   private async generateVideoOverlay(
     aiSubtitleData: AISubtitleData,
-    baseStyle: CaptionStyle,
+    baseStyle: SubtitleStyle,
     videoWidth: number,
     videoHeight: number,
     tempDir: string,

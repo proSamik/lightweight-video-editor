@@ -1,5 +1,5 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { VideoFile, CaptionSegment } from '../../types';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import { VideoFile, AISubtitleData, SubtitleFrame } from '../../types';
 import { useTheme } from '../contexts/ThemeContext';
 import { FiEye } from 'react-icons/fi';
 import { Video, AlertTriangle } from 'lucide-react';
@@ -7,36 +7,35 @@ import CaptionStyleModal from './CaptionStyleModal';
 
 interface VideoPanelProps {
   videoFile: VideoFile | null;
-  captions: CaptionSegment[];
   currentTime: number;
   onTimeUpdate: (time: number) => void;
   onTimeSeek?: (time: number) => void;
   onVideoSelect: () => void;
   onVideoDropped?: (filePath: string) => void;
-  selectedSegmentId?: string | null;
-  onCaptionUpdate?: (segmentId: string, updates: Partial<CaptionSegment>) => void;
   onPlayPause?: () => void;
   isPlaying?: boolean;
-  onSegmentSelect?: (segmentId: string) => void;
   replacementAudioPath?: string | null;
   isAudioPreviewEnabled?: boolean;
+  // AI Subtitle support - when available, use instead of captions
+  aiSubtitleData?: AISubtitleData | null;
+  selectedFrameId?: string | null;
+  onFrameSelect?: (frameId: string) => void;
 }
 
 const VideoPanel: React.FC<VideoPanelProps> = ({
   videoFile,
-  captions,
   currentTime,
   onTimeUpdate,
   onTimeSeek,
   onVideoSelect,
   onVideoDropped,
-  selectedSegmentId,
-  onCaptionUpdate,
   onPlayPause,
   isPlaying,
-  onSegmentSelect,
   replacementAudioPath,
   isAudioPreviewEnabled = true,
+  aiSubtitleData,
+  selectedFrameId,
+  onFrameSelect,
 }) => {
   const { theme } = useTheme();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -48,7 +47,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [isTimelineDragging, setIsTimelineDragging] = useState(false);
   const [showCaptionStyleModal, setShowCaptionStyleModal] = useState(false);
-  const [selectedCaptionForStyling, setSelectedCaptionForStyling] = useState<CaptionSegment | null>(null);
+  const [selectedCaptionForStyling, setSelectedCaptionForStyling] = useState<any | null>(null);
   const [modalPosition, setModalPosition] = useState({ x: 100, y: 100 });
   const [scaleFactor, setScaleFactor] = useState(1);
   const lastUpdateTimeRef = useRef<number>(0);
@@ -56,6 +55,67 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   const tempDragPositionRef = useRef<{ x: number; y: number } | null>(null);
   const [videoFileExists, setVideoFileExists] = useState<boolean | null>(null);
   const [videoLoadError, setVideoLoadError] = useState<boolean>(false);
+
+  // Convert AI subtitle frames to virtual caption segments for rendering
+  type DisplaySegment = { id: string; startTime: number; endTime: number; text: string; style: any; words?: { word: string; start: number; end: number }[] };
+  const virtualCaptionsFromAI = useMemo((): DisplaySegment[] => {
+    if (!aiSubtitleData) return [];
+    const virtualCaptions: DisplaySegment[] = [];
+    
+    aiSubtitleData.frames.forEach(frame => {
+      // Find the original caption segment for style reference
+      // Provide a safe fallback style
+      const baseStyle = frame.style || {
+        font: 'Segoe UI',
+        fontSize: 85,
+        textColor: '#ffffff',
+        highlighterColor: '#ffff00',
+        backgroundColor: 'transparent',
+        strokeColor: '#000000',
+        strokeWidth: 2,
+        textTransform: 'none',
+        position: { x: 50, y: 80, z: 0 },
+        renderMode: 'horizontal',
+        textAlign: 'center',
+        scale: 1,
+        emphasizeMode: true,
+        burnInSubtitles: true,
+      } as any;
+
+      // Get visible words from the frame
+      const visibleWords = frame.words.filter(word => 
+        word.editState !== 'strikethrough' && 
+        word.editState !== 'removedCaption' &&
+        !word.isPause
+      );
+
+      if (visibleWords.length === 0) return; // Skip empty frames
+
+      // Create virtual caption segment
+      const virtualCaption: DisplaySegment = {
+        id: frame.id,
+        startTime: frame.startTime * 1000, // Convert seconds to milliseconds
+        endTime: frame.endTime * 1000,
+        text: visibleWords.map((w: any) => w.word).join(' '),
+        words: visibleWords.map((word: any) => ({
+          word: word.word,
+          start: word.start * 1000,
+          end: word.end * 1000
+        })),
+        style: baseStyle,
+      };
+
+      virtualCaptions.push(virtualCaption);
+    });
+
+    return virtualCaptions.sort((a, b) => a.startTime - b.startTime);
+  }, [aiSubtitleData]);
+
+  // Use AI-derived captions if available, otherwise use regular captions
+  const effectiveCaptions = virtualCaptionsFromAI;
+  
+  // Determine effective selection - use frame selection for AI mode, segment selection for regular mode
+  const effectiveSelectedId = selectedFrameId || null;
 
   // Check if video file exists when videoFile changes
   useEffect(() => {
@@ -80,7 +140,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   }, [videoFile]);
 
   // Helper function to check if mouse click is on rendered caption text
-  const isClickOnCaption = (mouseX: number, mouseY: number, caption: CaptionSegment): boolean => {
+  const isClickOnCaption = (mouseX: number, mouseY: number, caption: any): boolean => {
     const canvas = canvasRef.current;
     if (!canvas) return false;
 
@@ -102,7 +162,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     // Get text to measure
     let textToMeasure = caption.text;
     if (caption.words && caption.words.length > 0) {
-      textToMeasure = caption.words.map(w => w.word).join(' ');
+      textToMeasure = caption.words.map((w: any) => w.word).join(' ');
     }
     
     const textMetrics = ctx.measureText(textToMeasure);
@@ -124,7 +184,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   // Mouse interaction handlers for text box manipulation
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (e.button !== 0) return; // Only handle left click for dragging
-    if (!onCaptionUpdate) return;
+    if (!onFrameSelect) return;
     
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -137,7 +197,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     const mouseY = (e.clientY - rect.top) * scaleY;
     
     // Find captions that's currently visible
-    const currentCaptions = captions.filter(
+    const currentCaptions = effectiveCaptions.filter(
       caption => currentTime >= caption.startTime && currentTime <= caption.endTime
     );
     
@@ -151,9 +211,9 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     }
     
     if (clickedCaption) {
-      // Select the caption if not already selected
-      if (selectedSegmentId !== clickedCaption.id && onSegmentSelect) {
-        onSegmentSelect(clickedCaption.id);
+      // Select the frame if not already selected
+      if (effectiveSelectedId !== clickedCaption.id) {
+        onFrameSelect(clickedCaption.id);
       }
       
       setIsDragging(true);
@@ -178,7 +238,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     const mouseY = (e.clientY - rect.top) * scaleY;
     
     // Find captions that's currently visible
-    const currentCaptions = captions.filter(
+    const currentCaptions = effectiveCaptions.filter(
       caption => currentTime >= caption.startTime && currentTime <= caption.endTime
     );
     
@@ -199,7 +259,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     e.preventDefault();
     
     // Find caption at current time
-    const currentCaption = captions.find(
+    const currentCaption = effectiveCaptions.find(
       caption => currentTime >= caption.startTime && currentTime <= caption.endTime
     );
     
@@ -217,7 +277,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
 
   // Global mouse move handler for dragging - real-time visual feedback
   const handleGlobalMouseMove = useCallback((e: MouseEvent) => {
-    if (!isDragging || !selectedSegmentId) return;
+    if (!isDragging || !effectiveSelectedId) return;
     
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -237,31 +297,22 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     
     // Immediately re-render canvas with new position
     renderCaptionsOnCanvasWithTempPosition();
-  }, [isDragging, selectedSegmentId]);
+  }, [isDragging, effectiveSelectedId]);
 
   // Global mouse up handler
   const handleGlobalMouseUp = useCallback(() => {
     // Save the temporary position to actual caption data if we have one
-    if (tempDragPositionRef.current && selectedSegmentId && onCaptionUpdate) {
-      const currentCaption = captions.find(c => c.id === selectedSegmentId);
+    if (tempDragPositionRef.current && effectiveSelectedId && onFrameSelect) {
+      const currentCaption = effectiveCaptions.find(c => c.id === effectiveSelectedId);
       if (currentCaption) {
-        onCaptionUpdate(selectedSegmentId, {
-          style: {
-            ...currentCaption.style,
-            position: {
-              ...currentCaption.style.position,
-              x: tempDragPositionRef.current.x,
-              y: tempDragPositionRef.current.y
-            }
-          }
-        });
+        // In AI mode, selection is by frame; style updates handled elsewhere
       }
     }
     
     // Clear temp position and stop dragging
     tempDragPositionRef.current = null;
     setIsDragging(false);
-  }, [selectedSegmentId, onCaptionUpdate, captions]);
+  }, [effectiveSelectedId, effectiveCaptions, aiSubtitleData]);
 
 
     // Render captions on canvas (same logic as export)
@@ -278,7 +329,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
       ctx.clearRect(0, 0, canvas.width, canvas.height);
   
       // Render regular captions using Caption Styling
-      const currentCaptions = captions.filter(
+      const currentCaptions = effectiveCaptions.filter(
         caption => currentTime >= caption.startTime && currentTime <= caption.endTime
       );
   
@@ -288,7 +339,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
       currentCaptions.forEach(caption => {
         renderCaptionOnCanvas(ctx, caption, canvas.width, canvas.height, currentTime, scaleFactor);
       });
-    }, [captions, currentTime, selectedSegmentId, scaleFactor]);
+    }, [effectiveCaptions, currentTime, effectiveSelectedId, scaleFactor]);
 
   // Set up global mouse event listeners for dragging
   useEffect(() => {
@@ -516,7 +567,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Get all current captions (for potential overlapping)
-    const currentCaptions = captions.filter(
+    const currentCaptions = effectiveCaptions.filter(
       caption => currentTime >= caption.startTime && currentTime <= caption.endTime
     );
 
@@ -527,7 +578,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
       let renderCaption = caption;
       
       // If this is the selected caption being dragged, use temp position
-      if (caption.id === selectedSegmentId && tempDragPositionRef.current) {
+      if (caption.id === effectiveSelectedId && tempDragPositionRef.current) {
         renderCaption = {
           ...caption,
           style: {
@@ -543,7 +594,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
       
       renderCaptionOnCanvas(ctx, renderCaption, canvas.width, canvas.height, currentTime, scaleFactor);
     });
-  }, [captions, currentTime, selectedSegmentId, scaleFactor]);
+  }, [effectiveCaptions, currentTime, effectiveSelectedId, scaleFactor]);
 
   // Force re-render when caption styles change - optimized
   useEffect(() => {
@@ -551,7 +602,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     if (!isDragging) {
       renderCaptionsOnCanvas();
     }
-  }, [captions.map(c => JSON.stringify(c.style)).join('|'), isDragging]); // Trigger when any style property changes
+  }, [effectiveCaptions.map(c => JSON.stringify(c.style)).join('|'), isDragging]); // Trigger when any style property changes
 
   // Re-render when captions or time changes - but not during dragging
   useEffect(() => {
@@ -1139,7 +1190,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
             maxWidth: '100%',
             maxHeight: '100%',
             objectFit: 'contain',
-            pointerEvents: captions.some(c => currentTime >= c.startTime && currentTime <= c.endTime) ? 'auto' : 'none',
+            pointerEvents: effectiveCaptions.some(c => currentTime >= c.startTime && currentTime <= c.endTime) ? 'auto' : 'none',
             cursor: isDragging ? 'grabbing' : (isHoveringCaption ? 'grab' : 'default'),
             zIndex: 10,
             // Show canvas background when video fails to load
@@ -1214,11 +1265,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
           isOpen={showCaptionStyleModal}
           onClose={() => setShowCaptionStyleModal(false)}
           caption={selectedCaptionForStyling}
-          onUpdate={(updates) => {
-            if (onCaptionUpdate && selectedCaptionForStyling) {
-              onCaptionUpdate(selectedCaptionForStyling.id, updates);
-            }
-          }}
+          onUpdate={() => {}}
           position={modalPosition}
         />
       </div>
@@ -1247,7 +1294,7 @@ function applyTextTransform(text: string, transform?: string): string {
 // Canvas rendering functions (matching CanvasVideoRenderer exactly)
 function renderCaptionOnCanvas(
   ctx: CanvasRenderingContext2D,
-  caption: CaptionSegment,
+  caption: any,
   canvasWidth: number,
   canvasHeight: number,
   currentTime: number,
@@ -1283,7 +1330,7 @@ function renderCaptionOnCanvas(
         text = text.toLowerCase();
         break;
       case 'capitalize':
-        text = text.replace(/\b\w/g, l => l.toUpperCase());
+        text = text.replace(/\b\w/g, (l: string) => l.toUpperCase());
         break;
     }
   }
@@ -1314,7 +1361,7 @@ function renderCaptionOnCanvas(
 function renderSimpleTextOnCanvas(
   ctx: CanvasRenderingContext2D,
   text: string,
-  caption: CaptionSegment,
+  caption: any,
   x: number,
   y: number,
   scaleFactor: number
@@ -1442,7 +1489,7 @@ function wrapTextToWidth(
 function renderKaraokeTextOnCanvas(
   ctx: CanvasRenderingContext2D,
   words: any[],
-  caption: CaptionSegment,
+  caption: any,
   frameTime: number,
   centerX: number,
   centerY: number,
@@ -1617,7 +1664,7 @@ function mapFontName(fontName: string): string {
 function renderProgressiveTextOnCanvas(
   ctx: CanvasRenderingContext2D,
   words: any[],
-  caption: CaptionSegment,
+  caption: any,
   frameTime: number,
   centerX: number,
   centerY: number,
@@ -1673,7 +1720,7 @@ function renderProgressiveTextOnCanvas(
     const firstWordY = centerY;
     
     // Draw each word in the line vertically
-    displayLine.forEach((word, wordIndex) => {
+    displayLine.forEach((word: any, wordIndex: number) => {
       // First word (index 0) stays at centerY, others appear below
       const wordY = firstWordY + (wordIndex * lineHeight);
       const isHighlighted = frameTime >= word.start && frameTime <= word.end;

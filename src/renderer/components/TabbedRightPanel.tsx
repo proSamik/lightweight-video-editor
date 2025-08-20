@@ -1,16 +1,11 @@
 import React, { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
-import { CaptionSegment, AISubtitleData } from '../../types';
+import { AISubtitleData } from '../../types';
 import StylingPanel from './StylingPanel';
 import AISubtitlesPanel from './AISubtitlesPanel';
 import { Palette, Brain } from 'lucide-react';
 
 interface TabbedRightPanelProps {
-  selectedSegment: CaptionSegment | null;
-  onSegmentUpdate: (segmentId: string, updates: Partial<CaptionSegment>) => void;
-  captions: CaptionSegment[];
-  onApplyToAll: (styleUpdates: Partial<CaptionSegment['style']>) => void;
-  onApplyToTimeline?: (startTime: number, endTime: number, styleUpdates: Partial<CaptionSegment['style']>) => void;
   onTimeSeek: (time: number) => void;
   transcriptionStatus: {
     isTranscribing: boolean;
@@ -19,39 +14,26 @@ interface TabbedRightPanelProps {
     speed?: string;
     eta?: string;
   };
-  selectedSegmentId: string | null;
-  onSegmentSelect: (segmentId: string) => void;
-  onSegmentDelete: (segmentId: string) => void;
   currentTime: number;
   aiSubtitleData?: AISubtitleData | null;
   onAISubtitleUpdate?: (data: AISubtitleData | null) => void;
   selectedFrameId?: string | null;
   onFrameSelect?: (frameId: string) => void;
-  onCaptionsSync?: (updatedCaptions: CaptionSegment[]) => void;
 }
 
 type TabType = 'styling' | 'aiSubtitles';
 
 const TabbedRightPanel: React.FC<TabbedRightPanelProps> = ({
-  selectedSegment,
-  onSegmentUpdate,
-  captions,
-  onApplyToAll,
-  onApplyToTimeline,
   onTimeSeek,
   transcriptionStatus,
-  selectedSegmentId,
-  onSegmentSelect,
-  onSegmentDelete,
   currentTime,
   aiSubtitleData,
   onAISubtitleUpdate,
   selectedFrameId,
   onFrameSelect,
-  onCaptionsSync,
 }) => {
   const { theme } = useTheme();
-  const [activeTab, setActiveTab] = useState<TabType>('styling');
+  const [activeTab, setActiveTab] = useState<TabType>('aiSubtitles');
 
   const tabStyle = (isActive: boolean) => ({
     flex: 1,
@@ -107,27 +89,20 @@ const TabbedRightPanel: React.FC<TabbedRightPanelProps> = ({
       }}>
         {activeTab === 'styling' ? (
           <StylingPanel
-            selectedSegment={selectedSegment}
-            onSegmentUpdate={onSegmentUpdate}
-            onApplyToAll={onApplyToAll}
-            onApplyToTimeline={onApplyToTimeline}
             onTimeSeek={onTimeSeek}
-            captions={captions}
-            currentTime={currentTime}
             transcriptionStatus={transcriptionStatus}
+            aiSubtitleData={aiSubtitleData}
+            selectedFrameId={selectedFrameId}
+            onAISubtitleUpdate={onAISubtitleUpdate}
           />
         ) : (
           <AISubtitlesPanel
-            captions={captions}
             currentTime={currentTime}
             onTimeSeek={onTimeSeek}
-            onCaptionUpdate={onSegmentUpdate}
-            onSegmentDelete={onSegmentDelete}
             aiSubtitleData={aiSubtitleData}
             onAISubtitleUpdate={onAISubtitleUpdate}
             selectedFrameId={selectedFrameId}
             onFrameSelect={onFrameSelect}
-            onCaptionsSync={onCaptionsSync}
           />
         )}
       </div>

@@ -483,6 +483,92 @@ ipcMain.handle('export-video-with-new-audio', async (event, videoPath: string, n
   }
 });
 
+ipcMain.handle('render-video-with-ai-subtitles', async (event, videoPath: string, aiSubtitleData: any, outputPath: string, exportSettings?: any, replacementAudioPath?: string) => {
+  try {
+    // Convert AI subtitle data to captions format for now
+    // TODO: Update FFmpeg services to work directly with AI subtitles
+    const captionsData = aiSubtitleData.frames.map((frame: any) => {
+      const visibleWords = Array.isArray(frame.words)
+        ? frame.words.filter((w: any) => w && w.editState !== 'strikethrough' && !w.isPause)
+        : [];
+
+      const mergedStyle = {
+        font: frame.style?.font || 'Arial',
+        fontSize: frame.style?.fontSize ?? 85,
+        textColor: frame.style?.textColor || '#ffffff',
+        highlighterColor: frame.style?.highlighterColor || '#ffff00',
+        backgroundColor: frame.style?.backgroundColor ?? 'transparent',
+        strokeColor: frame.style?.strokeColor,
+        strokeWidth: frame.style?.strokeWidth,
+        textTransform: frame.style?.textTransform,
+        position: {
+          x: frame.style?.position?.x ?? 50,
+          y: frame.style?.position?.y ?? 85,
+          z: frame.style?.position?.z ?? 0,
+        },
+        scale: frame.style?.scale ?? 1,
+        emphasizeMode: frame.style?.emphasizeMode ?? true,
+        renderMode: frame.style?.renderMode || 'horizontal',
+        textAlign: frame.style?.textAlign || 'center',
+        burnInSubtitles: frame.style?.burnInSubtitles !== false,
+      };
+
+      return {
+        id: frame.id,
+        startTime: Math.round(frame.startTime * 1000),
+        endTime: Math.round(frame.endTime * 1000),
+        text: visibleWords.map((w: any) => w.word).join(' '),
+        words: visibleWords.map((w: any) => ({
+          word: w.word,
+          start: Math.round(w.start * 1000),
+          end: Math.round(w.end * 1000),
+          editState: w.editState || 'normal',
+        })),
+        style: mergedStyle,
+      };
+    });
+
+    const ffmpegService = FFmpegService.getInstance();
+    
+    if (replacementAudioPath) {
+      // First render video with captions to a temp file
+      const tempVideoPath = outputPath.replace('.mp4', '_temp_with_subtitles.mp4');
+      await ffmpegService.renderVideoWithBurnedCaptions(videoPath, captionsData, tempVideoPath, (progress: number) => {
+        // Send progress updates to renderer (first 80% for subtitle rendering)
+        event.sender.send('rendering-progress', progress * 0.8);
+      }, exportSettings);
+      
+      // Then replace the audio track
+      await ffmpegService.replaceAudioTrack(tempVideoPath, replacementAudioPath, outputPath);
+      
+      // Send final progress
+      event.sender.send('rendering-progress', 100);
+      
+      // Clean up temp file
+      const fs = require('fs');
+      try {
+        fs.unlinkSync(tempVideoPath);
+      } catch (cleanupError) {
+        console.warn('Failed to clean up temp file:', cleanupError);
+      }
+      
+      return outputPath;
+    } else {
+      // Normal rendering without audio replacement
+      return await ffmpegService.renderVideoWithBurnedCaptions(videoPath, captionsData, outputPath, (progress: number) => {
+        // Send progress updates to renderer
+        event.sender.send('rendering-progress', progress);
+      }, exportSettings);
+    } 
+  } catch (error) {
+    // Check if this is a cancellation (expected behavior)
+    if (error instanceof Error && error.message.includes('cancelled')) {
+      throw error; // Re-throw cancellation errors as-is
+    }
+    throw new Error(`Failed to render video with AI subtitles: ${error}`);
+  }
+});
+
 ipcMain.handle('handle-file-drop', async (_event, filePath: string) => {
   // Send the dropped file path to the renderer
   mainWindow.webContents.send('file-dropped', filePath);
@@ -684,40 +770,40 @@ ipcMain.handle('test-ai-connection', async (_event, settings: any) => {
   }
 });
 
-ipcMain.handle('generate-description', async (_event, captions: any[], customPrompt?: string) => {
+ipcMain.handle('generate-description', async (_event, captionText: string, customPrompt?: string) => {
   try {
     const aiService = AIService.getInstance();
-    return await aiService.generateDescription(captions, customPrompt);
+    return await aiService.generateDescription(captionText, customPrompt);
   } catch (error) {
     console.error('Failed to generate description:', error);
     throw new Error(`Failed to generate description: ${error}`);
   }
 });
 
-ipcMain.handle('generate-titles', async (_event, description: string, captions: any[], customPrompt?: string) => {
+ipcMain.handle('generate-titles', async (_event, description: string, captionText: string, customPrompt?: string) => {
   try {
     const aiService = AIService.getInstance();
-    return await aiService.generateTitles(description, captions, customPrompt);
+    return await aiService.generateTitles(description, captionText, customPrompt);
   } catch (error) {
     console.error('Failed to generate titles:', error);
     throw new Error(`Failed to generate titles: ${error}`);
   }
 });
 
-ipcMain.handle('generate-tweet-hooks', async (_event, captions: any[], customPrompt?: string) => {
+ipcMain.handle('generate-tweet-hooks', async (_event, captionText: string, customPrompt?: string) => {
   try {
     const aiService = AIService.getInstance();
-    return await aiService.generateTweetHooks(captions, customPrompt);
+    return await aiService.generateTweetHooks(captionText, customPrompt);
   } catch (error) {
     console.error('Failed to generate tweet hooks:', error);
     throw new Error(`Failed to generate tweet hooks: ${error}`);
   }
 });
 
-ipcMain.handle('generate-thumbnail-ideas', async (_event, captions: any[], customPrompt?: string) => {
+ipcMain.handle('generate-thumbnail-ideas', async (_event, captionText: string, customPrompt?: string) => {
   try {
     const aiService = AIService.getInstance();
-    return await aiService.generateThumbnailIdeas(captions, customPrompt);
+    return await aiService.generateThumbnailIdeas(captionText, customPrompt);
   } catch (error) {
     console.error('Failed to generate thumbnail ideas:', error);
     throw new Error(`Failed to generate thumbnail ideas: ${error}`);

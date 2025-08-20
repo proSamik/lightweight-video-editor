@@ -1,5 +1,5 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { CaptionSegment } from '../../types';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import { AISubtitleData, SubtitleFrame, SubtitleStyle } from '../../types';
 import { useTheme } from '../contexts/ThemeContext';
 import { Button } from './ui';
 import { 
@@ -17,15 +17,9 @@ import {
 
 
 interface UnifiedTimelineProps {
-  captions: CaptionSegment[];
   currentTime: number;
-  selectedSegmentId: string | null;
-  onSegmentSelect: (segmentId: string) => void;
   onTimeSeek: (time: number) => void;
-  onSegmentDelete: (segmentId: string) => void;
-  onCaptionUpdate: (segmentId: string, updates: Partial<CaptionSegment>) => void;
   videoFile?: { path: string; name: string; duration?: number } | null;
-  onReTranscribeSegment?: (startTime: number, endTime: number) => void;
   onPlayPause?: () => void;
   isPlaying?: boolean;
   onUndo?: () => void;
@@ -34,6 +28,10 @@ interface UnifiedTimelineProps {
   canRedo?: boolean;
   replacementAudioPath?: string | null;
   onAudioPreviewToggle?: (enabled: boolean) => void;
+  // AI Subtitle support - when available, use instead of captions
+  aiSubtitleData?: AISubtitleData | null;
+  selectedFrameId?: string | null;
+  onFrameSelect?: (frameId: string) => void;
 }
 
 /**
@@ -42,12 +40,8 @@ interface UnifiedTimelineProps {
  * Timeline component with scroll, zoom, and interaction controls
  */
 const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
-  captions,
   currentTime,
-  selectedSegmentId,
-  onSegmentSelect,
   onTimeSeek,
-  onSegmentDelete,
   videoFile,
   onPlayPause,
   isPlaying = false,
@@ -57,6 +51,9 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   canRedo = false,
   replacementAudioPath,
   onAudioPreviewToggle,
+  aiSubtitleData,
+  selectedFrameId,
+  onFrameSelect,
 }) => {
   const { theme } = useTheme();
   const timelineRef = useRef<HTMLDivElement>(null);
@@ -68,6 +65,60 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   const [deleteConfirm, setDeleteConfirm] = useState<{segmentId: string, text: string} | null>(null);
   const [zoomLevel, setZoomLevel] = useState(0);
 
+  // Convert AI subtitle frames to virtual caption segments for timeline display
+  type DisplaySegment = { id: string; startTime: number; endTime: number; text: string; style: SubtitleStyle };
+  const virtualCaptionsFromAI = useMemo((): DisplaySegment[] => {
+    if (!aiSubtitleData) return [];
+    
+    const virtualCaptions: DisplaySegment[] = [];
+    
+    aiSubtitleData.frames.forEach(frame => {
+      // Provide a safe fallback style
+      const baseStyle = frame.style || {
+        font: 'Segoe UI',
+        fontSize: 85,
+        textColor: '#ffffff',
+        highlighterColor: '#ffff00',
+        backgroundColor: 'transparent',
+        strokeColor: '#000000',
+        strokeWidth: 2,
+        textTransform: 'none',
+        position: { x: 50, y: 80, z: 0 },
+        renderMode: 'horizontal',
+        textAlign: 'center',
+        scale: 1,
+        emphasizeMode: true,
+        burnInSubtitles: true,
+      } as any;
+
+      // Get visible words from the frame
+      const visibleWords = frame.words.filter(word => 
+        word.editState !== 'strikethrough' && 
+        word.editState !== 'removedCaption' &&
+        !word.isPause
+      );
+
+      if (visibleWords.length === 0) return; // Skip empty frames
+
+      // Create virtual caption segment for timeline
+      const virtualCaption: DisplaySegment = {
+        id: frame.id,
+        startTime: frame.startTime * 1000, // Convert seconds to milliseconds
+        endTime: frame.endTime * 1000,
+        text: visibleWords.map(w => w.word).join(' '),
+        style: baseStyle
+      };
+
+      virtualCaptions.push(virtualCaption);
+    });
+
+    return virtualCaptions.sort((a, b) => a.startTime - b.startTime);
+  }, [aiSubtitleData]);
+
+  // Use AI-derived segments
+  const effectiveCaptions = virtualCaptionsFromAI;
+  const effectiveSelectedId = selectedFrameId || null;
+
   // Timeline dimensions
   const TIMELINE_HEIGHT = 160;
   const CAPTION_TRACK_HEIGHT = 140;
@@ -75,8 +126,8 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   // Use video duration if available, otherwise fallback to caption duration
   const actualDuration = videoFile?.duration 
     ? videoFile.duration * 1000 // Convert from seconds to milliseconds
-    : captions.length > 0 
-      ? Math.max(...captions.map(c => c.endTime))
+    : effectiveCaptions.length > 0 
+      ? Math.max(...effectiveCaptions.map(c => c.endTime))
       : 60000; // Default 1 minute
 
   /**
@@ -169,13 +220,6 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
    */
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (selectedSegmentId) {
-        if (e.key === 'Delete' || e.key === 'Backspace') {
-          e.preventDefault();
-          onSegmentDelete(selectedSegmentId);
-        }
-      }
-      
       if (e.key === ' ') {
         e.preventDefault();
         onPlayPause?.();
@@ -205,7 +249,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('click', handleClick);
     };
-  }, [selectedSegmentId, onSegmentDelete, onPlayPause, onUndo, onRedo, canUndo, canRedo, contextMenu]);
+  }, [onPlayPause, onUndo, onRedo, canUndo, canRedo, contextMenu]);
 
   /**
    * Update container width when timeline container changes
@@ -333,8 +377,8 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   /**
    * Handle segment double click to select and seek to middle
    */
-  const handleSegmentDoubleClick = (segment: CaptionSegment) => {
-    onSegmentSelect(segment.id);
+  const handleSegmentDoubleClick = (segment: { id: string; startTime: number; endTime: number }) => {
+    onFrameSelect?.(segment.id);
     const middleTime = segment.startTime + ((segment.endTime - segment.startTime) / 2);
     onTimeSeek(middleTime);
   };
@@ -342,8 +386,8 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   /**
    * Handle segment click to select
    */
-  const handleSegmentClick = (segment: CaptionSegment) => {
-    onSegmentSelect(segment.id);
+  const handleSegmentClick = (segment: { id: string }) => {
+    onFrameSelect?.(segment.id);
   };
 
   return (
@@ -798,10 +842,10 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
               zIndex: 10
             }}
           >
-            {captions.map((segment, index) => {
+            {effectiveCaptions.map((segment, index) => {
               const left = (segment.startTime / actualDuration) * 100;
               const width = ((segment.endTime - segment.startTime) / actualDuration) * 100;
-              const isSelected = segment.id === selectedSegmentId;
+              const isSelected = segment.id === effectiveSelectedId;
               
               // Use consistent blue border color for all segments
               const segmentBorderColor = isSelected 
@@ -893,16 +937,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
               alignItems: 'center',
               gap: '8px'
             }}
-            onClick={() => {
-              const segment = captions.find(c => c.id === contextMenu.segmentId);
-              if (segment) {
-                setDeleteConfirm({
-                  segmentId: contextMenu.segmentId,
-                  text: segment.text
-                });
-                setContextMenu(null);
-              }
-            }}
+            onClick={() => setContextMenu(null)}
           >
             <FiTrash2 size={12} />
             Delete Segment
@@ -959,10 +994,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                 Cancel
               </button>
               <button
-                onClick={() => {
-                  onSegmentDelete(deleteConfirm.segmentId);
-                  setDeleteConfirm(null);
-                }}
+                onClick={() => setDeleteConfirm(null)}
                 style={{
                   padding: '8px 16px',
                   backgroundColor: theme.colors.error,

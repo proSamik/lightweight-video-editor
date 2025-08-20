@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
-import { ExportSettings, CaptionSegment } from '../../types';
+import { ExportSettings, AISubtitleData } from '../../types';
 import { LiquidModal } from './ui';
 import { FiSettings, FiZap, FiTarget, FiStar, FiMusic, FiFileText, FiVideo } from 'react-icons/fi';
 
@@ -9,7 +9,7 @@ interface ExportSettingsProps {
   onClose: () => void;
   onConfirm: (settings: ExportSettings) => void;
   replacementAudioPath?: string | null;
-  captions?: CaptionSegment[];
+  aiSubtitleData?: AISubtitleData | null;
 }
 
 const ExportSettingsModal: React.FC<ExportSettingsProps> = ({
@@ -17,14 +17,14 @@ const ExportSettingsModal: React.FC<ExportSettingsProps> = ({
   onClose,
   onConfirm,
   replacementAudioPath,
-  captions
+  aiSubtitleData
 }) => {
   const { theme } = useTheme();
   const [framerate, setFramerate] = useState<30 | 60>(30);
   const [exportMode, setExportMode] = useState<'complete' | 'newAudio' | 'subtitlesOnly'>('complete');
   const quality = 'high'; // Always use high quality
   
-  const hasCaptions = Boolean(captions?.length);
+  const hasSubtitles = Boolean(aiSubtitleData?.frames?.length);
   const hasReplacementAudio = Boolean(replacementAudioPath);
 
   const handleConfirm = () => {
@@ -185,11 +185,11 @@ const ExportSettingsModal: React.FC<ExportSettingsProps> = ({
                 value: 'complete', 
                 label: 'Export Complete Video', 
                 description: (() => {
-                  if (hasReplacementAudio && hasCaptions) {
+                  if (hasReplacementAudio && hasSubtitles) {
                     return 'Export video with new audio and subtitles';
-                  } else if (hasReplacementAudio && !hasCaptions) {
+                  } else if (hasReplacementAudio && !hasSubtitles) {
                     return 'Export video with new audio only';
-                  } else if (!hasReplacementAudio && hasCaptions) {
+                  } else if (!hasReplacementAudio && hasSubtitles) {
                     return 'Export video with original audio and subtitles';
                   } else {
                     return 'Export video with original audio only';
@@ -204,8 +204,8 @@ const ExportSettingsModal: React.FC<ExportSettingsProps> = ({
                 description: 'Export video with new audio only (no subtitles)', 
                 icon: FiMusic 
               }] : []),
-              // Show Export Video with Subtitles Only only if replacement audio AND captions are available
-              ...(hasReplacementAudio && hasCaptions ? [{ 
+              // Show Export Video with Subtitles Only only if replacement audio AND subtitles are available
+              ...(hasReplacementAudio && hasSubtitles ? [{ 
                 value: 'subtitlesOnly', 
                 label: 'Export Video with Subtitles Only', 
                 description: 'Export video with original audio and subtitles', 

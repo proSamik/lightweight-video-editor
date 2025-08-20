@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { CaptionPreset, CaptionStyle } from '../../../types';
+import { CaptionPreset, SubtitleStyle } from '../../../types';
 import { presetCategories } from '../../data/captionPresets';
 import { PresetPreview } from '../PresetPreview';
 
 interface PresetSelectorProps {
   selectedPresetId?: string;
   onPresetSelect: (preset: CaptionPreset) => void;
-  onStyleUpdate: (style: Partial<CaptionStyle>) => void;
-  onApplyToAll?: (style: Partial<CaptionStyle>) => void;
+  onStyleUpdate: (style: Partial<SubtitleStyle>) => void;
+  onApplyToAll?: (style: Partial<SubtitleStyle>) => void;
 }
 
 export const PresetSelector: React.FC<PresetSelectorProps> = ({
@@ -29,7 +29,7 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
     presets: category.presets.filter(preset => 
       preset.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       preset.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      preset.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+      (preset.tags || []).some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
     )
   })).filter(category => category.presets.length > 0);
 

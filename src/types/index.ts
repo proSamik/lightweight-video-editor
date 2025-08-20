@@ -1,52 +1,3 @@
-export interface CaptionSegment {
-  id: string;
-  startTime: number;
-  endTime: number;
-  text: string;
-  words?: WordTimestamp[];
-  style: CaptionStyle;
-}
-
-export interface CaptionStyle {
-  font: string; // Changed from FontOption to string for more flexibility
-  fontSize: number;
-  textColor: string; // Changed from ColorOption to string
-  highlighterColor: string; // Changed from ColorOption to string
-  backgroundColor: string; // Changed from ColorOption to string
-  strokeColor?: string; // Text stroke color
-  strokeWidth?: number; // Text stroke width
-  textTransform?: 'none' | 'capitalize' | 'uppercase' | 'lowercase'; // Text transformation
-  position: {
-    x: number;
-    y: number;
-    z?: number; // Z-axis rotation in degrees (0-360)
-  };
-  scale?: number; // Scale factor for subtitle size (0.5 - 2.0)
-  emphasizeMode?: boolean; // When true, highlighted words get emphasized instead of background highlight
-  renderMode?: 'horizontal' | 'progressive'; // New: horizontal (default) or progressive reveal
-  textAlign?: 'left' | 'center' | 'right'; // Text alignment for progressive mode
-  burnInSubtitles?: boolean; // Whether to burn subtitles into video or not (default: true)
-  animation?: AnimationStyle; // Animation properties for the preset
-}
-
-export interface AnimationStyle {
-  type: 'bounce' | 'fade' | 'slide' | 'typewriter' | 'glow' | 'wave' | 'zoom' | 'shake';
-  duration?: number; // Animation duration in milliseconds
-  delay?: number; // Delay between word animations in milliseconds
-  intensity?: number; // Animation intensity (0-1)
-  direction?: 'up' | 'down' | 'left' | 'right'; // For slide animations
-}
-
-export interface CaptionPreset {
-  id: string;
-  name: string;
-  description: string;
-  category: 'modern' | 'classic' | 'creative' | 'professional';
-  style: CaptionStyle;
-  thumbnail?: string; // Base64 encoded preview image
-  tags: string[];
-  popularity?: number; // For sorting by popularity
-}
 
 export interface WordTimestamp {
   word: string;
@@ -137,7 +88,7 @@ export interface TimelineSelection {
 export interface ProjectData {
   version: string;
   videoFile: VideoFile | null;
-  captions: CaptionSegment[];
+  aiSubtitleData?: AISubtitleData | null; // Primary subtitle data from AI processing
   timeline: TimelineSelection[];
   replacementAudioPath?: string | null;
   extractedAudioPath?: string | null; // Path to extracted audio file for waveform and transcription
@@ -180,22 +131,37 @@ export interface GeneratedContent {
   thumbnails?: string[];
 }
 
-export interface PresetCategory {
-  id: string;
-  name: string;
-  description: string;
-  presets: CaptionPreset[];
-}
 
 // AI Subtitles enhanced types
 export type WordEditState = 'normal' | 'strikethrough' | 'censored' | 'removedCaption' | 'editing';
+
+export interface SubtitleStyle {
+  font: string;
+  fontSize: number;
+  textColor: string;
+  highlighterColor: string;
+  backgroundColor: string;
+  strokeColor?: string;
+  strokeWidth?: number;
+  textTransform?: 'none' | 'capitalize' | 'uppercase' | 'lowercase';
+  position: {
+    x: number;
+    y: number;
+    z?: number;
+  };
+  scale?: number;
+  emphasizeMode?: boolean;
+  renderMode?: 'horizontal' | 'progressive';
+  textAlign?: 'left' | 'center' | 'right';
+  burnInSubtitles?: boolean;
+}
 
 export interface WordSegment extends WordTimestamp {
   id: string;
   editState: WordEditState;
   originalWord: string; // Keep track of original word for restore
   isKeyword?: boolean; // For keyword highlighting
-  customStyle?: Partial<CaptionStyle>; // Per-word style overrides
+  customStyle?: Partial<SubtitleStyle>; // Per-word style overrides
   isPause?: boolean; // For [.] pause markers
 }
 
@@ -205,7 +171,8 @@ export interface SubtitleFrame {
   endTime: number;
   words: WordSegment[];
   isCustomBreak?: boolean; // True if manually separated with double-enter
-  segmentId: string; // Reference to original caption segment
+  segmentId: string; // Reference to original segment
+  style?: SubtitleStyle; // Style information for this frame
 }
 
 export interface WordStyle {
@@ -232,4 +199,30 @@ export interface AISubtitleData {
   maxWordsPerFrame: number; // From transcription settings
   maxCharsPerFrame: number; // From transcription settings
   lastModified: number;
+}
+
+// Caption preset types for styling UI
+export interface CaptionPreset {
+  id: string;
+  name: string;
+  description: string;
+  category: 'modern' | 'creative' | 'professional' | 'classic';
+  style: SubtitleStyle & {
+    animation?: {
+      type: 'bounce' | 'fade' | 'typewriter' | 'glow' | 'slide' | 'shake' | 'zoom' | 'wave';
+      duration: number;
+      delay: number;
+      intensity: number;
+      direction?: 'up' | 'down' | 'left' | 'right';
+    };
+  };
+  tags?: string[];
+  popularity?: number;
+}
+
+export interface PresetCategory {
+  id: 'modern' | 'creative' | 'professional' | 'classic';
+  name: string;
+  description: string;
+  presets: CaptionPreset[];
 }

@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { VideoFile, CaptionSegment,ColorOption, ExportSettings, ProjectData, AISettings, GeneratedContent, AISubtitleData } from '../types';
+import { VideoFile, ExportSettings, ProjectData, AISettings, GeneratedContent, AISubtitleData, SubtitleFrame } from '../types';
 import VideoPanel from './components/VideoPanel';
 import UnifiedTimeline from './components/UnifiedTimeline';
 import TabbedRightPanel from './components/TabbedRightPanel';
 import TranscriptionSettings from './components/TranscriptionSettings';
 import ProjectManagerModal from './components/ProjectManager';
 import SuccessModal from './components/SuccessModal';
-import LoadingScreen from './components/LoadingScreen';
 import ExportProcessingModal from './components/ExportProcessingModal';
 import AISettingsModal from './components/AISettingsModal';
 import AIContentModal from './components/AIContentModal';
@@ -33,8 +32,6 @@ import {
 } from './components/IconComponents';
 
 interface AppState {
-  captions: CaptionSegment[];
-  selectedSegmentId: string | null;
   aiSubtitleData?: AISubtitleData | null;
   selectedFrameId?: string | null;
 }
@@ -45,9 +42,6 @@ const AppContent: React.FC = () => {
   const [replacementAudioPath, setReplacementAudioPath] = useState<string | null>(null);
   const [isAudioPreviewEnabled, setIsAudioPreviewEnabled] = useState(true);
   const [extractedAudioPath, setExtractedAudioPath] = useState<string | null>(null);
-  const [captions, setCaptions] = useState<CaptionSegment[]>([]);
-  const [originalCaptions, setOriginalCaptions] = useState<CaptionSegment[]>([]);
-  const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
   const [aiSubtitleData, setAiSubtitleData] = useState<AISubtitleData | null>(null);
   const [selectedFrameId, setSelectedFrameId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
@@ -116,7 +110,7 @@ const AppContent: React.FC = () => {
   // Initialize history and load project info
   useEffect(() => {
     if (historyIndex === -1) {
-      setHistory([{ captions: [], selectedSegmentId: null, aiSubtitleData: null, selectedFrameId: null }]);
+      setHistory([{ aiSubtitleData: null, selectedFrameId: null }]);
       setHistoryIndex(0);
     }
     loadCurrentProjectInfo();
@@ -144,7 +138,7 @@ const AppContent: React.FC = () => {
 
   // Save state to history
   const saveToHistory = () => {
-    const currentState = { captions, selectedSegmentId, aiSubtitleData, selectedFrameId };
+    const currentState = { aiSubtitleData, selectedFrameId };
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push(currentState);
     setHistory(newHistory);
@@ -161,19 +155,7 @@ const AppContent: React.FC = () => {
     markProjectModified();
   };
 
-  // Handle syncing captions from AI Subtitles
-  const handleCaptionsSync = (updatedCaptions: CaptionSegment[]) => {
-    // Update captions without adding to history (since AI subtitle changes already handle history)
-    setCaptions(updatedCaptions);
-    
-    // Mark project as modified
-    markProjectModified();
-    
-    // Clear segment selection if the selected segment no longer exists
-    if (selectedSegmentId && !updatedCaptions.find(c => c.id === selectedSegmentId)) {
-      setSelectedSegmentId(null);
-    }
-  };
+  // No more caption sync needed - AI Subtitles are the single source of truth
 
   // Update-related handlers
   const handleShowUpdateModal = (type: 'available' | 'downloaded' | 'changelog', info: any) => {
@@ -187,8 +169,6 @@ const AppContent: React.FC = () => {
     if (historyIndex > 0) {
       const newIndex = historyIndex - 1;
       const state = history[newIndex];
-      setCaptions(state.captions);
-      setSelectedSegmentId(state.selectedSegmentId);
       setAiSubtitleData(state.aiSubtitleData || null);
       setSelectedFrameId(state.selectedFrameId || null);
       setHistoryIndex(newIndex);
@@ -199,27 +179,12 @@ const AppContent: React.FC = () => {
     if (historyIndex < history.length - 1) {
       const newIndex = historyIndex + 1;
       const state = history[newIndex];
-      setCaptions(state.captions);
-      setSelectedSegmentId(state.selectedSegmentId);
       setAiSubtitleData(state.aiSubtitleData || null);
       setSelectedFrameId(state.selectedFrameId || null);
       setHistoryIndex(newIndex);
     }
   };
 
-  // Auto-select segment based on current time
-  useEffect(() => {
-    if (captions.length > 0) {
-      const currentSegment = captions.find(
-        caption => currentTime >= caption.startTime && currentTime <= caption.endTime
-      );
-      
-      // Only auto-select if no segment is currently selected or if we're in a different segment
-      if (currentSegment && currentSegment.id !== selectedSegmentId) {
-        setSelectedSegmentId(currentSegment.id);
-      }
-    }
-  }, [currentTime, captions, selectedSegmentId]);
 
 
   // Progress tracking and file drop event listeners
@@ -279,7 +244,7 @@ const AppContent: React.FC = () => {
         setShowAISettings(true);
       } else if ((e.metaKey || e.ctrlKey) && e.key === 'g') {
         e.preventDefault();
-        if (captions.length > 0) {
+        if (aiSubtitleData && aiSubtitleData.frames.length > 0) {
           setShowAIContent(true);
         }
       }
@@ -287,7 +252,7 @@ const AppContent: React.FC = () => {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [historyIndex, history, videoFile, captions]);
+  }, [historyIndex, history, videoFile, aiSubtitleData]);
 
   const checkDependencies = async () => {
     try {
@@ -387,7 +352,6 @@ const AppContent: React.FC = () => {
       
       setTranscriptionStatus(prev => ({ ...prev, message: 'Processing transcription results...' }));
       
-      // Convert transcription to caption segments with optional line wrapping
       // Get video metadata to determine aspect ratio for responsive font sizing
       const videoMetadata = await window.electronAPI.getVideoMetadata(videoPath);
       const isVertical = videoMetadata && videoMetadata.width && videoMetadata.height && 
@@ -404,45 +368,18 @@ const AppContent: React.FC = () => {
         defaultFontSize
       });
       
-      let captionSegments: CaptionSegment[] = transcriptionResult.segments.map((segment: any, index: number) => ({
-        id: `segment-${index}`,
-        startTime: segment.start, // Already in milliseconds from Whisper service
-        endTime: segment.end, // Already in milliseconds from Whisper service
-        text: segment.text,
-        words: segment.words ? segment.words.map((word: any) => ({
-          word: word.word,
-          start: word.start, // Already in milliseconds from Whisper service
-          end: word.end // Already in milliseconds from Whisper service
-        })) : [],
-        style: {
-          font: 'Segoe UI',
-          fontSize: defaultFontSize,
-          textColor: ColorOption.WHITE,
-          highlighterColor: ColorOption.YELLOW,
-          backgroundColor: ColorOption.TRANSPARENT,
-          strokeColor: ColorOption.BLACK,
-          strokeWidth: 2,
-          textTransform: 'none',
-          position: { x: 50, y: 80, z: 0 },
-          renderMode: 'horizontal',
-          textAlign: 'center',
-          scale: 1,
-          emphasizeMode: true,
-          burnInSubtitles: true
-        }
-      }));
-
-      setTranscriptionStatus(prev => ({ ...prev, message: 'Applying line wrapping...' }));
+      setTranscriptionStatus(prev => ({ ...prev, message: 'Creating AI subtitle data...' }));
       
-      // Apply line wrapping if settings provided
-      if (settings) {
-        captionSegments = applyLineWrapping(captionSegments, settings);
-      }
+      // Create AI subtitle data directly from transcription (no captions)
+      const aiData = createAISubtitleDataFromTranscription(
+        transcriptionResult, 
+        defaultFontSize
+      );
       
-      setTranscriptionStatus(prev => ({ ...prev, message: 'Finalizing captions...' }));
+      setTranscriptionStatus(prev => ({ ...prev, message: 'Finalizing AI subtitles...' }));
       
-      setCaptions(captionSegments);
-      setOriginalCaptions([...captionSegments]); // Save original captions for comparison
+      // Set AI subtitle data as the single source of truth
+      setAiSubtitleData(aiData);
       
       // If we extracted audio for a project, save the project to persist the audio path
       if (projectPath) {
@@ -476,72 +413,98 @@ const AppContent: React.FC = () => {
     }
   };
 
-  const applyLineWrapping = (segments: CaptionSegment[], settings: { maxCharsPerLine: number; maxWordsPerLine: number }): CaptionSegment[] => {
-    const wrappedSegments: CaptionSegment[] = [];
+  // Convert transcription results directly to AI subtitle data (no captions)
+  const createAISubtitleDataFromTranscription = (transcriptionResult: any, defaultFontSize: number, maxWordsPerFrame: number = 5, maxCharsPerFrame: number = 30): AISubtitleData => {
+    const frames: SubtitleFrame[] = [];
+    const audioSegments: any[] = [];
     
-    segments.forEach((segment) => {
-      const words = segment.words || segment.text.split(' ').map((word, i) => ({
-        word,
-        start: segment.startTime + (i * (segment.endTime - segment.startTime) / segment.text.split(' ').length),
-        end: segment.startTime + ((i + 1) * (segment.endTime - segment.startTime) / segment.text.split(' ').length)
-      }));
+    transcriptionResult.segments.forEach((segment: any, segmentIndex: number) => {
+      // Segment ID for referencing the original segment
+      const segmentId = `segment-${segmentIndex}`;
       
-      let currentSegmentWords: any[] = [];
-      let currentText = '';
-      let currentWordCount = 0;
-      let segmentCounter = 0;
-      
-      words.forEach((word) => {
-        const testText = currentText + (currentText ? ' ' : '') + word.word;
-        
-        // Check if adding this word would exceed limits
-        if (testText.length <= settings.maxCharsPerLine && currentWordCount < settings.maxWordsPerLine) {
-          currentText = testText;
-          currentSegmentWords.push(word);
-          currentWordCount++;
-        } else {
-          // Create new segment with current words if we have any
-          if (currentSegmentWords.length > 0) {
-            const segmentStart = currentSegmentWords[0].start;
-            const segmentEnd = currentSegmentWords[currentSegmentWords.length - 1].end;
-            
-            wrappedSegments.push({
-              ...segment,
-              id: `${segment.id}-${segmentCounter}`,
-              startTime: segmentStart,
-              endTime: segmentEnd,
-              text: currentText.trim(),
-              words: currentSegmentWords
-            });
-            
-            segmentCounter++;
-          }
-          
-          // Start new segment with current word
-          currentText = word.word;
-          currentSegmentWords = [word];
-          currentWordCount = 1;
-        }
+      // Create audio segment
+      audioSegments.push({
+        id: `audio-${segmentId}`,
+        startTime: segment.start / 1000, // Convert to seconds for AI format
+        endTime: segment.end / 1000,
+        isRemoved: false
       });
       
-      // Add remaining words as final segment
-      if (currentSegmentWords.length > 0) {
-        const segmentStart = currentSegmentWords[0].start;
-        const segmentEnd = currentSegmentWords[currentSegmentWords.length - 1].end;
+      if (segment.words && segment.words.length > 0) {
+        // Convert words to AI format (seconds)
+        const wordSegments = segment.words.map((word: any, wordIndex: number) => ({
+          ...word,
+          start: word.start / 1000, // Convert to seconds
+          end: word.end / 1000,
+          id: `${segmentId}-word-${wordIndex}`,
+          editState: 'normal' as const,
+          originalWord: word.word,
+          isPause: word.word === '[.]',
+          isKeyword: false
+        }));
         
-        wrappedSegments.push({
-          ...segment,
-          id: `${segment.id}-${segmentCounter}`,
-          startTime: segmentStart,
-          endTime: segmentEnd,
-          text: currentText.trim(),
-          words: currentSegmentWords
+        // Split words into frames based on maxWordsPerFrame and maxCharsPerFrame
+        let currentFrame: SubtitleFrame | null = null;
+        let currentWords: any[] = [];
+        let currentCharCount = 0;
+
+        wordSegments.forEach((wordSegment: any, index: number) => {
+          const wordLength = wordSegment.word.length + 1; // +1 for space
+          
+          // Check if we need to start a new frame
+          if (
+            currentWords.length >= maxWordsPerFrame ||
+            currentCharCount + wordLength > maxCharsPerFrame ||
+            currentFrame === null
+          ) {
+            // Save previous frame if exists
+            if (currentFrame !== null && currentWords.length > 0) {
+              (currentFrame as SubtitleFrame).words = [...currentWords];
+              const lastWord = currentWords[currentWords.length - 1];
+              if (lastWord) {
+                (currentFrame as SubtitleFrame).endTime = lastWord.end;
+              }
+              frames.push(currentFrame as SubtitleFrame);
+            }
+
+            // Start new frame
+            currentFrame = {
+              id: `frame-${segmentIndex}-${Math.floor(index / maxWordsPerFrame)}`,
+              startTime: wordSegment.start,
+              endTime: wordSegment.end,
+              words: [],
+              segmentId: segmentId,
+              isCustomBreak: false
+            };
+            currentWords = [];
+            currentCharCount = 0;
+          }
+
+          currentWords.push(wordSegment);
+          currentCharCount += wordLength;
         });
+
+        // Add the last frame if it has words
+        if (currentFrame !== null && currentWords.length > 0) {
+          (currentFrame as SubtitleFrame).words = currentWords;
+          const lastWord = currentWords[currentWords.length - 1];
+          if (lastWord) {
+            (currentFrame as SubtitleFrame).endTime = lastWord.end;
+          }
+          frames.push(currentFrame as SubtitleFrame);
+        }
       }
     });
-    
-    return wrappedSegments;
+
+    return {
+      frames,
+      audioSegments,
+      maxWordsPerFrame,
+      maxCharsPerFrame,
+      lastModified: Date.now()
+    };
   };
+
 
   const handleTranscriptionSettingsConfirm = async (settings: { maxCharsPerLine: number; maxWordsPerLine: number; whisperModel: string }) => {
     if (pendingVideoPath) {
@@ -570,36 +533,6 @@ const AppContent: React.FC = () => {
   };
 
 
-  // Function to detect actual word deletions (not just edits)
-  const hasActualWordDeletions = (original: CaptionSegment[], current: CaptionSegment[]): boolean => {
-    // Create maps of word count by segment
-    const originalWordCounts = new Map();
-    const currentWordCounts = new Map();
-    
-    original.forEach(segment => {
-      if (segment.words) {
-        originalWordCounts.set(segment.id, segment.words.length);
-      }
-    });
-    
-    current.forEach(segment => {
-      if (segment.words) {
-        // Count only non-empty words
-        const nonEmptyWords = segment.words.filter(w => w.word.trim() !== '');
-        currentWordCounts.set(segment.id, nonEmptyWords.length);
-      }
-    });
-    
-    // Check if any segment has fewer words (indicating deletions)
-    for (const [segmentId, originalCount] of originalWordCounts) {
-      const currentCount = currentWordCounts.get(segmentId) || 0;
-      if (currentCount < originalCount) {
-        return true; // Found actual word deletions
-      }
-    }
-    
-    return false; // No actual deletions, just edits
-  };
 
   const handleExport = async (exportSettings: ExportSettings) => {
     if (!videoFile) return;
@@ -652,88 +585,41 @@ const AppContent: React.FC = () => {
           break;
 
         case 'subtitlesOnly':
-          // Export video with original audio and subtitles
-          if (captions.length === 0) {
-            alert('No captions available for subtitle export.');
+          // Export video with original audio and AI subtitles
+          if (aiSubtitleData && aiSubtitleData.frames.length > 0) {
+            setLoadingMessage('Rendering video with AI subtitles...');
+            setLoadingProgress(0);
+            await window.electronAPI.renderVideoWithAISubtitles(
+              videoFile.path,
+              aiSubtitleData,
+              outputPath,
+              exportSettings
+            );
+          } else {
+            alert('No subtitles available for export.');
             setIsLoading(false);
             setLoadingProgress(undefined);
             return;
-          }
-          setLoadingMessage('Rendering video with subtitles...');
-          setLoadingProgress(0);
-          
-          const hasWordDeletions = hasActualWordDeletions(originalCaptions, captions);
-          
-          if (hasWordDeletions) {
-            setLoadingMessage('Applying word deletions to video...');
-            const tempVideoPath = outputPath.replace('.mp4', '_temp.mp4');
-            await window.electronAPI.applyWordDeletions(
-              videoFile.path,
-              originalCaptions,
-              captions,
-              tempVideoPath
-            );
-            
-            setLoadingMessage('Rendering video with subtitles...');
-            setLoadingProgress(0);
-            await window.electronAPI.renderVideoWithCaptions(
-              tempVideoPath,
-              captions,
-              outputPath,
-              exportSettings
-              // Note: No replacement audio for subtitles-only mode
-            );
-          } else {
-            await window.electronAPI.renderVideoWithCaptions(
-              videoFile.path,
-              captions,
-              outputPath,
-              exportSettings
-              // Note: No replacement audio for subtitles-only mode
-            );
           }
           break;
 
         default: // 'complete'
-          // Export complete video (with subtitles and audio replacement if available)
-          if (captions.length === 0) {
-            alert('No captions available for export.');
-            setIsLoading(false);
-            setLoadingProgress(undefined);
-            return;
-          }
-          
-          const hasWordDeletionsComplete = hasActualWordDeletions(originalCaptions, captions);
-          
-          if (hasWordDeletionsComplete) {
-            setLoadingMessage('Applying word deletions to video...');
-            const tempVideoPath = outputPath.replace('.mp4', '_temp.mp4');
-            await window.electronAPI.applyWordDeletions(
-              videoFile.path,
-              originalCaptions,
-              captions,
-              tempVideoPath
-            );
-            
-            setLoadingMessage('Rendering complete video...');
+          // Export complete video (with AI subtitles and audio replacement if available)
+          if (aiSubtitleData && aiSubtitleData.frames.length > 0) {
+            setLoadingMessage('Rendering complete video with AI subtitles...');
             setLoadingProgress(0);
-            await window.electronAPI.renderVideoWithCaptions(
-              tempVideoPath,
-              captions,
+            await window.electronAPI.renderVideoWithAISubtitles(
+              videoFile.path,
+              aiSubtitleData,
               outputPath,
               exportSettings,
               replacementAudioPath || undefined
             );
           } else {
-            setLoadingMessage('Rendering complete video...');
-            setLoadingProgress(0);
-            await window.electronAPI.renderVideoWithCaptions(
-              videoFile.path,
-              captions,
-              outputPath,
-              exportSettings,
-              replacementAudioPath || undefined
-            );
+            alert('No subtitles available for export.');
+            setIsLoading(false);
+            setLoadingProgress(undefined);
+            return;
           }
       }
 
@@ -762,7 +648,8 @@ const AppContent: React.FC = () => {
     const projectData = {
       version: '1.0',
       videoFile,
-      captions,
+      // AI subtitles are the single source of truth
+      aiSubtitleData,
       timeline: [], // Empty for now, could be used for timeline selections
       replacementAudioPath,
       extractedAudioPath, // Include the extracted audio path for waveforms
@@ -777,8 +664,9 @@ const AppContent: React.FC = () => {
   };
 
   const handleSaveProject = async () => {
-    if (!videoFile && captions.length === 0) {
-      alert('No project data to save. Load a video and create captions first.');
+    const hasAnySubtitles = aiSubtitleData && aiSubtitleData.frames.length > 0;
+    if (!videoFile && !hasAnySubtitles) {
+      alert('No project data to save. Load a video and create subtitles first.');
       return;
     }
 
@@ -798,8 +686,8 @@ const AppContent: React.FC = () => {
   };
 
   const handleSaveProjectAs = async () => {
-    if (!videoFile && captions.length === 0) {
-      alert('No project data to save. Load a video and create captions first.');
+    if (!videoFile && (!aiSubtitleData || aiSubtitleData.frames.length === 0)) {
+      alert('No project data to save. Load a video and create subtitles first.');
       return;
     }
 
@@ -824,14 +712,13 @@ const AppContent: React.FC = () => {
       
       // Reset UI state
       setVideoFile(null);
-      setCaptions([]);
-      setOriginalCaptions([]);
-      setSelectedSegmentId(null);
+      setAiSubtitleData(null);
+      setSelectedFrameId(null);
       setCurrentTime(0);
       setGeneratedContent(null);
       
       // Reset history
-      setHistory([{ captions: [], selectedSegmentId: null, aiSubtitleData: null }]);
+      setHistory([{ aiSubtitleData: null, selectedFrameId: null }]);
       setHistoryIndex(0);
       
       // Update project info
@@ -874,8 +761,8 @@ const AppContent: React.FC = () => {
   };
 
   const handleSrtExport = async () => {
-    if (!captions || captions.length === 0) {
-      alert('No captions available for export.');
+    if (!aiSubtitleData || aiSubtitleData.frames.length === 0) {
+      alert('No subtitles available for export.');
       return;
     }
 
@@ -884,7 +771,20 @@ const AppContent: React.FC = () => {
       const projectName = currentProjectInfo.projectName || 'subtitles';
       const defaultFileName = `${projectName}.srt`;
       
-      const result = await window.electronAPI.exportSrt(captions, defaultFileName);
+      // Convert AI subtitle frames to caption format for SRT export
+      const captionsForSrt = aiSubtitleData.frames.map((frame, index) => ({
+        id: frame.id,
+        startTime: frame.startTime * 1000, // Convert to milliseconds
+        endTime: frame.endTime * 1000,
+        text: frame.words.map(w => w.word).join(' '),
+        words: frame.words.map(w => ({ 
+          word: w.word, 
+          start: w.start * 1000, 
+          end: w.end * 1000 
+        }))
+      }));
+      
+      const result = await window.electronAPI.exportSrt(captionsForSrt, defaultFileName);
       if (result.success && !result.canceled) {
         setExportedSrtPath(result.filePath);
         setShowSrtSuccess(true);
@@ -949,16 +849,21 @@ const AppContent: React.FC = () => {
     saveToHistory();
 
     setVideoFile(projectData.videoFile);
-    setCaptions(projectData.captions);
-    setOriginalCaptions([...projectData.captions]);
+    
+    // Load AI subtitles as the single source of truth
+    if (projectData.aiSubtitleData) {
+      setAiSubtitleData(projectData.aiSubtitleData);
+    }
+    
     setReplacementAudioPath(projectData.replacementAudioPath || null);
     setExtractedAudioPath(projectData.extractedAudioPath || null); // Restore extracted audio path for waveforms
-    setSelectedSegmentId(null);
+    setSelectedFrameId(null); // Reset frame selection
     setCurrentTime(0);
 
-    // If no extracted audio exists but we have captions and a video file, 
+    // If no extracted audio exists but we have AI subtitles and a video file, 
     // extract audio for better waveform performance
-    if (!projectData.extractedAudioPath && projectData.videoFile && projectData.captions.length > 0) {
+    const hasSubtitles = (projectData.aiSubtitleData?.frames.length ?? 0) > 0;
+    if (!projectData.extractedAudioPath && projectData.videoFile && hasSubtitles) {
       const currentProjectPath = await window.electronAPI.getCurrentProjectInfo();
       if (currentProjectPath.projectPath) {
         console.log('No extracted audio found for existing project, extracting audio for waveforms...');
@@ -1009,74 +914,6 @@ const AppContent: React.FC = () => {
     console.log('Project loaded successfully');
   };
 
-  const handleCaptionUpdate = (segmentId: string, updates: Partial<CaptionSegment>) => {
-    // Save current state to history before making changes
-    saveToHistory();
-    
-    setCaptions(prev => 
-      prev.map(segment => 
-        segment.id === segmentId 
-          ? { ...segment, ...updates }
-          : segment
-      )
-    );
-    
-    // Mark project as modified
-    markProjectModified();
-  };
-
-  const handleCaptionDelete = (segmentId: string) => {
-    // Save current state to history before making changes
-    saveToHistory();
-    
-    setCaptions(prev => prev.filter(segment => segment.id !== segmentId));
-    
-    // Clear selection if the deleted segment was selected
-    if (selectedSegmentId === segmentId) {
-      setSelectedSegmentId(null);
-    }
-    
-    // Mark project as modified
-    markProjectModified();
-  };
-
-  const handleApplyToAll = (styleUpdates: Partial<CaptionSegment['style']>) => {
-    // Save current state to history before making changes
-    saveToHistory();
-    
-    setCaptions(prev => 
-      prev.map(segment => ({
-        ...segment,
-        style: { ...segment.style, ...styleUpdates }
-      }))
-    );
-    
-    // Mark project as modified
-    markProjectModified();
-  };
-
-  const handleApplyToTimeline = (startTime: number, endTime: number, styleUpdates: Partial<CaptionSegment['style']>) => {
-    // Save current state to history before making changes
-    saveToHistory();
-    
-    setCaptions(prev => 
-      prev.map(segment => {
-        // Check if segment overlaps with the selected time range
-        const segmentOverlaps = segment.startTime < endTime && segment.endTime > startTime;
-        
-        if (segmentOverlaps) {
-          return {
-            ...segment,
-            style: { ...segment.style, ...styleUpdates }
-          };
-        }
-        return segment;
-      })
-    );
-    
-    // Mark project as modified
-    markProjectModified();
-  };
 
   const handlePlayPause = () => {
     if ((window as any).videoPlayPause) {
@@ -1136,133 +973,7 @@ const AppContent: React.FC = () => {
     }
   };
 
-  const handleSplitSegment = (segmentId: string, splitTime: number) => {
-    // Save current state to history
-    saveToHistory();
-    
-    const segmentToSplit = captions.find(c => c.id === segmentId);
-    if (!segmentToSplit) return;
-    
-    // Split words based on timing
-    const firstWords = segmentToSplit.words ? segmentToSplit.words.filter(w => w.end <= splitTime) : [];
-    const secondWords = segmentToSplit.words ? segmentToSplit.words.filter(w => w.start >= splitTime) : [];
-    
-    // Split text based on words
-    const firstText = firstWords.length > 0 
-      ? firstWords.map(w => w.word).join(' ').trim()
-      : segmentToSplit.text.split(' ').slice(0, Math.ceil(segmentToSplit.text.split(' ').length / 2)).join(' ');
-    
-    const secondText = secondWords.length > 0
-      ? secondWords.map(w => w.word).join(' ').trim()
-      : segmentToSplit.text.split(' ').slice(Math.ceil(segmentToSplit.text.split(' ').length / 2)).join(' ');
-    
-    // Create two new segments
-    const firstSegment: CaptionSegment = {
-      ...segmentToSplit,
-      id: `${segmentId}-split-1`,
-      endTime: splitTime,
-      text: firstText,
-      words: firstWords
-    };
-    
-    const secondSegment: CaptionSegment = {
-      ...segmentToSplit,
-      id: `${segmentId}-split-2`,
-      startTime: splitTime,
-      text: secondText,
-      words: secondWords
-    };
-    
-    // Update captions array
-    setCaptions(prev => {
-      const newCaptions = prev.filter(c => c.id !== segmentId);
-      newCaptions.push(firstSegment, secondSegment);
-      return newCaptions.sort((a, b) => a.startTime - b.startTime);
-    });
-    
-    // Select the first segment
-    setSelectedSegmentId(firstSegment.id);
-    markProjectModified();
-  };
 
-  const handleReTranscribeSegment = async (startTime: number, endTime: number) => {
-    if (!videoFile) {
-      alert('No video file loaded.');
-      return;
-    }
-
-    if (!(await checkDependencies())) return;
-
-    try {
-      setTranscriptionStatus({ isTranscribing: true, progress: 0, message: 'Re-transcribing selected segment...' });
-      
-      // Convert to seconds for the timeline selection
-      const timelineSelections = [{
-        startTime: startTime / 1000, // Convert from ms to seconds
-        endTime: endTime / 1000,
-        label: `Re-transcribe ${Math.round(startTime/1000)}s - ${Math.round(endTime/1000)}s`
-      }];
-      
-      // Extract audio first
-      const audioPath = await window.electronAPI.extractAudio(videoFile.path);
-      
-      // Transcribe the selected segment
-      const transcriptionResult = await window.electronAPI.transcribeAudioSegments(audioPath, timelineSelections, 'base');
-      
-      if (transcriptionResult && transcriptionResult.length > 0) {
-        // Save current state to history
-        saveToHistory();
-        
-        // Remove existing captions in the selected time range
-        const filteredCaptions = captions.filter(caption => 
-          caption.endTime < startTime || caption.startTime > endTime
-        );
-        
-        // Create new caption segments from transcription
-        const newSegments: CaptionSegment[] = transcriptionResult[0].segments.map((segment: any, index: number) => ({
-          id: `retranscribe-${Date.now()}-${index}`,
-          startTime: segment.start, // Already in milliseconds from Whisper service
-          endTime: segment.end, // Already in milliseconds from Whisper service
-          text: segment.text,
-          words: segment.words ? segment.words.map((word: any) => ({
-            word: word.word,
-            start: word.start, // Already in milliseconds from Whisper service
-            end: word.end // Already in milliseconds from Whisper service
-          })) : [],
-          style: {
-            font: 'Segoe UI',
-            fontSize: 85,
-            textColor: ColorOption.WHITE,
-            highlighterColor: ColorOption.YELLOW,
-            backgroundColor: ColorOption.TRANSPARENT,
-            strokeColor: ColorOption.BLACK,
-            strokeWidth: 2,
-            textTransform: 'none',
-            position: { x: 50, y: 80, z: 0 },
-            renderMode: 'horizontal',
-            textAlign: 'center',
-            scale: 1,
-            emphasizeMode: true,
-            burnInSubtitles: true
-          }
-        }));
-        
-        // Combine and sort all captions by start time
-        const updatedCaptions = [...filteredCaptions, ...newSegments]
-          .sort((a, b) => a.startTime - b.startTime);
-        
-        setCaptions(updatedCaptions);
-        markProjectModified();
-        
-        setTranscriptionStatus({ isTranscribing: false, progress: 100, message: 'Re-transcription completed' });
-        console.log(`Re-transcribed segment from ${Math.round(startTime/1000)}s to ${Math.round(endTime/1000)}s`);
-      }
-    } catch (error) {
-      console.error('Re-transcription error:', error);
-      setTranscriptionStatus({ isTranscribing: false, progress: 0, message: 'Re-transcription failed' });
-      alert(`Re-transcription failed: ${error}`);
-    }
-  };
 
   // Start/stop timer for export progress
   useEffect(() => {
@@ -1496,8 +1207,8 @@ const AppContent: React.FC = () => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => captions.length > 0 && setShowAIContent(true)}
-              disabled={captions.length === 0}
+              onClick={() => aiSubtitleData && aiSubtitleData.frames.length > 0 && setShowAIContent(true)}
+              disabled={!aiSubtitleData || aiSubtitleData.frames.length === 0}
               title="Generate AI Content (Ctrl/Cmd+G)"
               style={{ padding: '2px 6px' }}
             >
@@ -1533,7 +1244,7 @@ const AppContent: React.FC = () => {
                 </span>
               </Button>
             )}
-            {captions && captions.length > 0 && (
+            {aiSubtitleData && aiSubtitleData.frames.length > 0 && (
               <Button
                 variant="primary"
                 size="sm"
@@ -1564,8 +1275,8 @@ const AppContent: React.FC = () => {
               variant="primary"
               size="sm"
               onClick={handleShowExportSettings}
-              disabled={!videoFile || (!captions || captions.length === 0) && !replacementAudioPath}
-              title={captions && captions.length > 0 ? "Export Video with Captions" : "Export Video with Audio"}
+              disabled={!videoFile || (!aiSubtitleData || aiSubtitleData.frames.length === 0) && !replacementAudioPath}
+              title={aiSubtitleData && aiSubtitleData.frames.length > 0 ? "Export Video with Subtitles" : "Export Video with Audio"}
               style={{ padding: '2px 6px' }}
             >
               <ExportVideoIcon size={14} />
@@ -1610,32 +1321,25 @@ const AppContent: React.FC = () => {
               >
                 <VideoPanel
                   videoFile={videoFile}
-                  captions={captions}
                   currentTime={currentTime}
                   onTimeUpdate={setCurrentTime}
                   onTimeSeek={setCurrentTime}
                   onVideoSelect={handleVideoSelect}
                   onVideoDropped={handleVideoDropped}
-                  selectedSegmentId={selectedSegmentId}
-                  onCaptionUpdate={handleCaptionUpdate}
                   onPlayPause={handlePlayPause}
                   isPlaying={isPlaying}
-                  onSegmentSelect={setSelectedSegmentId}
                   replacementAudioPath={replacementAudioPath}
                   isAudioPreviewEnabled={isAudioPreviewEnabled}
+                  aiSubtitleData={aiSubtitleData}
+                  selectedFrameId={selectedFrameId}
+                  onFrameSelect={setSelectedFrameId}
                 />
                 
                 {/* Unified Timeline - Only show when video is loaded */}
                 <UnifiedTimeline
-                  captions={captions}
                   currentTime={currentTime}
-                  selectedSegmentId={selectedSegmentId}
-                  onSegmentSelect={setSelectedSegmentId}
                   onTimeSeek={setCurrentTime}
-                  onSegmentDelete={handleCaptionDelete}
-                  onCaptionUpdate={handleCaptionUpdate}
                   videoFile={videoFile}
-                  onReTranscribeSegment={handleReTranscribeSegment}
                   onPlayPause={handlePlayPause}
                   isPlaying={isPlaying}
                   onUndo={undo}
@@ -1664,22 +1368,13 @@ const AppContent: React.FC = () => {
                 }}
               >
                 <TabbedRightPanel
-                  selectedSegment={captions.find(c => c.id === selectedSegmentId) || null}
-                  onSegmentUpdate={handleCaptionUpdate}
-                  captions={captions}
-                  onApplyToAll={handleApplyToAll}
-                  onApplyToTimeline={handleApplyToTimeline}
                   onTimeSeek={setCurrentTime}
                   transcriptionStatus={transcriptionStatus}
-                  selectedSegmentId={selectedSegmentId}
-                  onSegmentSelect={setSelectedSegmentId}
-                  onSegmentDelete={handleCaptionDelete}
                   currentTime={currentTime}
                   aiSubtitleData={aiSubtitleData}
                   onAISubtitleUpdate={handleAISubtitleUpdate}
                   selectedFrameId={selectedFrameId}
                   onFrameSelect={setSelectedFrameId}
-                  onCaptionsSync={handleCaptionsSync}
                 />
               </Card>
             </>
@@ -1694,17 +1389,13 @@ const AppContent: React.FC = () => {
             }}>
               <VideoPanel
                 videoFile={videoFile}
-                captions={captions}
                 currentTime={currentTime}
                 onTimeUpdate={setCurrentTime}
                 onTimeSeek={setCurrentTime}
                 onVideoSelect={handleVideoSelect}
                 onVideoDropped={handleVideoDropped}
-                selectedSegmentId={selectedSegmentId}
-                onCaptionUpdate={handleCaptionUpdate}
                 onPlayPause={handlePlayPause}
                 isPlaying={isPlaying}
-                onSegmentSelect={setSelectedSegmentId}
                 replacementAudioPath={replacementAudioPath}
                 isAudioPreviewEnabled={isAudioPreviewEnabled}
               />
@@ -1764,7 +1455,7 @@ const AppContent: React.FC = () => {
       <AIContentModal
         isOpen={showAIContent}
         onClose={() => setShowAIContent(false)}
-        captions={captions}
+        aiSubtitleData={aiSubtitleData}
         onSave={(content) => {
           console.log('App.tsx - Received content from AIContentModal:', content);
           setGeneratedContent(content);
@@ -1789,7 +1480,7 @@ const AppContent: React.FC = () => {
           handleExport(settings);
         }}
         replacementAudioPath={replacementAudioPath}
-        captions={captions}
+        aiSubtitleData={aiSubtitleData}
       />
 
       {/* Export Processing Modal (Liquid) */}

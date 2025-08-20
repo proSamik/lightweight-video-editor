@@ -8,12 +8,12 @@ import {
   spacing,
   typography,
 } from '../ui';
-import { ExportSettings, CaptionSegment } from '../../../types';
+import { ExportSettings, AISubtitleData } from '../../../types';
 import { ExportSrtIcon, ExportVideoWithNewAudioIcon } from '../IconComponents';
 
 interface ExportSectionProps {
   videoFile?: { path: string; name: string } | null;
-  captions?: CaptionSegment[];
+  aiSubtitleData?: AISubtitleData | null;
   onExport?: (settings: ExportSettings) => void;
   onShowExportSettings: () => void;
   onVideoWithNewAudioExport?: () => void;
@@ -22,7 +22,7 @@ interface ExportSectionProps {
 
 export const ExportSection: React.FC<ExportSectionProps> = ({
   videoFile,
-  captions,
+  aiSubtitleData,
   onExport,
   onShowExportSettings,
   onVideoWithNewAudioExport,
@@ -31,21 +31,22 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
   const { theme } = useTheme();
 
   const hasVideo = Boolean(videoFile?.path);
-  const hasCaptions = Boolean(captions?.length);
+  const hasCaptions = Boolean(aiSubtitleData?.frames?.length);
   const hasReplacementAudio = Boolean(replacementAudioPath);
   const canExport = hasVideo && (hasCaptions || hasReplacementAudio) && onExport;
 
   // Export to SRT file
   const handleSrtExport = () => {
-    if (!captions || captions.length === 0) return;
+    if (!aiSubtitleData || aiSubtitleData.frames.length === 0) return;
 
     try {
       // Generate SRT content
       let srtContent = '';
-      captions.forEach((caption, index) => {
-        const startTime = formatSrtTime(caption.startTime);
-        const endTime = formatSrtTime(caption.endTime);
-        srtContent += `${index + 1}\n${startTime} --> ${endTime}\n${caption.text}\n\n`;
+      aiSubtitleData.frames.forEach((frame, index) => {
+        const startTime = formatSrtTime(frame.startTime * 1000);
+        const endTime = formatSrtTime(frame.endTime * 1000);
+        const text = frame.words.map(w => w.word).join(' ');
+        srtContent += `${index + 1}\n${startTime} --> ${endTime}\n${text}\n\n`;
       });
 
       // Create and download file

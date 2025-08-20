@@ -231,7 +231,7 @@ export class ProjectManager {
       }
       
       // Validate project data structure
-      if (!projectData.version || !projectData.captions) {
+      if (!projectData.version || !projectData.aiSubtitleData) {
         throw new Error('Invalid project file format - missing required fields');
       }
 
