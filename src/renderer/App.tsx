@@ -467,14 +467,30 @@ const AppContent: React.FC = () => {
               frames.push(currentFrame as SubtitleFrame);
             }
 
-            // Start new frame
+            // Start new frame with default style including 2.5px stroke
             currentFrame = {
               id: `frame-${segmentIndex}-${Math.floor(index / maxWordsPerFrame)}`,
               startTime: wordSegment.start,
               endTime: wordSegment.end,
               words: [],
               segmentId: segmentId,
-              isCustomBreak: false
+              isCustomBreak: false,
+              style: {
+                font: 'Montserrat',
+                fontSize: defaultFontSize,
+                textColor: '#ffffff',
+                highlighterColor: '#ffff00',
+                backgroundColor: 'transparent',
+                strokeColor: '#000000',
+                strokeWidth: 2.5,
+                textTransform: 'none',
+                position: { x: 50, y: 80, z: 0 },
+                renderMode: 'horizontal',
+                textAlign: 'center',
+                scale: 1,
+                emphasizeMode: true,
+                burnInSubtitles: true,
+              }
             };
             currentWords = [];
             currentCharCount = 0;
