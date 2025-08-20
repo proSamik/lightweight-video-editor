@@ -139,12 +139,13 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
 
     if (firstHalf.length === 0 || secondHalf.length === 0) return;
 
-    // Update first frame
+    // Update first frame (inherit existing style)
     const updatedFirstFrame = {
       ...frame,
       endTime: firstHalf[firstHalf.length - 1].end,
       words: firstHalf,
-      isCustomBreak: true
+      isCustomBreak: true,
+      style: frame.style // Inherit current style
     };
 
     // Create new frame for second half with guaranteed unique ID
@@ -166,7 +167,8 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
       endTime: secondHalf[secondHalf.length - 1].end,
       words: secondHalf,
       segmentId: frame.segmentId,
-      isCustomBreak: true
+      isCustomBreak: true,
+      style: frame.style // Inherit current style from original frame
     };
 
     // Update frames array
@@ -207,8 +209,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     const targetFrame = aiSubtitleData.frames[targetIndex];
     if (!targetFrame) return;
 
-    // Check if frames belong to the same original segment
-    if (frame.segmentId !== targetFrame.segmentId) return;
+    // Remove segment restriction - allow merging any adjacent frames
 
     // Merge frames
     const mergedWords = direction === 'up' 
@@ -220,8 +221,9 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
       startTime: Math.min(frame.startTime, targetFrame.startTime),
       endTime: Math.max(frame.endTime, targetFrame.endTime),
       words: mergedWords.sort((a, b) => a.start - b.start),
-      segmentId: frame.segmentId,
-      isCustomBreak: frame.isCustomBreak || targetFrame.isCustomBreak
+      segmentId: direction === 'up' ? targetFrame.segmentId : frame.segmentId, // Use the segment ID from the primary frame
+      isCustomBreak: frame.isCustomBreak || targetFrame.isCustomBreak,
+      style: frame.style || targetFrame.style // Inherit style from either frame
     };
 
     // Remove both frames and add merged frame
@@ -380,6 +382,10 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     e.preventDefault();
     e.stopPropagation();
 
+    // Find the word and frame for seeking
+    const frame = aiSubtitleData?.frames.find(f => f.id === frameId);
+    const word = frame?.words.find(w => w.id === wordId);
+
     if (isShiftPressed) {
       // Multi-select with Shift
       setSelectedWordIds(prev => {
@@ -403,6 +409,14 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
         isMultiSelect: selectedWordIds.size > 1,
         selectedWordIds: [wordId]
       });
+
+      // Select the frame and seek to the word's start time
+      if (onFrameSelect) {
+        onFrameSelect(frameId);
+      }
+      if (word && onTimeSeek) {
+        onTimeSeek(word.start * 1000); // Convert seconds to milliseconds
+      }
     }
   };
 
@@ -434,6 +448,12 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
   const handleFrameClick = (frameId: string) => {
     if (onFrameSelect) {
       onFrameSelect(frameId);
+    }
+    
+    // Also seek to the start of the selected frame to sync with timeline
+    const frame = aiSubtitleData?.frames.find(f => f.id === frameId);
+    if (frame && onTimeSeek) {
+      onTimeSeek(frame.startTime * 1000); // Convert seconds to milliseconds
     }
   };
 
@@ -838,69 +858,85 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
               
               {/* Merge Controls */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                {/* Merge Up Button */}
-                {frameIndex > 0 && renderFrames[frameIndex - 1]?.segmentId === frame.segmentId && (
-                  <button
-                    onClick={() => handleFrameMerge(frame.id, 'up')}
-                    style={{
-                      padding: '4px',
-                      backgroundColor: 'transparent',
-                      color: theme.colors.textSecondary,
-                      border: `1px solid ${theme.colors.border}`,
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      transition: 'all 0.2s ease'
-                    }}
-                    onMouseEnter={(e) => {
+                {/* Merge Up Button - Always visible and enabled when there's a frame above */}
+                <button
+                  onClick={() => handleFrameMerge(frame.id, 'up')}
+                  disabled={frameIndex === 0}
+                  style={{
+                    padding: '4px',
+                    backgroundColor: 'transparent',
+                    color: frameIndex > 0 
+                      ? theme.colors.textSecondary 
+                      : theme.colors.textMuted,
+                    border: `1px solid ${theme.colors.border}`,
+                    borderRadius: '4px',
+                    cursor: frameIndex > 0 
+                      ? 'pointer' 
+                      : 'not-allowed',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.2s ease',
+                    opacity: frameIndex > 0 ? 1 : 0.5
+                  }}
+                  onMouseEnter={(e) => {
+                    if (frameIndex > 0) {
                       e.currentTarget.style.backgroundColor = theme.colors.background;
                       e.currentTarget.style.color = theme.colors.primary;
                       e.currentTarget.style.borderColor = theme.colors.primary;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.color = theme.colors.textSecondary;
-                      e.currentTarget.style.borderColor = theme.colors.border;
-                    }}
-                    title="Merge with frame above"
-                  >
-                    <ChevronUp size={16} />
-                  </button>
-                )}
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = frameIndex > 0 
+                      ? theme.colors.textSecondary 
+                      : theme.colors.textMuted;
+                    e.currentTarget.style.borderColor = theme.colors.border;
+                  }}
+                  title="Merge with frame above"
+                >
+                  <ChevronUp size={16} />
+                </button>
                 
-                {/* Merge Down Button */}
-                {frameIndex < renderFrames.length - 1 && renderFrames[frameIndex + 1]?.segmentId === frame.segmentId && (
-                  <button
-                    onClick={() => handleFrameMerge(frame.id, 'down')}
-                    style={{
-                      padding: '4px',
-                      backgroundColor: 'transparent',
-                      color: theme.colors.textSecondary,
-                      border: `1px solid ${theme.colors.border}`,
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      transition: 'all 0.2s ease'
-                    }}
-                    onMouseEnter={(e) => {
+                {/* Merge Down Button - Always visible and enabled when there's a frame below */}
+                <button
+                  onClick={() => handleFrameMerge(frame.id, 'down')}
+                  disabled={frameIndex === renderFrames.length - 1}
+                  style={{
+                    padding: '4px',
+                    backgroundColor: 'transparent',
+                    color: frameIndex < renderFrames.length - 1 
+                      ? theme.colors.textSecondary 
+                      : theme.colors.textMuted,
+                    border: `1px solid ${theme.colors.border}`,
+                    borderRadius: '4px',
+                    cursor: frameIndex < renderFrames.length - 1 
+                      ? 'pointer' 
+                      : 'not-allowed',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.2s ease',
+                    opacity: frameIndex < renderFrames.length - 1 ? 1 : 0.5
+                  }}
+                  onMouseEnter={(e) => {
+                    if (frameIndex < renderFrames.length - 1) {
                       e.currentTarget.style.backgroundColor = theme.colors.background;
                       e.currentTarget.style.color = theme.colors.primary;
                       e.currentTarget.style.borderColor = theme.colors.primary;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.color = theme.colors.textSecondary;
-                      e.currentTarget.style.borderColor = theme.colors.border;
-                    }}
-                    title="Merge with frame below"
-                  >
-                    <ChevronDown size={16} />
-                  </button>
-                )}
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = frameIndex < renderFrames.length - 1 
+                      ? theme.colors.textSecondary 
+                      : theme.colors.textMuted;
+                    e.currentTarget.style.borderColor = theme.colors.border;
+                  }}
+                  title="Merge with frame below"
+                >
+                  <ChevronDown size={16} />
+                </button>
               </div>
             </div>
 
