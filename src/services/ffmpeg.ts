@@ -2,8 +2,6 @@ import ffmpeg from 'fluent-ffmpeg';
 import * as path from 'path';
 import * as fs from 'fs';
 import { VideoFile } from '../types';
-import { GPUCanvasVideoRenderer } from './gpuCanvasRenderer';
-import { CanvasVideoRenderer } from './canvasRenderer';
 import { FFmpegOverlayRenderer } from './ffmpegOverlayRenderer';
 
 // Import bundled FFmpeg binaries
@@ -531,22 +529,6 @@ export class FFmpegService {
         overlayRenderer.cancelRendering();
       } catch (error) {
         console.warn('[FFmpegService] Error cancelling overlay renderer:', error);
-      }
-      
-      try {
-        const gpuRenderer = GPUCanvasVideoRenderer.getInstance();
-        gpuRenderer.cancelRendering();
-      } catch (error) {
-        console.warn('[FFmpegService] Error cancelling GPU renderer:', error);
-      }
-      
-      try {
-        const canvasRenderer = CanvasVideoRenderer.getInstance();
-        if (typeof canvasRenderer.cancelRendering === 'function') {
-          canvasRenderer.cancelRendering();
-        }
-      } catch (error) {
-        console.warn('[FFmpegService] Error cancelling Canvas renderer:', error);
       }
       
       // Kill all active FFmpeg processes
