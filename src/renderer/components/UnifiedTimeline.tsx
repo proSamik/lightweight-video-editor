@@ -390,6 +390,38 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
     onFrameSelect?.(segment.id);
   };
 
+  // Keep selected frame in view
+  useEffect(() => {
+    if (!timelineContainerRef.current || !timelineRef.current) return;
+    const container = timelineContainerRef.current;
+    const timeline = timelineRef.current;
+    const selectedId = selectedFrameId;
+    if (!selectedId) return;
+
+    // Find the element for the selected segment by data attribute
+    const el = timeline.querySelector(`[data-segment-id="${selectedId}"]`) as HTMLElement | null;
+    if (!el) return;
+
+    const elLeft = el.offsetLeft;
+    const elRight = elLeft + el.offsetWidth;
+    const viewLeft = container.scrollLeft;
+    const viewRight = viewLeft + container.clientWidth;
+
+    if (elLeft < viewLeft || elRight > viewRight) {
+      container.scrollTo({ left: Math.max(0, elLeft - container.clientWidth * 0.2), behavior: 'smooth' });
+    }
+  }, [selectedFrameId]);
+
+  // Update selected frame when playhead enters a new segment (if none selected or playhead left selected)
+  useEffect(() => {
+    if (!aiSubtitleData?.frames?.length || !onFrameSelect) return;
+    const ms = currentTime;
+    const within = virtualCaptionsFromAI.find(seg => ms >= seg.startTime && ms <= seg.endTime);
+    if (within && within.id !== selectedFrameId) {
+      onFrameSelect(within.id);
+    }
+  }, [currentTime, aiSubtitleData?.frames, onFrameSelect]);
+
   return (
     <div style={{ 
       width: '100%', 
@@ -859,6 +891,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
               return (
                 <div
                   key={segment.id}
+                  data-segment-id={segment.id}
                   style={{
                     position: 'absolute',
                     left: `${left}%`,

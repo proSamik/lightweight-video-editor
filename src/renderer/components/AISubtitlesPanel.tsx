@@ -315,6 +315,27 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     }
   }, [aiSubtitleData?.frames, selectedFrameId, onFrameSelect]);
 
+  // Auto-scroll to the frame that contains the current playhead time
+  useEffect(() => {
+    if (!containerRef.current || !aiSubtitleData?.frames?.length) return;
+    const currentSec = currentTime / 1000;
+    const activeFrame = aiSubtitleData.frames.find(f => currentSec >= f.startTime && currentSec <= f.endTime);
+    const targetId = activeFrame?.id || selectedFrameId;
+    if (!targetId) return;
+
+    const el = containerRef.current.querySelector(`[data-frame-id="${targetId}"]`) as HTMLElement | null;
+    if (el) {
+      const container = containerRef.current;
+      const elTop = el.offsetTop;
+      const elBottom = elTop + el.offsetHeight;
+      const viewTop = container.scrollTop;
+      const viewBottom = viewTop + container.clientHeight;
+      if (elTop < viewTop || elBottom > viewBottom) {
+        container.scrollTo({ top: elTop - 24, behavior: 'smooth' });
+      }
+    }
+  }, [currentTime, selectedFrameId, aiSubtitleData?.frames]);
+
   // Handle word click
   const handleWordClick = (e: React.MouseEvent, wordId: string, frameId: string) => {
     e.preventDefault();
@@ -723,36 +744,6 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
         }}>
           {aiSubtitleData.frames.length} frames • Max {maxWordsPerFrame} words, {maxCharsPerFrame} chars per frame
         </p>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            onClick={() => exportAISubtitles('srt')}
-            style={{
-              padding: '6px 12px',
-              backgroundColor: theme.colors.primary,
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '12px',
-              cursor: 'pointer'
-            }}
-          >
-            Export SRT
-          </button>
-          <button
-            onClick={() => exportAISubtitles('modified')}
-            style={{
-              padding: '6px 12px',
-              backgroundColor: theme.colors.accent,
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '12px',
-              cursor: 'pointer'
-            }}
-          >
-            Export Modified
-          </button>
-        </div>
       </div>
 
       {/* Subtitle Frames */}
@@ -764,6 +755,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
         {renderFrames.map((frame, frameIndex) => (
           <div
             key={frame.id}
+            data-frame-id={frame.id}
             onClick={() => handleFrameClick(frame.id)}
             style={{
               marginBottom: '24px',
