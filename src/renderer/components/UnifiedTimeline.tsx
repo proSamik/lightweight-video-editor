@@ -80,6 +80,30 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
       : 60000; // Default 1 minute
 
   /**
+   * Calculate adaptive zoom multiplier based on video duration
+   * Short videos (< 2 min): 1x multiplier (normal zoom range)
+   * Medium videos (2-10 min): 2x multiplier 
+   * Long videos (10-30 min): 5x multiplier
+   * Very long videos (> 30 min): 10x multiplier
+   */
+  const getZoomMultiplier = (durationMs: number): number => {
+    const durationMinutes = durationMs / (1000 * 60);
+    
+    if (durationMinutes < 2) {
+      return 1; // Short videos: normal zoom range
+    } else if (durationMinutes < 10) {
+      return 2; // Medium videos: 2x zoom capability
+    } else if (durationMinutes < 30) {
+      return 5; // Long videos: 5x zoom capability  
+    } else {
+      return 10; // Very long videos: 10x zoom capability
+    }
+  };
+
+  // Calculate the actual zoom multiplier for this video
+  const zoomMultiplier = getZoomMultiplier(actualDuration);
+
+  /**
    * Format time display in MM:SS.ms format
    */
   const formatTime = (ms: number) => {
@@ -493,7 +517,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
             <span style={{ minWidth: '28px' }}>Zoom</span>
             <input
               type="range"
-              min="0.1"
+              min="0.25"
               max="100"
               step="0.1"
               value={zoomLevel}
@@ -506,10 +530,10 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                 cursor: 'pointer',
                 borderRadius: '4px',
               }}
-              title={`Zoom: ${Math.round((zoomLevel - 0.1) / (100 - 0.1) * 100)}/100`}
+              title={`Zoom: ${Math.round((zoomLevel - 0.25) / (100 - 0.25) * 100)}/100 (${Math.round(zoomLevel * zoomMultiplier * 10)/10}x effective)`}
             />
             <span style={{ minWidth: '32px', fontSize: '10px' }}>
-              {Math.round((zoomLevel - 0.1) / (100 - 0.1) * 100)}
+              {Math.round((zoomLevel - 0.25) / (100 - 0.25) * 100)}
             </span>
           </div>
           
@@ -742,7 +766,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
             position: 'relative',
             cursor: isDragging ? 'grabbing' : 'pointer',
             background: theme.colors.background,
-            width: `${Math.max(100 * zoomLevel, 100)}%`, // Minimum 100% width, scales with zoom
+            width: `${Math.max(100 * (zoomLevel * zoomMultiplier), 100)}%`, // Minimum 100% width, scales with adaptive zoom
             minWidth: '100%',
             marginLeft: '10px',
           }}
