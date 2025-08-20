@@ -347,6 +347,120 @@ export class FFmpegService {
     });
   }
 
+  public async extractAudioSegments(
+    audioPath: string,
+    segments: { start: number; end: number; outputPath: string }[],
+    onProgress?: (progress: number) => void
+  ): Promise<string[]> {
+    const extractedPaths: string[] = [];
+    
+    for (let i = 0; i < segments.length; i++) {
+      const segment = segments[i];
+      
+      await new Promise<void>((resolve, reject) => {
+        ffmpeg(audioPath)
+          .setFfmpegPath(this.ffmpegPath)
+          .setFfprobePath(this.ffprobePath)
+          .seekInput(segment.start)
+          .duration(segment.end - segment.start)
+          .audioCodec('copy')
+          .format('wav')
+          .output(segment.outputPath)
+          .on('end', () => {
+            extractedPaths.push(segment.outputPath);
+            if (onProgress) {
+              onProgress(((i + 1) / segments.length) * 100);
+            }
+            resolve();
+          })
+          .on('error', (err: any) => {
+            reject(err);
+          })
+          .run();
+      });
+    }
+    
+    return extractedPaths;
+  }
+
+  public async concatenateAudioSegments(
+    segmentPaths: string[],
+    outputPath: string,
+    onProgress?: (progress: number) => void
+  ): Promise<string> {
+    return new Promise((resolve, reject) => {
+      // Create a temporary file list for FFmpeg concat
+      const concatListPath = path.join(path.dirname(outputPath), 'concat_list.txt');
+      const fileList = segmentPaths.map(p => `file '${p}'`).join('\n');
+      
+      fs.writeFileSync(concatListPath, fileList);
+      
+      ffmpeg()
+        .setFfmpegPath(this.ffmpegPath)
+        .setFfprobePath(this.ffprobePath)
+        .input(concatListPath)
+        .inputOptions(['-f', 'concat', '-safe', '0'])
+        .audioCodec('copy')
+        .format('wav')
+        .output(outputPath)
+        .on('progress', (progress: any) => {
+          if (onProgress && progress.percent) {
+            onProgress(progress.percent);
+          }
+        })
+        .on('end', () => {
+          // Clean up temporary file
+          try {
+            fs.unlinkSync(concatListPath);
+          } catch (error) {
+            console.warn('Failed to clean up temporary concat file:', error);
+          }
+          resolve(outputPath);
+        })
+        .on('error', (err: any) => {
+          // Clean up temporary file on error
+          try {
+            fs.unlinkSync(concatListPath);
+          } catch (error) {
+            console.warn('Failed to clean up temporary concat file:', error);
+          }
+          reject(err);
+        })
+        .run();
+    });
+  }
+
+  public async renderVideoWithModifiedAudio(
+    videoPath: string,
+    modifiedAudioPath: string,
+    outputPath: string,
+    onProgress?: (progress: number) => void
+  ): Promise<string> {
+    return new Promise((resolve, reject) => {
+      ffmpeg(videoPath)
+        .setFfmpegPath(this.ffmpegPath)
+        .setFfprobePath(this.ffprobePath)
+        .input(modifiedAudioPath)
+        .videoCodec('copy')
+        .audioCodec('aac')
+        .format('mp4')
+        .outputOptions(['-map', '0:v:0', '-map', '1:a:0'])
+        .output(outputPath)
+        .on('progress', (progress: any) => {
+          if (onProgress && progress.percent) {
+            onProgress(progress.percent);
+          }
+        })
+        .on('end', () => {
+          resolve(outputPath);
+        })
+        .on('error', (err: any) => {
+          reject(err);
+        })
+        .run();
+    });
+  }
+
   public async renderVideoWithBurnedCaptions(
     videoPath: string,
     captionsData: any[],

@@ -162,6 +162,35 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
     }
   };
 
+  // Handle line splitting
+  const handleLineSplit = (lines: string[]) => {
+    if (!selectedSegment || lines.length <= 1) return;
+
+    const totalDuration = selectedSegment.endTime - selectedSegment.startTime;
+    const durationPerLine = totalDuration / lines.length;
+
+    // Create new segments for each line
+    const newSegments: Partial<CaptionSegment>[] = lines.map((line, index) => ({
+      text: line.trim(),
+      startTime: selectedSegment.startTime + (index * durationPerLine),
+      endTime: selectedSegment.startTime + ((index + 1) * durationPerLine),
+      style: { ...selectedSegment.style },
+      words: [] // Reset words for manual line splits
+    }));
+
+    // For now, we'll just update the current segment with the first line
+    // and provide feedback that this creates multiple segments
+    if (newSegments.length > 0) {
+      onSegmentUpdate(selectedSegment.id, {
+        text: newSegments[0].text,
+        words: []
+      });
+      
+      // TODO: Implement proper segment splitting in the parent component
+      console.log('Line split requested - would create segments:', newSegments);
+    }
+  };
+
   // Handle timeline apply
   const handleTimelineApply = (startTime: number, endTime: number) => {
     if (selectedSegment) {
@@ -413,6 +442,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
                       onWordDeleteWithAudio={handleWordDeleteWithAudio}
                       onWordMerge={handleWordMerge}
                       onJumpToWord={handleJumpToWord}
+                      onLineSplit={handleLineSplit}
                     />
                   </div>
                 )}

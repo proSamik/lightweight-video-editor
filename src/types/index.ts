@@ -117,7 +117,7 @@ export enum ColorOption {
 export interface ExportSettings {
   framerate: 30 | 60;
   quality: 'fast' | 'balanced' | 'high';
-  exportMode: 'complete' | 'newAudio' | 'subtitlesOnly';
+  exportMode: 'complete' | 'newAudio' | 'subtitlesOnly' | 'modifiedSegments';
 }
 
 export interface SearchResult {
@@ -185,4 +185,51 @@ export interface PresetCategory {
   name: string;
   description: string;
   presets: CaptionPreset[];
+}
+
+// AI Subtitles enhanced types
+export type WordEditState = 'normal' | 'strikethrough' | 'censored' | 'removedCaption' | 'editing';
+
+export interface WordSegment extends WordTimestamp {
+  id: string;
+  editState: WordEditState;
+  originalWord: string; // Keep track of original word for restore
+  isKeyword?: boolean; // For keyword highlighting
+  customStyle?: Partial<CaptionStyle>; // Per-word style overrides
+  isPause?: boolean; // For [.] pause markers
+}
+
+export interface SubtitleFrame {
+  id: string;
+  startTime: number;
+  endTime: number;
+  words: WordSegment[];
+  isCustomBreak?: boolean; // True if manually separated with double-enter
+  segmentId: string; // Reference to original caption segment
+}
+
+export interface WordStyle {
+  color?: string;
+  backgroundColor?: string;
+  fontSize?: number;
+  fontWeight?: 'normal' | 'bold';
+  textDecoration?: 'none' | 'line-through' | 'underline';
+  opacity?: number;
+}
+
+export interface AudioSegment {
+  id: string;
+  startTime: number;
+  endTime: number;
+  isRemoved: boolean; // If true, this segment should be excluded from final audio
+  originalPath?: string; // Path to original audio segment
+  replacementPath?: string; // Path to replacement audio if edited
+}
+
+export interface AISubtitleData {
+  frames: SubtitleFrame[];
+  audioSegments: AudioSegment[];
+  maxWordsPerFrame: number; // From transcription settings
+  maxCharsPerFrame: number; // From transcription settings
+  lastModified: number;
 }

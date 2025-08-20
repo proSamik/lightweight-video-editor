@@ -97,6 +97,11 @@ const electronAPI = {
   // Check if file exists
   fileExists: (filePath: string) =>
     ipcRenderer.invoke('file-exists', filePath),
+  // AI Subtitles export
+  exportAISubtitlesSRT: (aiSubtitleData: any) =>
+    ipcRenderer.invoke('export-ai-subtitles-srt', aiSubtitleData),
+  exportModifiedVideo: (aiSubtitleData: any) =>
+    ipcRenderer.invoke('export-modified-video', aiSubtitleData),
   
   // Update-related APIs
   checkForUpdates: () => 

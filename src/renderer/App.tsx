@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { VideoFile, CaptionSegment,ColorOption, ExportSettings, ProjectData, AISettings, GeneratedContent } from '../types';
+import { VideoFile, CaptionSegment,ColorOption, ExportSettings, ProjectData, AISettings, GeneratedContent, AISubtitleData } from '../types';
 import VideoPanel from './components/VideoPanel';
 import UnifiedTimeline from './components/UnifiedTimeline';
 import TabbedRightPanel from './components/TabbedRightPanel';
@@ -35,6 +35,8 @@ import {
 interface AppState {
   captions: CaptionSegment[];
   selectedSegmentId: string | null;
+  aiSubtitleData?: AISubtitleData | null;
+  selectedFrameId?: string | null;
 }
 
 const AppContent: React.FC = () => {
@@ -46,6 +48,8 @@ const AppContent: React.FC = () => {
   const [captions, setCaptions] = useState<CaptionSegment[]>([]);
   const [originalCaptions, setOriginalCaptions] = useState<CaptionSegment[]>([]);
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
+  const [aiSubtitleData, setAiSubtitleData] = useState<AISubtitleData | null>(null);
+  const [selectedFrameId, setSelectedFrameId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -112,7 +116,7 @@ const AppContent: React.FC = () => {
   // Initialize history and load project info
   useEffect(() => {
     if (historyIndex === -1) {
-      setHistory([{ captions: [], selectedSegmentId: null }]);
+      setHistory([{ captions: [], selectedSegmentId: null, aiSubtitleData: null, selectedFrameId: null }]);
       setHistoryIndex(0);
     }
     loadCurrentProjectInfo();
@@ -140,11 +144,35 @@ const AppContent: React.FC = () => {
 
   // Save state to history
   const saveToHistory = () => {
-    const currentState = { captions, selectedSegmentId };
+    const currentState = { captions, selectedSegmentId, aiSubtitleData, selectedFrameId };
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push(currentState);
     setHistory(newHistory);
     setHistoryIndex(newHistory.length - 1);
+  };
+
+  // AI Subtitle update handler with history
+  const handleAISubtitleUpdate = (newData: AISubtitleData | null) => {
+    // Save current state to history before making changes
+    saveToHistory();
+    setAiSubtitleData(newData);
+    
+    // Mark project as modified
+    markProjectModified();
+  };
+
+  // Handle syncing captions from AI Subtitles
+  const handleCaptionsSync = (updatedCaptions: CaptionSegment[]) => {
+    // Update captions without adding to history (since AI subtitle changes already handle history)
+    setCaptions(updatedCaptions);
+    
+    // Mark project as modified
+    markProjectModified();
+    
+    // Clear segment selection if the selected segment no longer exists
+    if (selectedSegmentId && !updatedCaptions.find(c => c.id === selectedSegmentId)) {
+      setSelectedSegmentId(null);
+    }
   };
 
   // Update-related handlers
@@ -161,6 +189,8 @@ const AppContent: React.FC = () => {
       const state = history[newIndex];
       setCaptions(state.captions);
       setSelectedSegmentId(state.selectedSegmentId);
+      setAiSubtitleData(state.aiSubtitleData || null);
+      setSelectedFrameId(state.selectedFrameId || null);
       setHistoryIndex(newIndex);
     }
   };
@@ -171,6 +201,8 @@ const AppContent: React.FC = () => {
       const state = history[newIndex];
       setCaptions(state.captions);
       setSelectedSegmentId(state.selectedSegmentId);
+      setAiSubtitleData(state.aiSubtitleData || null);
+      setSelectedFrameId(state.selectedFrameId || null);
       setHistoryIndex(newIndex);
     }
   };
@@ -799,7 +831,7 @@ const AppContent: React.FC = () => {
       setGeneratedContent(null);
       
       // Reset history
-      setHistory([{ captions: [], selectedSegmentId: null }]);
+      setHistory([{ captions: [], selectedSegmentId: null, aiSubtitleData: null }]);
       setHistoryIndex(0);
       
       // Update project info
@@ -1612,6 +1644,9 @@ const AppContent: React.FC = () => {
                   canRedo={historyIndex < history.length - 1}
                   replacementAudioPath={replacementAudioPath}
                   onAudioPreviewToggle={setIsAudioPreviewEnabled}
+                  aiSubtitleData={aiSubtitleData}
+                  selectedFrameId={selectedFrameId}
+                  onFrameSelect={setSelectedFrameId}
                 />
               </Card>
 
@@ -1640,6 +1675,11 @@ const AppContent: React.FC = () => {
                   onSegmentSelect={setSelectedSegmentId}
                   onSegmentDelete={handleCaptionDelete}
                   currentTime={currentTime}
+                  aiSubtitleData={aiSubtitleData}
+                  onAISubtitleUpdate={handleAISubtitleUpdate}
+                  selectedFrameId={selectedFrameId}
+                  onFrameSelect={setSelectedFrameId}
+                  onCaptionsSync={handleCaptionsSync}
                 />
               </Card>
             </>

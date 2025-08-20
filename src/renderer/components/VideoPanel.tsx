@@ -263,6 +263,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     setIsDragging(false);
   }, [selectedSegmentId, onCaptionUpdate, captions]);
 
+
     // Render captions on canvas (same logic as export)
     const renderCaptionsOnCanvas = useCallback(() => {
       const canvas = canvasRef.current;
@@ -276,7 +277,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
       // Clear canvas
       ctx.clearRect(0, 0, canvas.width, canvas.height);
   
-      // Get all current captions (for potential overlapping)
+      // Render regular captions using Caption Styling
       const currentCaptions = captions.filter(
         caption => currentTime >= caption.startTime && currentTime <= caption.endTime
       );

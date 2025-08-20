@@ -11,6 +11,7 @@ import { AIService } from '../services/aiService';
 import { SettingsManager } from '../services/settingsManager';
 import { UpdateService } from '../services/updateService';
 import DependencyInstaller from '../services/dependencyInstaller';
+import AISubtitleExporter from '../services/aiSubtitleExporter';
 
 let mainWindow: BrowserWindow;
 
@@ -868,5 +869,71 @@ ipcMain.handle('refresh-dependency-detection', async () => {
   } catch (error) {
     console.error('Failed to refresh dependency detection:', error);
     throw new Error(`Failed to refresh dependency detection: ${error}`);
+  }
+});
+
+// AI Subtitles export handlers
+ipcMain.handle('export-ai-subtitles-srt', async (_event, aiSubtitleData: any) => {
+  try {
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: 'Export AI Subtitles as SRT',
+      defaultPath: 'ai-subtitles.srt',
+      filters: [
+        { name: 'SRT Files', extensions: ['srt'] }
+      ]
+    });
+
+    if (result.canceled || !result.filePath) {
+      return { success: false, error: 'Export cancelled' };
+    }
+
+    const exporter = AISubtitleExporter.getInstance();
+    const defaultStyle = {
+      font: 'Arial',
+      fontSize: 24,
+      textColor: '#ffffff',
+      highlighterColor: '#ffff00',
+      backgroundColor: 'transparent',
+      position: { x: 50, y: 85 }
+    };
+    const outputPath = await exporter.exportModifiedVideo(
+      '', // No video path needed for SRT only
+      '', // No audio path needed for SRT only
+      aiSubtitleData,
+      defaultStyle,
+      result.filePath,
+      { exportMode: 'subtitlesOnly', framerate: 30, quality: 'balanced' },
+      (progress, message) => {
+        _event.sender.send('export-progress', progress, message);
+      }
+    );
+
+    return { success: true, path: outputPath };
+  } catch (error) {
+    console.error('Failed to export AI subtitles as SRT:', error);
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('export-modified-video', async (_event, aiSubtitleData: any) => {
+  try {
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: 'Export Modified Video',
+      defaultPath: 'modified-video.mp4',
+      filters: [
+        { name: 'Video Files', extensions: ['mp4'] }
+      ]
+    });
+
+    if (result.canceled || !result.filePath) {
+      return { success: false, error: 'Export cancelled' };
+    }
+
+    // This would need access to the current video and audio paths
+    // For now, we'll return a placeholder response
+    return { success: false, error: 'Modified video export not yet fully implemented - requires video context' };
+  } catch (error) {
+    console.error('Failed to export modified video:', error);
+    return { success: false, error: (error as Error).message };
   }
 });

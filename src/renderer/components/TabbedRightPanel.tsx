@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
-import { CaptionSegment } from '../../types';
+import { CaptionSegment, AISubtitleData } from '../../types';
 import StylingPanel from './StylingPanel';
-import SubtitlePanel from './SubtitlePanel';
-import { Palette, FileText } from 'lucide-react';
+import AISubtitlesPanel from './AISubtitlesPanel';
+import { Palette, Brain } from 'lucide-react';
 
 interface TabbedRightPanelProps {
   selectedSegment: CaptionSegment | null;
@@ -23,9 +23,14 @@ interface TabbedRightPanelProps {
   onSegmentSelect: (segmentId: string) => void;
   onSegmentDelete: (segmentId: string) => void;
   currentTime: number;
+  aiSubtitleData?: AISubtitleData | null;
+  onAISubtitleUpdate?: (data: AISubtitleData | null) => void;
+  selectedFrameId?: string | null;
+  onFrameSelect?: (frameId: string) => void;
+  onCaptionsSync?: (updatedCaptions: CaptionSegment[]) => void;
 }
 
-type TabType = 'styling' | 'subtitles';
+type TabType = 'styling' | 'aiSubtitles';
 
 const TabbedRightPanel: React.FC<TabbedRightPanelProps> = ({
   selectedSegment,
@@ -39,6 +44,11 @@ const TabbedRightPanel: React.FC<TabbedRightPanelProps> = ({
   onSegmentSelect,
   onSegmentDelete,
   currentTime,
+  aiSubtitleData,
+  onAISubtitleUpdate,
+  selectedFrameId,
+  onFrameSelect,
+  onCaptionsSync,
 }) => {
   const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState<TabType>('styling');
@@ -82,11 +92,11 @@ const TabbedRightPanel: React.FC<TabbedRightPanelProps> = ({
           Styling
         </button>
         <button
-          onClick={() => setActiveTab('subtitles')}
-          style={tabStyle(activeTab === 'subtitles')}
+          onClick={() => setActiveTab('aiSubtitles')}
+          style={tabStyle(activeTab === 'aiSubtitles')}
         >
-          <FileText size={14} />
-          Subtitles
+          <Brain size={14} />
+          AI Subtitles
         </button>
       </div>
 
@@ -107,14 +117,17 @@ const TabbedRightPanel: React.FC<TabbedRightPanelProps> = ({
             transcriptionStatus={transcriptionStatus}
           />
         ) : (
-          <SubtitlePanel
+          <AISubtitlesPanel
             captions={captions}
-            selectedSegmentId={selectedSegmentId}
-            onSegmentSelect={onSegmentSelect}
+            currentTime={currentTime}
+            onTimeSeek={onTimeSeek}
             onCaptionUpdate={onSegmentUpdate}
             onSegmentDelete={onSegmentDelete}
-            onTimeSeek={onTimeSeek}
-            currentTime={currentTime}
+            aiSubtitleData={aiSubtitleData}
+            onAISubtitleUpdate={onAISubtitleUpdate}
+            selectedFrameId={selectedFrameId}
+            onFrameSelect={onFrameSelect}
+            onCaptionsSync={onCaptionsSync}
           />
         )}
       </div>

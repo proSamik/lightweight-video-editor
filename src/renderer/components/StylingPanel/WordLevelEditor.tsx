@@ -21,6 +21,7 @@ interface WordLevelEditorProps {
   onWordMerge: (wordIndex: number) => void;
   onJumpToWord: (wordStart: number) => void;
   onWordDeleteWithAudio?: (wordIndex: number) => void;
+  onLineSplit?: (lines: string[]) => void;
 }
 
 export const WordLevelEditor: React.FC<WordLevelEditorProps> = ({
@@ -30,10 +31,13 @@ export const WordLevelEditor: React.FC<WordLevelEditorProps> = ({
   onWordMerge,
   onJumpToWord,
   onWordDeleteWithAudio,
+  onLineSplit,
 }) => {
   const { theme } = useTheme();
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingValue, setEditingValue] = useState('');
+  const [isLineSplitMode, setIsLineSplitMode] = useState(false);
+  const [lineSplitText, setLineSplitText] = useState('');
 
   const startEditing = (index: number, currentWord: string) => {
     setEditingIndex(index);
@@ -119,6 +123,31 @@ export const WordLevelEditor: React.FC<WordLevelEditorProps> = ({
     return `${seconds.toFixed(1)}s`;
   };
 
+  // Initialize line split text with current text
+  const initializeLineSplit = () => {
+    const currentText = words.map(w => w.word).join(' ');
+    setLineSplitText(currentText);
+    setIsLineSplitMode(true);
+  };
+
+  // Handle line split submission
+  const handleLineSplitSubmit = () => {
+    if (onLineSplit && lineSplitText.trim()) {
+      const lines = lineSplitText.split('\n').filter(line => line.trim());
+      if (lines.length > 1) {
+        onLineSplit(lines);
+      }
+    }
+    setIsLineSplitMode(false);
+    setLineSplitText('');
+  };
+
+  // Cancel line split
+  const cancelLineSplit = () => {
+    setIsLineSplitMode(false);
+    setLineSplitText('');
+  };
+
   // Delete text only icon (eraser)
   const DeleteTextIcon = () => (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -184,6 +213,65 @@ export const WordLevelEditor: React.FC<WordLevelEditorProps> = ({
       label="Word-Level Editor"
       hint="Double-click words to edit • Click time to jump to position"
     >
+      {/* Line Split Mode */}
+      {isLineSplitMode ? (
+        <div style={{
+          marginBottom: spacing.md,
+          padding: spacing.md,
+          backgroundColor: theme.colors.background,
+          border: `1px solid ${theme.colors.primary}`,
+          borderRadius: borderRadius.md
+        }}>
+          <div style={{
+            marginBottom: spacing.sm,
+            fontSize: typography.fontSize.sm,
+            fontWeight: typography.fontWeight.medium,
+            color: theme.colors.text
+          }}>
+            Split into multiple lines (one line per subtitle segment):
+          </div>
+          <textarea
+            value={lineSplitText}
+            onChange={(e) => setLineSplitText(e.target.value)}
+            placeholder="Enter each line on a new line..."
+            style={{
+              width: '100%',
+              minHeight: '100px',
+              padding: spacing.sm,
+              backgroundColor: theme.colors.backgroundSecondary,
+              border: `1px solid ${theme.colors.border}`,
+              borderRadius: borderRadius.sm,
+              color: theme.colors.text,
+              fontSize: typography.fontSize.sm,
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+              resize: 'vertical'
+            }}
+          />
+          <HStack gap="sm" style={{ marginTop: spacing.sm }}>
+            <Button variant="primary" size="sm" onClick={handleLineSplitSubmit}>
+              Apply Split
+            </Button>
+            <Button variant="ghost" size="sm" onClick={cancelLineSplit}>
+              Cancel
+            </Button>
+          </HStack>
+        </div>
+      ) : (
+        /* Line Split Button */
+        onLineSplit && (
+          <div style={{ marginBottom: spacing.md }}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={initializeLineSplit}
+              style={{ width: '100%' }}
+            >
+              Split into Lines
+            </Button>
+          </div>
+        )
+      )}
+
       <div style={containerStyles}>
         <Stack gap="sm">
           {words.map((word, index) => {
