@@ -27,6 +27,7 @@ src/
 │   ├── whisper.ts         # Audio transcription via OpenAI Whisper
 │   ├── videoEditor.ts     # Video editing operations (word deletions)
 │   ├── canvasRenderer.ts  # Canvas-based caption rendering
+│   ├── ffmpegOverlayRenderer.ts # FFmpeg-based overlay rendering with timing precision
 │   ├── srtExporter.ts     # SRT subtitle export for YouTube
 │   ├── aiService.ts       # AI content generation (descriptions/titles)
 │   └── settingsManager.ts # Persistent settings storage
@@ -71,7 +72,7 @@ npm run dev-renderer  # Start webpack dev server for renderer
 - Singleton service for video processing
 - Auto-detects FFmpeg installation paths (macOS homebrew, system PATH)
 - Handles video metadata extraction, audio extraction, and final video rendering
-- Falls back to canvas-based rendering for precise caption placement
+- Streamlined architecture with removed legacy Canvas and GPU renderers
 
 #### WhisperService (`src/services/whisper.ts`)
 - Interfaces with OpenAI Whisper for audio transcription
@@ -84,6 +85,13 @@ npm run dev-renderer  # Start webpack dev server for renderer
 - Supports word-level deletions by comparing caption states
 - Uses FFmpeg for segment extraction and concatenation
 - Merges overlapping time segments for efficient processing
+
+#### FFmpegOverlayRenderer (`src/services/ffmpegOverlayRenderer.ts`)
+- High-performance FFmpeg-based overlay rendering system
+- Prevents timing conflicts between overlay files with intelligent overlap detection
+- Precise millisecond-level timing conversion with `msToSeconds()` helper
+- Optimized filter chain building for multiple PNG overlays with exclusive timing
+- Enhanced caption word timing with gap enforcement to prevent visual conflicts
 
 #### CanvasVideoRenderer (`src/services/canvasRenderer.ts`)
 - Web-compatible Canvas-based rendering system
@@ -100,6 +108,7 @@ npm run dev-renderer  # Start webpack dev server for renderer
 - Coordinates video processing pipeline
 - Sets default caption styling: 85px font, transparent background, emphasis mode enabled
 - Provides progress tracking for transcription and rendering operations
+- Features 60/40 split layout between video preview and styling panels for balanced workspace
 
 #### VideoPanel.tsx - Video Preview
 - HTML5 video element with Canvas overlay for caption preview
@@ -212,6 +221,18 @@ npm run dev-renderer  # Start webpack dev server for renderer
 - **Montserrat font support**: Added popular web font for modern styling
 - **Improved video rendering**: Fixed frame mixing and timeline synchronization issues
 - **Smart text filtering**: Automatic cleanup of empty captions in exports
+
+### Video Rendering Architecture Improvements
+- **Streamlined rendering services**: Removed legacy CanvasVideoRenderer and GPUCanvasVideoRenderer classes to simplify architecture
+- **Enhanced FFmpegOverlayRenderer**: Intelligent overlap prevention with `ensureNoOverlaps()` method
+- **Precise timing control**: Millisecond-accurate overlay timing with exclusive `gte/lt` conditions
+- **Improved maintainability**: Comprehensive code comments and cleaner service dependencies
+- **Better performance**: Reduced complexity in video rendering pipeline
+
+### UI Layout Enhancements
+- **Balanced workspace**: Updated to 60/40 split between video preview and styling panels
+- **Responsive design**: Improved panel sizing for better content visibility
+- **Streamlined controls**: Optimized for both video editing and caption styling workflows
 
 ### Keyboard Shortcuts
 - **Cmd/Ctrl + ,**: Open AI Settings
