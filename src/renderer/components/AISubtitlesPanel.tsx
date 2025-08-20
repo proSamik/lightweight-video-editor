@@ -79,9 +79,31 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
   // AI Subtitles are now the primary data source - no conversion needed
 
   // Always use sorted frames directly from aiSubtitleData - no local state needed
+  // Also fix any duplicate IDs that might exist in the data
   const renderFrames = useMemo(() => {
     if (!aiSubtitleData) return [] as SubtitleFrame[];
-    return [...aiSubtitleData.frames].sort((a, b) => a.startTime - b.startTime);
+    
+    const frames = [...aiSubtitleData.frames];
+    const seenIds = new Set<string>();
+    const fixedFrames = frames.map((frame, index) => {
+      if (seenIds.has(frame.id)) {
+        // Generate a new unique ID for duplicate frames
+        const newId = `${frame.id}-duplicate-fix-${Date.now()}-${index}`;
+        console.warn(`Fixed duplicate frame ID: ${frame.id} -> ${newId}`);
+        return { ...frame, id: newId };
+      }
+      seenIds.add(frame.id);
+      return frame;
+    });
+    
+    // Update the parent data if we fixed any duplicates
+    if (fixedFrames.some((frame, index) => frame.id !== frames[index].id)) {
+      const fixedData = { ...aiSubtitleData, frames: fixedFrames, lastModified: Date.now() };
+      // Schedule the update for the next tick to avoid infinite re-renders
+      setTimeout(() => updateAISubtitleData(fixedData), 0);
+    }
+    
+    return fixedFrames.sort((a, b) => a.startTime - b.startTime);
   }, [aiSubtitleData?.frames]);
 
   // Get currently highlighted words based on current time
@@ -125,9 +147,21 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
       isCustomBreak: true
     };
 
-    // Create new frame for second half
+    // Create new frame for second half with guaranteed unique ID
+    const generateUniqueId = (baseId: string, existingFrames: SubtitleFrame[]): string => {
+      const timestamp = Date.now();
+      const random = Math.floor(Math.random() * 1000);
+      let newId = `${baseId}-split-${timestamp}-${random}`;
+      
+      // Ensure the ID is truly unique
+      while (existingFrames.some(f => f.id === newId)) {
+        newId = `${baseId}-split-${timestamp}-${Math.floor(Math.random() * 10000)}`;
+      }
+      return newId;
+    };
+
     const newFrame: SubtitleFrame = {
-      id: `${frameId}-split-${Date.now()}`,
+      id: generateUniqueId(frameId, aiSubtitleData.frames),
       startTime: secondHalf[0].start,
       endTime: secondHalf[secondHalf.length - 1].end,
       words: secondHalf,
