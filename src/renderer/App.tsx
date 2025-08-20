@@ -1569,7 +1569,7 @@ const AppContent: React.FC = () => {
                 variant="default" 
                 padding="none"
                 style={{ 
-                  flex: '1 1 70%', 
+                  flex: '1 1 60%', 
                   display: 'flex', 
                   flexDirection: 'column',
                   minHeight: 0,
@@ -1620,9 +1620,8 @@ const AppContent: React.FC = () => {
                 variant="default" 
                 padding="none"
                 style={{ 
-                  flex: '1 1 30%', 
+                  flex: '1 1 40%', 
                   minWidth: '300px',
-                  maxWidth: '400px',
                   minHeight: 0,
                   display: 'flex',
                   flexDirection: 'column',
