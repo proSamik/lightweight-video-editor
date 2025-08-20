@@ -133,7 +133,7 @@ export interface GeneratedContent {
 
 
 // AI Subtitles enhanced types
-export type WordEditState = 'normal' | 'strikethrough' | 'censored' | 'removedCaption' | 'editing';
+export type WordEditState = 'normal' | 'strikethrough' | 'censored' | 'removedCaption' | 'silenced' | 'editing';
 
 export interface SubtitleStyle {
   font: string;

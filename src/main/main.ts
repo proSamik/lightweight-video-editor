@@ -1001,7 +1001,7 @@ ipcMain.handle('export-ai-subtitles-srt', async (_event, aiSubtitleData: any) =>
   }
 });
 
-ipcMain.handle('export-modified-video', async (_event, aiSubtitleData: any) => {
+ipcMain.handle('export-modified-video', async (event, aiSubtitleData: any, videoPath: string, audioPath?: string) => {
   try {
     const result = await dialog.showSaveDialog(mainWindow, {
       title: 'Export Modified Video',
@@ -1015,9 +1015,45 @@ ipcMain.handle('export-modified-video', async (_event, aiSubtitleData: any) => {
       return { success: false, error: 'Export cancelled' };
     }
 
-    // This would need access to the current video and audio paths
-    // For now, we'll return a placeholder response
-    return { success: false, error: 'Modified video export not yet fully implemented - requires video context' };
+    const exporter = AISubtitleExporter.getInstance();
+    const defaultStyle = {
+      font: 'Arial',
+      fontSize: 85,
+      textColor: '#ffffff',
+      highlighterColor: '#ffff00',
+      backgroundColor: 'transparent',
+      strokeColor: '#000000',
+      strokeWidth: 2,
+      textTransform: 'none' as const,
+      position: { x: 50, y: 80, z: 0 },
+      renderMode: 'horizontal' as const,
+      textAlign: 'center' as const,
+      scale: 1,
+      emphasizeMode: true,
+      burnInSubtitles: true,
+    };
+    
+    const exportSettings = { 
+      exportMode: 'complete' as const, 
+      framerate: 30 as const, 
+      quality: 'balanced' as const 
+    };
+
+    console.log(`[Main] Starting modified video export with videoPath: ${videoPath}, audioPath: ${audioPath}`);
+    
+    const outputPath = await exporter.exportModifiedVideo(
+      videoPath,
+      audioPath || '', // Use empty string if no audio path provided
+      aiSubtitleData,
+      defaultStyle,
+      result.filePath,
+      exportSettings,
+      (progress, message) => {
+        event.sender.send('export-progress', progress, message);
+      }
+    );
+
+    return { success: true, path: outputPath };
   } catch (error) {
     console.error('Failed to export modified video:', error);
     return { success: false, error: (error as Error).message };

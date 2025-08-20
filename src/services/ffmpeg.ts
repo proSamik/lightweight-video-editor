@@ -430,6 +430,131 @@ export class FFmpegService {
     });
   }
 
+  /**
+   * Extract a video segment from start to end time
+   */
+  public async extractVideoSegment(
+    videoPath: string,
+    startTime: number,
+    endTime: number,
+    outputPath: string,
+    onProgress?: (progress: number) => void
+  ): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const duration = endTime - startTime;
+      
+      console.log(`[FFmpeg] Extracting video segment: ${startTime}s to ${endTime}s (duration: ${duration}s)`);
+      
+      ffmpeg(videoPath)
+        .setFfmpegPath(this.ffmpegPath)
+        .setFfprobePath(this.ffprobePath)
+        .seekInput(startTime)
+        .duration(duration)
+        .videoCodec('libx264') // Re-encode to ensure compatibility
+        .audioCodec('aac')
+        .format('mp4')
+        .outputOptions([
+          '-avoid_negative_ts', 'make_zero',
+          '-fflags', '+genpts'
+        ])
+        .output(outputPath)
+        .on('progress', (progress: any) => {
+          if (onProgress && progress.percent) {
+            onProgress(progress.percent);
+          }
+        })
+        .on('end', () => {
+          console.log(`[FFmpeg] Video segment extracted successfully: ${outputPath}`);
+          resolve(outputPath);
+        })
+        .on('error', (err: any) => {
+          console.error(`[FFmpeg] Video segment extraction failed:`, err);
+          reject(new Error(`Video segment extraction failed: ${err.message}`));
+        })
+        .run();
+    });
+  }
+
+  /**
+   * Concatenate multiple video segments into one video
+   */
+  public async concatenateVideoSegments(
+    segmentPaths: string[],
+    outputPath: string,
+    onProgress?: (progress: number) => void
+  ): Promise<string> {
+    return new Promise((resolve, reject) => {
+      if (segmentPaths.length === 0) {
+        reject(new Error('No video segments to concatenate'));
+        return;
+      }
+
+      if (segmentPaths.length === 1) {
+        // Only one segment, just copy it
+        const copyCommand = ffmpeg(segmentPaths[0])
+          .setFfmpegPath(this.ffmpegPath)
+          .setFfprobePath(this.ffprobePath)
+          .videoCodec('copy')
+          .audioCodec('copy')
+          .output(outputPath)
+          .on('end', () => resolve(outputPath))
+          .on('error', (err: any) => reject(new Error(`Video copy failed: ${err.message}`)));
+        
+        copyCommand.run();
+        return;
+      }
+
+      // Create a temporary file list for FFmpeg concat
+      const concatListPath = path.join(path.dirname(outputPath), 'video_concat_list.txt');
+      const fileList = segmentPaths.map(p => `file '${path.resolve(p)}'`).join('\n');
+      
+      console.log(`[FFmpeg] Concatenating ${segmentPaths.length} video segments`);
+      console.log(`[FFmpeg] Concat list:\n${fileList}`);
+      
+      fs.writeFileSync(concatListPath, fileList);
+      
+      ffmpeg()
+        .setFfmpegPath(this.ffmpegPath)
+        .setFfprobePath(this.ffprobePath)
+        .input(concatListPath)
+        .inputOptions(['-f', 'concat', '-safe', '0'])
+        .videoCodec('libx264') // Re-encode to ensure compatibility
+        .audioCodec('aac')
+        .format('mp4')
+        .outputOptions([
+          '-avoid_negative_ts', 'make_zero',
+          '-fflags', '+genpts'
+        ])
+        .output(outputPath)
+        .on('progress', (progress: any) => {
+          if (onProgress && progress.percent) {
+            onProgress(progress.percent);
+          }
+        })
+        .on('end', () => {
+          console.log(`[FFmpeg] Video concatenation completed: ${outputPath}`);
+          // Clean up temporary file
+          try {
+            fs.unlinkSync(concatListPath);
+          } catch (error) {
+            console.warn('Failed to clean up temporary video concat file:', error);
+          }
+          resolve(outputPath);
+        })
+        .on('error', (err: any) => {
+          console.error(`[FFmpeg] Video concatenation failed:`, err);
+          // Clean up temporary file on error
+          try {
+            fs.unlinkSync(concatListPath);
+          } catch (error) {
+            console.warn('Failed to clean up temporary video concat file:', error);
+          }
+          reject(new Error(`Video concatenation failed: ${err.message}`));
+        })
+        .run();
+    });
+  }
+
   public async renderVideoWithModifiedAudio(
     videoPath: string,
     modifiedAudioPath: string,

@@ -102,8 +102,8 @@ const electronAPI = {
   // AI Subtitles export
   exportAISubtitlesSRT: (aiSubtitleData: any) =>
     ipcRenderer.invoke('export-ai-subtitles-srt', aiSubtitleData),
-  exportModifiedVideo: (aiSubtitleData: any) =>
-    ipcRenderer.invoke('export-modified-video', aiSubtitleData),
+  exportModifiedVideo: (aiSubtitleData: any, videoPath: string, audioPath?: string) =>
+    ipcRenderer.invoke('export-modified-video', aiSubtitleData, videoPath, audioPath),
   
   // Update-related APIs
   checkForUpdates: () => 

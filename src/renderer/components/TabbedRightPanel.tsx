@@ -19,6 +19,8 @@ interface TabbedRightPanelProps {
   onAISubtitleUpdate?: (data: AISubtitleData | null) => void;
   selectedFrameId?: string | null;
   onFrameSelect?: (frameId: string) => void;
+  videoPath?: string | null;
+  audioPath?: string | null;
 }
 
 type TabType = 'styling' | 'aiSubtitles';
@@ -31,6 +33,8 @@ const TabbedRightPanel: React.FC<TabbedRightPanelProps> = ({
   onAISubtitleUpdate,
   selectedFrameId,
   onFrameSelect,
+  videoPath,
+  audioPath,
 }) => {
   const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState<TabType>('aiSubtitles');
@@ -103,6 +107,8 @@ const TabbedRightPanel: React.FC<TabbedRightPanelProps> = ({
             onAISubtitleUpdate={onAISubtitleUpdate}
             selectedFrameId={selectedFrameId}
             onFrameSelect={onFrameSelect}
+            videoPath={videoPath}
+            audioPath={audioPath}
           />
         )}
       </div>

@@ -84,25 +84,32 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
         burnInSubtitles: true,
       } as any;
 
-      // Get visible words from the frame
-      const visibleWords = frame.words.filter(word => 
+      // Get words that should be included in the preview timeline
+      // Exclude both silenced and strikethrough words to match export behavior
+      const keptWords = frame.words.filter(word => 
         word.editState !== 'strikethrough' && 
-        word.editState !== 'removedCaption' &&
+        word.editState !== 'silenced' &&
         !word.isPause
       );
 
-      if (visibleWords.length === 0) return; // Skip empty frames
+      // Get visible words from kept words (exclude removedCaption for text display)
+      const visibleWords = keptWords.filter(word => 
+        word.editState !== 'removedCaption'
+      );
 
-      // Create virtual caption segment
+      if (keptWords.length === 0) return; // Skip frames with no kept words
+
+      // Create virtual caption segment with proper timing
       const virtualCaption: DisplaySegment = {
         id: frame.id,
-        startTime: frame.startTime * 1000, // Convert seconds to milliseconds
-        endTime: frame.endTime * 1000,
+        startTime: keptWords[0].start * 1000, // Use first kept word's start
+        endTime: keptWords[keptWords.length - 1].end * 1000, // Use last kept word's end
         text: visibleWords.map((w: any) => w.word).join(' '),
-        words: visibleWords.map((word: any) => ({
+        words: keptWords.map((word: any) => ({
           word: word.word,
           start: word.start * 1000,
-          end: word.end * 1000
+          end: word.end * 1000,
+          editState: word.editState // Include edit state for rendering decisions
         })),
         style: baseStyle,
       };
@@ -118,6 +125,112 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   
   // Determine effective selection - use frame selection for AI mode, segment selection for regular mode
   const effectiveSelectedId = selectedFrameId || null;
+
+  // Get time ranges that should be muted (silenced words only - cut words are handled differently)
+  const getSilencedTimeRanges = useCallback((): Array<{start: number, end: number}> => {
+    if (!aiSubtitleData) return [];
+    
+    const silencedRanges: Array<{start: number, end: number}> = [];
+    
+    aiSubtitleData.frames.forEach(frame => {
+      frame.words.forEach(word => {
+        if (word.editState === 'silenced') {
+          silencedRanges.push({
+            start: word.start * 1000, // Convert to milliseconds
+            end: word.end * 1000
+          });
+        }
+      });
+    });
+    
+    return silencedRanges;
+  }, [aiSubtitleData]);
+
+  // Get segments that should be cut (silenced + strikethrough)
+  const getCutSegments = useCallback((): Array<{start: number, end: number}> => {
+    if (!aiSubtitleData) return [];
+    
+    const cutSegments: Array<{start: number, end: number}> = [];
+    
+    aiSubtitleData.frames.forEach(frame => {
+      frame.words.forEach(word => {
+        if (word.editState === 'silenced' || word.editState === 'strikethrough') {
+          cutSegments.push({
+            start: word.start * 1000, // Convert to milliseconds
+            end: word.end * 1000
+          });
+        }
+      });
+    });
+    
+    // Merge overlapping segments
+    const sortedSegments = cutSegments.sort((a, b) => a.start - b.start);
+    const mergedSegments: Array<{start: number, end: number}> = [];
+    
+    for (const segment of sortedSegments) {
+      if (mergedSegments.length === 0 || segment.start > mergedSegments[mergedSegments.length - 1].end) {
+        mergedSegments.push(segment);
+      } else {
+        mergedSegments[mergedSegments.length - 1].end = Math.max(mergedSegments[mergedSegments.length - 1].end, segment.end);
+      }
+    }
+    
+    return mergedSegments;
+  }, [aiSubtitleData]);
+
+  // Get current word being played (for more precise muting)
+  const getCurrentPlayingWord = useCallback((time: number) => {
+    if (!aiSubtitleData) return null;
+    
+    const timeInSeconds = time / 1000;
+    
+    for (const frame of aiSubtitleData.frames) {
+      for (const word of frame.words) {
+        if (timeInSeconds >= word.start && timeInSeconds <= word.end) {
+          return word;
+        }
+      }
+    }
+    return null;
+  }, [aiSubtitleData]);
+
+  // Check if current time should be muted (word-level precision)
+  // Since we're cutting segments in export, we should also hide/mute them in preview
+  const shouldBeMuted = useCallback((time: number): boolean => {
+    const currentWord = getCurrentPlayingWord(time);
+    return currentWord?.editState === 'silenced' || currentWord?.editState === 'strikethrough' || false;
+  }, [getCurrentPlayingWord]);
+
+  // Find the next valid (non-cut) time after the current time
+  const findNextValidTime = useCallback((currentTimeMs: number): number | null => {
+    if (!aiSubtitleData) return null;
+    
+    const cutSegments = getCutSegments();
+    const currentTimeInMs = currentTimeMs;
+    
+    // Check if we're currently in a cut segment
+    for (const segment of cutSegments) {
+      if (currentTimeInMs >= segment.start && currentTimeInMs <= segment.end) {
+        // We're in a cut segment, find the end of this segment
+        return segment.end;
+      }
+    }
+    
+    return null; // Not in a cut segment
+  }, [aiSubtitleData, getCutSegments]);
+
+  // Auto-skip over cut segments during playback
+  const handleAutoSkip = useCallback((currentTimeMs: number) => {
+    const video = videoRef.current;
+    if (!video || video.paused) return;
+    
+    const nextValidTime = findNextValidTime(currentTimeMs);
+    if (nextValidTime !== null) {
+      // Skip to the end of the cut segment
+      video.currentTime = nextValidTime / 1000;
+      onTimeUpdate(nextValidTime);
+    }
+  }, [findNextValidTime, onTimeUpdate]);
 
   // Check if video file exists when videoFile changes
   useEffect(() => {
@@ -450,6 +563,10 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     if (video) {
       const handleTimeUpdate = () => {
         const currentTimeMs = video.currentTime * 1000;
+        
+        // Auto-skip over cut segments during playback
+        handleAutoSkip(currentTimeMs);
+        
         onTimeUpdate(currentTimeMs);
         // Force canvas re-render will be handled by the renderCaptionsOnCanvas useEffect
       };
@@ -466,7 +583,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
       };
     }
     return undefined;
-  }, [onTimeUpdate]);
+  }, [onTimeUpdate, handleAutoSkip]);
 
   // Sync video time when currentTime prop changes (for seeking)
   useEffect(() => {
@@ -775,7 +892,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
 
     let syncTimeoutId: NodeJS.Timeout | null = null;
 
-    // Debounced sync to avoid frequent corrections
+    // Debounced sync to avoid frequent corrections and apply dynamic muting
     const syncAudio = () => {
       if (!replacementAudio || !replacementAudioPath || !isAudioPreviewEnabled) return;
       
@@ -785,8 +902,21 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
         if (replacementAudio && Math.abs(replacementAudio.currentTime - video.currentTime) > 0.2) {
           replacementAudio.currentTime = video.currentTime;
         }
+        
+        // Apply dynamic muting based on silenced/cut words
+        const currentTimeMs = video.currentTime * 1000;
+        const isMuted = shouldBeMuted(currentTimeMs);
+        
+        if (isMuted) {
+          replacementAudio.volume = 0;
+          video.volume = 0; // Also mute video audio
+        } else {
+          replacementAudio.volume = isAudioPreviewEnabled ? 1 : 0;
+          video.volume = isAudioPreviewEnabled ? 0 : 1;
+        }
+        
         syncTimeoutId = null;
-      }, 100);
+      }, 16); // More frequent updates for precise control
     };
 
     const handleVideoPlay = () => {
@@ -826,7 +956,30 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
         clearTimeout(syncTimeoutId);
       }
     };
-  }, [isAudioPreviewEnabled, replacementAudioPath]); // Include dependencies for current state access
+  }, [isAudioPreviewEnabled, replacementAudioPath, shouldBeMuted]); // Include dependencies for current state access
+
+  // Handle dynamic muting for original video audio when no replacement audio
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handleVideoTimeUpdate = () => {
+      // Only apply muting when using original video audio (no replacement audio or preview disabled)
+      if (replacementAudioPath && isAudioPreviewEnabled) return;
+      
+      const currentTimeMs = video.currentTime * 1000;
+      const isMuted = shouldBeMuted(currentTimeMs);
+      
+      // Apply muting smoothly without jumping
+      video.volume = isMuted ? 0 : 1;
+    };
+
+    video.addEventListener('timeupdate', handleVideoTimeUpdate);
+
+    return () => {
+      video.removeEventListener('timeupdate', handleVideoTimeUpdate);
+    };
+  }, [replacementAudioPath, isAudioPreviewEnabled, shouldBeMuted]);
 
   // Handle audio preview toggle - simplified for debugging
   useEffect(() => {

@@ -241,6 +241,66 @@ npm run dev-renderer  # Start webpack dev server for renderer
 - **Cmd/Ctrl + O**: Open project manager
 - **Cmd/Ctrl + Z**: Undo/Redo
 
+## Word Editing States & Behavior
+
+The AI subtitle editor supports multiple word editing states that affect both preview and export:
+
+### Word Edit States
+
+1. **Normal** (`'normal'`)
+   - **Preview**: Full audio and text display
+   - **Export**: Included in final video with full audio and subtitles
+   - **Use case**: Default state for all words
+
+2. **Censored** (`'censored'`)
+   - **Preview**: Text replaced with asterisks (e.g., "hello" → "h****"), full audio
+   - **Export**: Censored text in subtitles, original audio preserved
+   - **Use case**: Obscure inappropriate words while keeping audio timing
+
+3. **Removed Caption** (`'removedCaption'`)
+   - **Preview**: Text hidden from subtitles, full audio plays
+   - **Export**: No text in subtitles, original audio preserved
+   - **Use case**: Hide specific words from captions but keep them audible
+
+4. **Silenced** (`'silenced'`)
+   - **Preview**: Audio muted during word timing, text hidden
+   - **Export**: Audio and video segments completely removed (shorter video)
+   - **Use case**: Remove inappropriate audio while shortening timeline
+
+5. **Cut from Video** (`'strikethrough'`)
+   - **Preview**: Audio muted during word timing, text hidden  
+   - **Export**: Audio and video segments completely removed (shorter video)
+   - **Use case**: Remove segments entirely from final video
+
+### Export Processing Pipeline
+
+The export system handles word states through a two-stage process:
+
+1. **Segment Extraction**: Only words with `normal`, `censored`, and `removedCaption` states are kept
+2. **Timeline Reconstruction**: Video and audio segments are extracted and concatenated
+3. **Subtitle Generation**: Text rendering respects each word's edit state
+
+```typescript
+// Words that result in segment removal
+const removedStates = ['silenced', 'strikethrough'];
+
+// Words that affect only text display
+const textOnlyStates = ['censored', 'removedCaption'];
+```
+
+### Technical Implementation
+
+**FFmpeg Operations**:
+- `extractVideoSegment()`: Extracts video clips for kept segments
+- `concatenateVideoSegments()`: Joins video clips into final timeline
+- `extractAudioSegments()`: Extracts audio clips for kept segments
+- `concatenateAudioSegments()`: Joins audio clips into final timeline
+
+**Preview Synchronization**:
+- Real-time audio muting based on `getCurrentPlayingWord()`
+- Visual feedback through text styling and highlighting
+- Word-level precision timing for accurate preview
+
 ## Common Development Tasks
 
 ### Adding New Caption Styles

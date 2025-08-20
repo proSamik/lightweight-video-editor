@@ -17,6 +17,8 @@ interface AISubtitlesPanelProps {
   onAISubtitleUpdate?: (data: AISubtitleData | null) => void;
   selectedFrameId?: string | null;
   onFrameSelect?: (frameId: string) => void;
+  videoPath?: string | null;
+  audioPath?: string | null;
 }
 
 interface WordContextMenu {
@@ -37,7 +39,9 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
   aiSubtitleData: propAiSubtitleData,
   onAISubtitleUpdate,
   selectedFrameId,
-  onFrameSelect
+  onFrameSelect,
+  videoPath,
+  audioPath
 }) => {
   const { theme } = useTheme();
   const [internalAiSubtitleData, setInternalAiSubtitleData] = useState<AISubtitleData | null>(null);
@@ -78,8 +82,42 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
 
   // AI Subtitles are now the primary data source - no conversion needed
 
+  // Utility function to ensure frames don't overlap
+  const ensureNonOverlappingFrames = (frames: SubtitleFrame[]): SubtitleFrame[] => {
+    const sortedFrames = [...frames].sort((a, b) => a.startTime - b.startTime);
+    const GAP_DURATION = 0.01; // 10ms gap between frames
+
+    return sortedFrames.map((frame, index) => {
+      if (index === 0) return frame;
+      
+      const prevFrame = sortedFrames[index - 1];
+      
+      // If current frame starts at or before previous frame ends, adjust the timing
+      if (frame.startTime <= prevFrame.endTime) {
+        const adjustedStartTime = prevFrame.endTime + GAP_DURATION;
+        
+        // Ensure the frame duration is at least 0.1 seconds
+        const minEndTime = adjustedStartTime + 0.1;
+        const adjustedEndTime = Math.max(frame.endTime, minEndTime);
+        
+        return {
+          ...frame,
+          startTime: adjustedStartTime,
+          endTime: adjustedEndTime,
+          words: frame.words.map(word => ({
+            ...word,
+            start: Math.max(word.start, adjustedStartTime),
+            end: Math.min(word.end, adjustedEndTime)
+          }))
+        };
+      }
+      
+      return frame;
+    });
+  };
+
   // Always use sorted frames directly from aiSubtitleData - no local state needed
-  // Also fix any duplicate IDs that might exist in the data
+  // Also fix any duplicate IDs that might exist in the data and ensure non-overlapping times
   const renderFrames = useMemo(() => {
     if (!aiSubtitleData) return [] as SubtitleFrame[];
     
@@ -96,14 +134,22 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
       return frame;
     });
     
-    // Update the parent data if we fixed any duplicates
-    if (fixedFrames.some((frame, index) => frame.id !== frames[index].id)) {
-      const fixedData = { ...aiSubtitleData, frames: fixedFrames, lastModified: Date.now() };
+    // Fix overlapping times
+    const nonOverlappingFrames = ensureNonOverlappingFrames(fixedFrames);
+    
+    // Update the parent data if we fixed any duplicates or overlaps
+    const needsUpdate = fixedFrames.some((frame, index) => frame.id !== frames[index].id) ||
+                       nonOverlappingFrames.some((frame, index) => 
+                         Math.abs(frame.startTime - fixedFrames[index].startTime) > 0.001 ||
+                         Math.abs(frame.endTime - fixedFrames[index].endTime) > 0.001);
+    
+    if (needsUpdate) {
+      const fixedData = { ...aiSubtitleData, frames: nonOverlappingFrames, lastModified: Date.now() };
       // Schedule the update for the next tick to avoid infinite re-renders
       setTimeout(() => updateAISubtitleData(fixedData), 0);
     }
     
-    return fixedFrames.sort((a, b) => a.startTime - b.startTime);
+    return nonOverlappingFrames.sort((a, b) => a.startTime - b.startTime);
   }, [aiSubtitleData?.frames]);
 
   // Get currently highlighted words based on current time
@@ -112,13 +158,21 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     
     const highlighted = new Set<string>();
     const currentTimeInSeconds = currentTime / 1000; // Convert currentTime (milliseconds) to seconds
-    aiSubtitleData.frames.forEach(frame => {
-      frame.words.forEach(word => {
+    
+    // Find the current frame first
+    const currentFrame = aiSubtitleData.frames.find(frame => 
+      currentTimeInSeconds >= frame.startTime && currentTimeInSeconds <= frame.endTime
+    );
+    
+    if (currentFrame) {
+      // Only highlight words in the current frame
+      currentFrame.words.forEach(word => {
         if (currentTimeInSeconds >= word.start && currentTimeInSeconds <= word.end) {
           highlighted.add(word.id);
         }
       });
-    });
+    }
+    
     return highlighted;
   }, [aiSubtitleData, currentTime]);
 
@@ -179,13 +233,13 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
       ...aiSubtitleData.frames.slice(frameIndex + 1)
     ];
 
-    // Ensure frames are always ordered by time for immediate correct UI order
+    // Ensure frames are always ordered by time and don't overlap
     const sortedFrames = [...updatedFrames].sort((a, b) => a.startTime - b.startTime);
-
+    const nonOverlappingFrames = ensureNonOverlappingFrames(sortedFrames);
 
     const newAIData = {
       ...aiSubtitleData,
-      frames: sortedFrames,
+      frames: nonOverlappingFrames,
       lastModified: Date.now()
     };
     
@@ -234,13 +288,13 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     const insertIndex = Math.min(frameIndex, targetIndex);
     updatedFrames.splice(insertIndex, 0, mergedFrame);
 
-    // Ensure frames are always ordered by time for immediate correct UI order
+    // Ensure frames are always ordered by time and don't overlap
     const sortedFrames = [...updatedFrames].sort((a, b) => a.startTime - b.startTime);
-
+    const nonOverlappingFrames = ensureNonOverlappingFrames(sortedFrames);
 
     const newAIData = {
       ...aiSubtitleData,
-      frames: sortedFrames,
+      frames: nonOverlappingFrames,
       lastModified: Date.now()
     };
     
@@ -492,7 +546,12 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
         }
       } else if (format === 'modified') {
         // Use IPC to trigger modified video export
-        const result = await window.electronAPI.exportModifiedVideo(aiSubtitleData);
+        if (!videoPath) {
+          alert('No video file available for export.');
+          return;
+        }
+        
+        const result = await window.electronAPI.exportModifiedVideo(aiSubtitleData, videoPath, audioPath || undefined);
         if (result.success) {
           console.log('Modified video exported successfully:', result.path);
         }
@@ -579,26 +638,20 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
         case 'edit':
           handleWordDoubleClick(wordId, word.word);
           break;
-        case 'keyword':
-          updateWordInFrames(wordId, word.word, 'normal');
-          // Toggle keyword status
-          const updatedFrames = aiSubtitleData.frames.map(f => ({
-            ...f,
-            words: f.words.map(w => 
-              w.id === wordId ? { ...w, isKeyword: !w.isKeyword } : w
-            )
-          }));
-          const newAIData = { ...aiSubtitleData, frames: updatedFrames, lastModified: Date.now() };
-          updateAISubtitleData(newAIData);
-          break;
         case 'silence':
-          // Keep word visible but remove audio (placeholder for future implementation)
+          updateWordInFrames(wordId, word.word, 'silenced');
           break;
         case 'censor':
-          const censoredWord = word.originalWord.length <= 2 
-            ? '**' 
-            : word.originalWord[0] + '*'.repeat(Math.max(2, word.originalWord.length - 1));
-          updateWordInFrames(wordId, censoredWord, 'censored');
+          if (word.editState === 'censored') {
+            // Uncensor: restore original word
+            updateWordInFrames(wordId, word.originalWord, 'normal');
+          } else {
+            // Censor: replace with asterisks
+            const censoredWord = word.originalWord.length <= 2 
+              ? '**' 
+              : word.originalWord[0] + '*'.repeat(Math.max(2, word.originalWord.length - 1));
+            updateWordInFrames(wordId, censoredWord, 'censored');
+          }
           break;
         case 'removeCaption':
           updateWordInFrames(wordId, word.word, 'removedCaption');
@@ -618,6 +671,25 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     setContextMenu(prev => ({ ...prev, show: false }));
   };
 
+  // Get tooltip text for word based on its state
+  const getWordTooltip = (word: WordSegment): string => {
+    switch (word.editState) {
+      case 'strikethrough':
+        return 'Cut from video - Audio and text will be removed';
+      case 'censored':
+        return 'Censored - Text replaced with asterisks';
+      case 'removedCaption':
+        return 'Remove caption - Text hidden but audio remains';
+      case 'silenced':
+        return 'Silenced - Audio muted but text visible';
+      case 'normal':
+        if (word.isKeyword) return 'Keyword - Highlighted word';
+        return `Original: "${word.originalWord}" | Time: ${word.start.toFixed(2)}s - ${word.end.toFixed(2)}s`;
+      default:
+        return `Time: ${word.start.toFixed(2)}s - ${word.end.toFixed(2)}s`;
+    }
+  };
+
   // Get word style based on state
   const getWordStyle = (word: WordSegment): React.CSSProperties => {
     const isHighlighted = currentlyHighlightedWords.has(word.id);
@@ -626,12 +698,15 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     const baseStyle: React.CSSProperties = {
       display: 'inline-block',
       padding: '2px 4px',
-      margin: '1px',
+      margin: isSelected ? '0px 2px' : '2px 3px', // Ensure selected words don't overlap
       borderRadius: '3px',
       cursor: 'pointer',
       transition: 'all 0.2s ease',
       userSelect: 'none',
-      border: isSelected ? `2px solid ${theme.colors.primary}` : '2px solid transparent'
+      border: isSelected ? `2px solid ${theme.colors.primary}` : 'none',
+      outline: isSelected ? 'none' : undefined,
+      position: 'relative',
+      zIndex: isSelected ? 10 : 1 // Ensure selected word appears on top
     };
 
     // Apply edit state styling
@@ -639,7 +714,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
       case 'strikethrough':
         return {
           ...baseStyle,
-          textDecoration: 'line-through',
+          textDecoration: 'line-through double',
           color: theme.colors.textSecondary,
           backgroundColor: isHighlighted ? theme.colors.error + '40' : 'transparent'
         };
@@ -652,9 +727,16 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
       case 'removedCaption':
         return {
           ...baseStyle,
+          textDecoration: 'line-through',
           color: theme.colors.textSecondary,
           opacity: 0.6,
           backgroundColor: isHighlighted ? theme.colors.textSecondary + '40' : 'transparent'
+        };
+      case 'silenced':
+        return {
+          ...baseStyle,
+          backgroundColor: isHighlighted ? theme.colors.textSecondary + '60' : theme.colors.textSecondary + '30',
+          color: theme.colors.textSecondary
         };
       case 'editing':
         return {
@@ -701,6 +783,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
 
     const isStrikethrough = word.editState === 'strikethrough';
     const isMultiSelect = selectedWordIds.size > 1;
+    const isCensored = word.editState === 'censored';
 
     const menuItems = isStrikethrough 
       ? [{ icon: RotateCcw, label: 'Restore', action: 'restore', color: theme.colors.success }]
@@ -708,9 +791,8 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
           { icon: Copy, label: 'Copy', action: 'copy' },
           { icon: Edit3, label: 'Edit', action: 'edit' },
           ...(isMultiSelect ? [{ icon: Edit3, label: 'Combine', action: 'combine', color: theme.colors.accent }] : []),
-          { icon: Star, label: 'Keyword', action: 'keyword', color: theme.colors.warning },
           { icon: VolumeX, label: 'Silence', action: 'silence', color: theme.colors.info },
-          { icon: Hash, label: 'Censor', action: 'censor', color: theme.colors.warning },
+          { icon: Hash, label: isCensored ? 'Uncensor' : 'Censor', action: 'censor', color: theme.colors.warning },
           { icon: FileX, label: 'Remove Caption', action: 'removeCaption', color: theme.colors.textSecondary },
           { icon: Trash2, label: 'Cut from Video', action: 'cutFromVideo', color: theme.colors.error }
         ];
@@ -984,6 +1066,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
                     style={getWordStyle(word)}
                     onClick={(e) => handleWordClick(e, word.id, frame.id)}
                     onDoubleClick={() => handleWordDoubleClick(word.id, word.word)}
+                    title={getWordTooltip(word)}
                   >
                     {word.word}
                   </span>

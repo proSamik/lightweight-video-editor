@@ -41,6 +41,9 @@ export class AISubtitleExporter {
     exportSettings: ExportSettings,
     onProgress?: (progress: number, message: string) => void
   ): Promise<string> {
+    console.log(`[AI SUBTITLE EXPORTER] Export started with mode: ${exportSettings.exportMode}`);
+    console.log(`[AI SUBTITLE EXPORTER] AI Subtitle Data frames: ${aiSubtitleData.frames.length}`);
+    
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-subtitle-export-'));
     
     try {
@@ -100,21 +103,29 @@ export class AISubtitleExporter {
     tempDir: string,
     onProgress?: (progress: number, message: string) => void
   ): Promise<string> {
-    onProgress?.(20, 'Processing audio segments...');
+    onProgress?.(20, 'Processing video and audio segments...');
     
-    // Identify segments to keep (non-strikethrough)
-    const audioSegmentsToKeep = this.getAudioSegmentsToKeep(aiSubtitleData);
+    // Get segments to keep (excluding both silenced and cut words)
+    const segmentsToKeep = this.getSegmentsToKeep(aiSubtitleData);
     
-    if (audioSegmentsToKeep.length === 0) {
-      throw new Error('No audio segments to keep after processing');
+    if (segmentsToKeep.length === 0) {
+      throw new Error('No segments to keep after processing');
     }
     
     // Extract and concatenate audio segments
     const modifiedAudioPath = await this.createModifiedAudio(
       originalAudioPath,
-      audioSegmentsToKeep,
+      segmentsToKeep,
       tempDir,
-      (progress) => onProgress?.(20 + progress * 0.3, 'Processing audio...')
+      (progress) => onProgress?.(20 + progress * 0.2, 'Processing audio...')
+    );
+    
+    // Extract and concatenate video segments  
+    const modifiedVideoPath = await this.createModifiedVideo(
+      originalVideoPath,
+      segmentsToKeep,
+      tempDir,
+      (progress) => onProgress?.(40 + progress * 0.2, 'Processing video...')
     );
     
     onProgress?.(50, 'Generating subtitle overlays...');
@@ -129,16 +140,16 @@ export class AISubtitleExporter {
       (progress) => onProgress?.(50 + progress * 0.2, 'Rendering subtitles...')
     );
     
-    onProgress?.(70, 'Combining video and audio...');
+    onProgress?.(60, 'Combining modified video and audio...');
     
-    // Combine video with modified audio and subtitle overlay
+    // Combine modified video with modified audio and subtitle overlay
     const finalVideoPath = await this.combineVideoAudioAndSubtitles(
-      originalVideoPath,
+      modifiedVideoPath,
       modifiedAudioPath,
       overlayPath,
       outputPath,
       exportSettings,
-      (progress) => onProgress?.(70 + progress * 0.3, 'Final video assembly...')
+      (progress) => onProgress?.(60 + progress * 0.4, 'Final video assembly...')
     );
     
     onProgress?.(100, 'Export complete!');
@@ -157,31 +168,114 @@ export class AISubtitleExporter {
     tempDir: string,
     onProgress?: (progress: number, message: string) => void
   ): Promise<string> {
-    onProgress?.(30, 'Generating enhanced subtitles...');
-    
-    // Generate overlay images for all frames with word-level highlighting
-    const overlayPath = await this.generateVideoOverlay(
-      aiSubtitleData,
-      baseStyle,
-      1920, // Default resolution
-      1080,
-      tempDir,
-      (progress) => onProgress?.(30 + progress * 0.4, 'Rendering enhanced subtitles...')
+    // Check if we need to cut segments (silenced or strikethrough words)
+    const hasWordsToRemove = aiSubtitleData.frames.some(frame => 
+      frame.words.some(word => word.editState === 'silenced' || word.editState === 'strikethrough')
     );
+
+    console.log(`[Export] Checking for words to remove...`);
+    console.log(`[Export] Total frames: ${aiSubtitleData.frames.length}`);
     
-    onProgress?.(70, 'Applying subtitles to video...');
+    // Debug: check all word states
+    let totalWords = 0;
+    let silencedCount = 0;
+    let strikethroughCount = 0;
     
-    // Apply overlay to original video
-    const finalVideoPath = await this.ffmpegService.renderVideoWithBurnedCaptions(
-      originalVideoPath,
-      [], // Use overlay instead of caption data
-      outputPath,
-      (progress) => onProgress?.(70 + progress * 0.3, 'Final rendering...'),
-      exportSettings
-    );
+    aiSubtitleData.frames.forEach(frame => {
+      frame.words.forEach(word => {
+        totalWords++;
+        if (word.editState === 'silenced') silencedCount++;
+        if (word.editState === 'strikethrough') strikethroughCount++;
+        if (word.editState === 'silenced' || word.editState === 'strikethrough') {
+          console.log(`[Export] Found word to remove: "${word.word}" (state: ${word.editState})`);
+        }
+      });
+    });
     
-    onProgress?.(100, 'Export complete!');
-    return finalVideoPath;
+    console.log(`[Export] Word analysis: ${totalWords} total, ${silencedCount} silenced, ${strikethroughCount} strikethrough`);
+    console.log(`[Export] hasWordsToRemove: ${hasWordsToRemove}`);
+
+    if (hasWordsToRemove) {
+      // Use the modified segments approach when cutting is needed
+      onProgress?.(20, 'Processing video and audio segments...');
+      
+      // Get segments to keep (excluding both silenced and cut words)
+      const segmentsToKeep = this.getSegmentsToKeep(aiSubtitleData);
+      
+      if (segmentsToKeep.length === 0) {
+        throw new Error('No segments to keep after processing');
+      }
+      
+      // Extract and concatenate audio segments
+      const modifiedAudioPath = await this.createModifiedAudio(
+        await this.ffmpegService.extractAudioForProject(originalVideoPath, tempDir),
+        segmentsToKeep,
+        tempDir,
+        (progress) => onProgress?.(20 + progress * 0.2, 'Processing audio...')
+      );
+      
+      // Extract and concatenate video segments  
+      const modifiedVideoPath = await this.createModifiedVideo(
+        originalVideoPath,
+        segmentsToKeep,
+        tempDir,
+        (progress) => onProgress?.(40 + progress * 0.2, 'Processing video...')
+      );
+      
+      onProgress?.(60, 'Generating subtitle overlays...');
+      
+      // Generate video overlay for modified frames
+      const overlayPath = await this.generateVideoOverlay(
+        aiSubtitleData,
+        baseStyle,
+        1920, // Default resolution
+        1080,
+        tempDir,
+        (progress) => onProgress?.(60 + progress * 0.2, 'Rendering subtitles...')
+      );
+      
+      onProgress?.(80, 'Combining modified video and audio...');
+      
+      // Combine modified video with modified audio and subtitle overlay
+      const finalVideoPath = await this.combineVideoAudioAndSubtitles(
+        modifiedVideoPath,
+        modifiedAudioPath,
+        overlayPath,
+        outputPath,
+        exportSettings,
+        (progress) => onProgress?.(80 + progress * 0.2, 'Final video assembly...')
+      );
+      
+      onProgress?.(100, 'Export complete!');
+      return finalVideoPath;
+    } else {
+      // No cutting needed, use original approach with overlays
+      onProgress?.(30, 'Generating enhanced subtitles...');
+      
+      // Generate overlay images for all frames with word-level highlighting
+      const overlayPath = await this.generateVideoOverlay(
+        aiSubtitleData,
+        baseStyle,
+        1920, // Default resolution
+        1080,
+        tempDir,
+        (progress) => onProgress?.(30 + progress * 0.4, 'Rendering enhanced subtitles...')
+      );
+      
+      onProgress?.(70, 'Applying subtitles to video...');
+      
+      // Apply overlay to original video
+      const finalVideoPath = await this.ffmpegService.renderVideoWithBurnedCaptions(
+        originalVideoPath,
+        [], // Use overlay instead of caption data
+        outputPath,
+        (progress) => onProgress?.(70 + progress * 0.3, 'Final rendering...'),
+        exportSettings
+      );
+      
+      onProgress?.(100, 'Export complete!');
+      return finalVideoPath;
+    }
   }
 
   /**
@@ -206,25 +300,42 @@ export class AISubtitleExporter {
   }
 
   /**
-   * Get audio segments that should be kept (non-strikethrough words)
+   * Get audio/video segments that should be kept (excluding silenced and strikethrough words)
+   * Both silenced and cut words should be completely removed from the timeline
    */
-  private getAudioSegmentsToKeep(aiSubtitleData: AISubtitleData): Array<{ start: number; end: number }> {
+  private getSegmentsToKeep(aiSubtitleData: AISubtitleData): Array<{ start: number; end: number }> {
     const segments: Array<{ start: number; end: number }> = [];
+    let removedWordsCount = 0;
+    let keptWordsCount = 0;
     
     aiSubtitleData.frames.forEach(frame => {
       frame.words.forEach(word => {
-        if (word.editState !== 'strikethrough') {
+        // Exclude both silenced and strikethrough words - both should be cut from video
+        if (word.editState !== 'strikethrough' && word.editState !== 'silenced') {
           segments.push({
             start: word.start,
             end: word.end
           });
+          keptWordsCount++;
+        } else {
+          console.log(`[Export] Removing word "${word.word}" (${word.editState}) from ${word.start}s to ${word.end}s`);
+          removedWordsCount++;
         }
       });
     });
     
+    console.log(`[Export] Processing segments: ${keptWordsCount} words kept, ${removedWordsCount} words removed`);
+    
     // Merge overlapping segments
-    return this.mergeOverlappingSegments(segments);
+    const mergedSegments = this.mergeOverlappingSegments(segments);
+    console.log(`[Export] After merging: ${mergedSegments.length} segments to keep`);
+    mergedSegments.forEach((segment, index) => {
+      console.log(`[Export] Segment ${index + 1}: ${segment.start}s to ${segment.end}s (duration: ${(segment.end - segment.start).toFixed(2)}s)`);
+    });
+    
+    return mergedSegments;
   }
+
 
   /**
    * Merge overlapping audio segments
@@ -287,6 +398,45 @@ export class AISubtitleExporter {
     
     return modifiedAudioPath;
   }
+
+  /**
+   * Create modified video by extracting and concatenating segments
+   */
+  private async createModifiedVideo(
+    originalVideoPath: string,
+    segments: Array<{ start: number; end: number }>,
+    tempDir: string,
+    onProgress?: (progress: number) => void
+  ): Promise<string> {
+    const segmentPaths: string[] = [];
+    
+    // Extract each video segment
+    for (let i = 0; i < segments.length; i++) {
+      const segment = segments[i];
+      const segmentPath = path.join(tempDir, `video_segment_${i}.mp4`);
+      
+      await this.ffmpegService.extractVideoSegment(
+        originalVideoPath,
+        segment.start,
+        segment.end,
+        segmentPath,
+        (progress) => onProgress?.((i / segments.length + progress / 100 / segments.length) * 80)
+      );
+      
+      segmentPaths.push(segmentPath);
+    }
+    
+    // Concatenate all video segments
+    const modifiedVideoPath = path.join(tempDir, 'modified_video.mp4');
+    await this.ffmpegService.concatenateVideoSegments(
+      segmentPaths,
+      modifiedVideoPath,
+      (progress) => onProgress?.(80 + progress * 0.2)
+    );
+    
+    return modifiedVideoPath;
+  }
+
 
   /**
    * Generate video overlay with enhanced AI subtitles

@@ -1392,6 +1392,8 @@ const AppContent: React.FC = () => {
                   onAISubtitleUpdate={handleAISubtitleUpdate}
                   selectedFrameId={selectedFrameId}
                   onFrameSelect={setSelectedFrameId}
+                  videoPath={videoFile?.path || null}
+                  audioPath={replacementAudioPath || extractedAudioPath || null}
                 />
               </Card>
             </>
