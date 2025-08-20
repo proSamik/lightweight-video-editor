@@ -20,6 +20,7 @@ interface VideoPanelProps {
   aiSubtitleData?: AISubtitleData | null;
   selectedFrameId?: string | null;
   onFrameSelect?: (frameId: string) => void;
+  onAISubtitleUpdate?: (data: AISubtitleData | null) => void;
 }
 
 const VideoPanel: React.FC<VideoPanelProps> = ({
@@ -36,6 +37,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   aiSubtitleData,
   selectedFrameId,
   onFrameSelect,
+  onAISubtitleUpdate,
 }) => {
   const { theme } = useTheme();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -301,18 +303,40 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
 
   // Global mouse up handler
   const handleGlobalMouseUp = useCallback(() => {
-    // Save the temporary position to actual caption data if we have one
-    if (tempDragPositionRef.current && effectiveSelectedId && onFrameSelect) {
-      const currentCaption = effectiveCaptions.find(c => c.id === effectiveSelectedId);
-      if (currentCaption) {
-        // In AI mode, selection is by frame; style updates handled elsewhere
-      }
+    // Save the temporary position to actual subtitle data if we have one
+    if (tempDragPositionRef.current && effectiveSelectedId && onAISubtitleUpdate && aiSubtitleData) {
+      const newPosition = tempDragPositionRef.current;
+      
+      // Create updated AI subtitle data with the new position
+      const updatedData: AISubtitleData = {
+        ...aiSubtitleData,
+        frames: aiSubtitleData.frames.map(frame => {
+          if (frame.id === effectiveSelectedId) {
+            return {
+              ...frame,
+              style: {
+                ...frame.style,
+                position: {
+                  ...frame.style?.position,
+                  x: newPosition.x,
+                  y: newPosition.y
+                }
+              }
+            } as SubtitleFrame;
+          }
+          return frame;
+        }),
+        lastModified: Date.now()
+      };
+      
+      // Update the AI subtitle data
+      onAISubtitleUpdate(updatedData);
     }
     
     // Clear temp position and stop dragging
     tempDragPositionRef.current = null;
     setIsDragging(false);
-  }, [effectiveSelectedId, effectiveCaptions, aiSubtitleData]);
+  }, [effectiveSelectedId, aiSubtitleData, onAISubtitleUpdate]);
 
 
     // Render captions on canvas (same logic as export)
