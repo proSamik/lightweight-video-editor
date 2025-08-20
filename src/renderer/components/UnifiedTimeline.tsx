@@ -119,6 +119,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   const effectiveCaptions = virtualCaptionsFromAI;
   const effectiveSelectedId = selectedFrameId || null;
 
+
   // Timeline dimensions
   const TIMELINE_HEIGHT = 160;
   const CAPTION_TRACK_HEIGHT = 140;
@@ -896,6 +897,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                     position: 'absolute',
                     left: `${left}%`,
                     width: `${width}%`,
+                    top: 0,
                     height: '100%',
                     background: segmentBackgroundColor,
                     border: `2px solid ${segmentBorderColor}`,
@@ -922,20 +924,16 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                   }}
                   title={segment.text}
                 >
-                  <span style={{ 
-                    whiteSpace: 'normal', 
-                    overflow: 'hidden', 
-                    textOverflow: 'ellipsis',
-                    lineHeight: '1.2',
-                    fontSize: '11px',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 3,
-                    WebkitBoxOrient: 'vertical',
-                    textDecoration: segment.style.burnInSubtitles === false ? 'line-through' : 'none',
-                    opacity: segment.style.burnInSubtitles === false ? 0.6 : 1
+                  <div style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '6px',
+                    width: '100%'
                   }}>
-                    {segment.text}
-                  </span>
+                    {segment.text.split(' ').map((word, i) => (
+                      <span key={i} style={{ whiteSpace: 'nowrap' }}>{word}</span>
+                    ))}
+                  </div>
                 </div>
               );
             })}
