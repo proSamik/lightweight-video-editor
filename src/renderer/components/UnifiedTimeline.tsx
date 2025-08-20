@@ -73,8 +73,8 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
     const virtualCaptions: DisplaySegment[] = [];
     
     aiSubtitleData.frames.forEach(frame => {
-      // Provide a safe fallback style
-      const baseStyle = frame.style || {
+      // Use the actual frame style, with safe fallback only for missing properties
+      const fallbackStyle = {
         font: 'Segoe UI',
         fontSize: 85,
         textColor: '#ffffff',
@@ -90,6 +90,8 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
         emphasizeMode: true,
         burnInSubtitles: true,
       } as any;
+      
+      const baseStyle = { ...fallbackStyle, ...frame.style };
 
       // Get visible words from the frame
       const visibleWords = frame.words.filter(word => 
@@ -925,21 +927,27 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                   title={segment.text}
                 >
                   <div style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: '2px',
                     width: '100%',
-                    maxWidth: '100%',
-                    alignItems: 'flex-start',
-                    justifyContent: 'flex-start'
+                    height: '100%',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    alignItems: 'center',
+                    fontSize: '10px',
+                    lineHeight: '1.2',
+                    textDecoration: segment.style?.burnInSubtitles === false ? 'line-through' : 'none',
+                    opacity: segment.style?.burnInSubtitles === false ? 0.6 : 1
                   }}>
-                    {segment.text.split(' ').map((word, i) => (
-                      <span key={i} style={{ 
-                        whiteSpace: 'nowrap',
-                        fontSize: '10px',
-                        lineHeight: '1.2'
-                      }}>{word}</span>
-                    ))}
+                    <div style={{
+                      wordBreak: 'break-word',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 3,
+                      WebkitBoxOrient: 'vertical',
+                      width: '100%'
+                    }}>
+                      {segment.text}
+                    </div>
                   </div>
                 </div>
               );
