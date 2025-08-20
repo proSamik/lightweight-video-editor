@@ -927,11 +927,18 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                   <div style={{
                     display: 'flex',
                     flexWrap: 'wrap',
-                    gap: '6px',
-                    width: '100%'
+                    gap: '2px',
+                    width: '100%',
+                    maxWidth: '100%',
+                    alignItems: 'flex-start',
+                    justifyContent: 'flex-start'
                   }}>
                     {segment.text.split(' ').map((word, i) => (
-                      <span key={i} style={{ whiteSpace: 'nowrap' }}>{word}</span>
+                      <span key={i} style={{ 
+                        whiteSpace: 'nowrap',
+                        fontSize: '10px',
+                        lineHeight: '1.2'
+                      }}>{word}</span>
                     ))}
                   </div>
                 </div>
