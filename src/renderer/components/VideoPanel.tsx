@@ -84,26 +84,21 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
         burnInSubtitles: true,
       } as any;
 
-      // Get words that should be included in the preview timeline
-      // All words are kept in overlay-based rendering
-      const keptWords = frame.words.filter(word => 
+      // Get visible words for preview (exclude removedCaption and pauses)
+      const visibleWords = frame.words.filter(word => 
+        word.editState !== 'removedCaption' &&
         !word.isPause
       );
 
-      // Get visible words from kept words (exclude removedCaption for text display)
-      const visibleWords = keptWords.filter(word => 
-        word.editState !== 'removedCaption'
-      );
-
-      if (keptWords.length === 0) return; // Skip frames with no kept words
+      if (visibleWords.length === 0) return; // Skip frames with no visible words
 
       // Create virtual caption segment with proper timing
       const virtualCaption: DisplaySegment = {
         id: frame.id,
-        startTime: keptWords[0].start * 1000, // Use first kept word's start
-        endTime: keptWords[keptWords.length - 1].end * 1000, // Use last kept word's end
+        startTime: visibleWords[0].start * 1000, // Use first visible word's start
+        endTime: visibleWords[visibleWords.length - 1].end * 1000, // Use last visible word's end
         text: visibleWords.map((w: any) => w.word).join(' '),
-        words: keptWords.map((word: any) => ({
+        words: visibleWords.map((word: any) => ({
           word: word.word,
           start: word.start * 1000,
           end: word.end * 1000,
