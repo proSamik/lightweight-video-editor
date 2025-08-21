@@ -464,12 +464,13 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
         selectedWordIds: [wordId]
       });
 
-      // Select the frame and seek to the word's start time
+      // Select the frame and seek to the middle of the word's time segment
       if (onFrameSelect) {
         onFrameSelect(frameId);
       }
       if (word && onTimeSeek) {
-        onTimeSeek(word.start * 1000); // Convert seconds to milliseconds
+        const middleTime = (word.start + word.end) / 2; // Calculate middle of word segment
+        onTimeSeek(middleTime * 1000); // Convert seconds to milliseconds
       }
     }
   };
@@ -717,16 +718,17 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     
     const baseStyle: React.CSSProperties = {
       display: 'inline-block',
-      padding: '2px 4px',
-      margin: isSelected ? '0px 2px' : '2px 3px', // Ensure selected words don't overlap
+      padding: '4px 6px', // Increased padding to compensate for removed border
+      margin: '2px 3px',
       borderRadius: '3px',
       cursor: 'pointer',
       transition: 'all 0.2s ease',
       userSelect: 'none',
-      border: isSelected ? `2px solid ${theme.colors.primary}` : 'none',
-      outline: isSelected ? 'none' : undefined,
+      border: 'none', // Remove border completely
+      outline: 'none',
+      boxShadow: isSelected ? `0 0 0 2px ${theme.colors.primary}` : 'none', // Use box-shadow for selection
       position: 'relative',
-      zIndex: isSelected ? 10 : 1 // Ensure selected word appears on top
+      zIndex: isSelected ? 10 : 1
     };
 
     // Apply edit state styling
@@ -1095,7 +1097,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
         <div>• Shift + click: Multi-select words</div>
         <div>• Double Enter: Split frame at selected word</div>
         <div>• Use merge buttons (↑↓) to combine frames</div>
-        <div>• Right-click strikethrough words to restore</div>
+        <div>• Cmd/Ctrl + Z: Undo all changes</div>
       </div>
 
       {/* Context Menu */}
