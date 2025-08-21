@@ -54,7 +54,6 @@ export class AISubtitleRenderer {
 
     // Filter out words that should not be rendered
     const visibleWords = frame.words.filter(word => 
-      word.editState !== 'strikethrough' && 
       word.editState !== 'removedCaption' &&
       !word.isPause
     );
@@ -275,9 +274,8 @@ export class AISubtitleRenderer {
   ): Promise<Array<{ imagePath: string; startTime: number; endTime: number }>> {
     const overlays: Array<{ imagePath: string; startTime: number; endTime: number }> = [];
     
-    // Get visible words (excluding strikethrough, removed, and pauses)
+    // Get visible words (excluding removed and pauses)
     const visibleWords = frame.words.filter(word => 
-      word.editState !== 'strikethrough' && 
       word.editState !== 'removedCaption' &&
       !word.isPause
     );
@@ -361,8 +359,7 @@ export class AISubtitleRenderer {
         startTime: word.start,
         endTime: word.end,
         style: this.getWordStyle(word, baseStyle, false),
-        isVisible: word.editState !== 'strikethrough' && 
-                  word.editState !== 'removedCaption' &&
+        isVisible: word.editState !== 'removedCaption' &&
                   !word.isPause
       }))
     }));

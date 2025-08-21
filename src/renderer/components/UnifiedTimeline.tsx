@@ -95,7 +95,6 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
 
       // Get visible words from the frame
       const visibleWords = frame.words.filter(word => 
-        word.editState !== 'strikethrough' && 
         word.editState !== 'removedCaption' &&
         !word.isPause
       );

@@ -6,7 +6,7 @@ import {
   AISubtitleData, 
   WordEditState,
 } from '../../types';
-import { Copy, Edit3, Star, VolumeX, Hash, FileX, Trash2, RotateCcw, ChevronUp, ChevronDown, Merge } from 'lucide-react';
+import { Copy, Edit3, Star, Hash, FileX, ChevronUp, ChevronDown } from 'lucide-react';
 
 interface AISubtitlesPanelProps {
   currentTime: number;
@@ -533,6 +533,28 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     updateAISubtitleData(newAIData);
   };
 
+  // Update word in frames with previous word tracking
+  const updateWordInFramesWithPrevious = (wordId: string, newWord: string, newState: WordEditState, previousWord: string) => {
+    if (!aiSubtitleData) return;
+
+    const updatedFrames = aiSubtitleData.frames.map(frame => ({
+      ...frame,
+      words: frame.words.map(word => 
+        word.id === wordId 
+          ? { ...word, word: newWord, editState: newState, previousWord: previousWord }
+          : word
+      )
+    }));
+
+    const newAIData = {
+      ...aiSubtitleData,
+      frames: updatedFrames,
+      lastModified: Date.now()
+    };
+    
+    updateAISubtitleData(newAIData);
+  };
+
   // Export AI subtitles
   const exportAISubtitles = async (format: 'srt' | 'modified') => {
     if (!aiSubtitleData) return;
@@ -638,9 +660,6 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
         case 'edit':
           handleWordDoubleClick(wordId, word.word);
           break;
-        case 'silence':
-          updateWordInFrames(wordId, word.word, 'silenced');
-          break;
         case 'censor':
           if (word.editState === 'censored') {
             // Uncensor: restore original word
@@ -654,10 +673,14 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
           }
           break;
         case 'removeCaption':
-          updateWordInFrames(wordId, word.word, 'removedCaption');
-          break;
-        case 'cutFromVideo':
-          updateWordInFrames(wordId, word.word, 'strikethrough');
+          if (word.editState === 'removedCaption') {
+            // Restore: show caption again using previously stored text
+            const textToRestore = word.previousWord || word.word;
+            updateWordInFrames(wordId, textToRestore, 'normal');
+          } else {
+            // Remove caption: store current text and hide caption
+            updateWordInFramesWithPrevious(wordId, word.word, 'removedCaption', word.word);
+          }
           break;
         case 'restore':
           updateWordInFrames(wordId, word.originalWord, 'normal');
@@ -674,14 +697,11 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
   // Get tooltip text for word based on its state
   const getWordTooltip = (word: WordSegment): string => {
     switch (word.editState) {
-      case 'strikethrough':
-        return 'Cut from video - Audio and text will be removed';
       case 'censored':
         return 'Censored - Text replaced with asterisks';
       case 'removedCaption':
-        return 'Remove caption - Text hidden but audio remains';
-      case 'silenced':
-        return 'Silenced - Audio muted but text visible';
+        const storedText = word.previousWord || word.word;
+        return `Caption hidden (stored: "${storedText}") - Click to restore`;
       case 'normal':
         if (word.isKeyword) return 'Keyword - Highlighted word';
         return `Original: "${word.originalWord}" | Time: ${word.start.toFixed(2)}s - ${word.end.toFixed(2)}s`;
@@ -711,13 +731,6 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
 
     // Apply edit state styling
     switch (word.editState) {
-      case 'strikethrough':
-        return {
-          ...baseStyle,
-          textDecoration: 'line-through double',
-          color: theme.colors.textSecondary,
-          backgroundColor: isHighlighted ? theme.colors.error + '40' : 'transparent'
-        };
       case 'censored':
         return {
           ...baseStyle,
@@ -731,12 +744,6 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
           color: theme.colors.textSecondary,
           opacity: 0.6,
           backgroundColor: isHighlighted ? theme.colors.textSecondary + '40' : 'transparent'
-        };
-      case 'silenced':
-        return {
-          ...baseStyle,
-          backgroundColor: isHighlighted ? theme.colors.textSecondary + '60' : theme.colors.textSecondary + '30',
-          color: theme.colors.textSecondary
         };
       case 'editing':
         return {
@@ -781,21 +788,17 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
 
     if (!word) return null;
 
-    const isStrikethrough = word.editState === 'strikethrough';
     const isMultiSelect = selectedWordIds.size > 1;
     const isCensored = word.editState === 'censored';
+    const isRemovedCaption = word.editState === 'removedCaption';
 
-    const menuItems = isStrikethrough 
-      ? [{ icon: RotateCcw, label: 'Restore', action: 'restore', color: theme.colors.success }]
-      : [
-          { icon: Copy, label: 'Copy', action: 'copy' },
-          { icon: Edit3, label: 'Edit', action: 'edit' },
-          ...(isMultiSelect ? [{ icon: Edit3, label: 'Combine', action: 'combine', color: theme.colors.accent }] : []),
-          { icon: VolumeX, label: 'Silence', action: 'silence', color: theme.colors.info },
-          { icon: Hash, label: isCensored ? 'Uncensor' : 'Censor', action: 'censor', color: theme.colors.warning },
-          { icon: FileX, label: 'Remove Caption', action: 'removeCaption', color: theme.colors.textSecondary },
-          { icon: Trash2, label: 'Cut from Video', action: 'cutFromVideo', color: theme.colors.error }
-        ];
+    const menuItems = [
+      { icon: Copy, label: 'Copy', action: 'copy' },
+      { icon: Edit3, label: 'Edit', action: 'edit' },
+      ...(isMultiSelect ? [{ icon: Edit3, label: 'Combine', action: 'combine', color: theme.colors.accent }] : []),
+      { icon: Hash, label: isCensored ? 'Uncensor' : 'Censor', action: 'censor', color: theme.colors.warning },
+      { icon: FileX, label: isRemovedCaption ? 'Restore Caption' : 'Remove Caption', action: 'removeCaption', color: theme.colors.textSecondary }
+    ];
 
     return (
       <div

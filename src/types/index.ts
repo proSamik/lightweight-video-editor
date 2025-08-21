@@ -133,7 +133,7 @@ export interface GeneratedContent {
 
 
 // AI Subtitles enhanced types
-export type WordEditState = 'normal' | 'strikethrough' | 'censored' | 'removedCaption' | 'silenced' | 'editing';
+export type WordEditState = 'normal' | 'censored' | 'removedCaption' | 'editing';
 
 export interface SubtitleStyle {
   font: string;
@@ -160,6 +160,7 @@ export interface WordSegment extends WordTimestamp {
   id: string;
   editState: WordEditState;
   originalWord: string; // Keep track of original word for restore
+  previousWord?: string; // Keep track of word before state change (for restore from removedCaption)
   isKeyword?: boolean; // For keyword highlighting
   customStyle?: Partial<SubtitleStyle>; // Per-word style overrides
   isPause?: boolean; // For [.] pause markers

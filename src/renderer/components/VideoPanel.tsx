@@ -85,10 +85,8 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
       } as any;
 
       // Get words that should be included in the preview timeline
-      // Exclude both silenced and strikethrough words to match export behavior
+      // All words are kept in overlay-based rendering
       const keptWords = frame.words.filter(word => 
-        word.editState !== 'strikethrough' && 
-        word.editState !== 'silenced' &&
         !word.isPause
       );
 
@@ -126,57 +124,15 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   // Determine effective selection - use frame selection for AI mode, segment selection for regular mode
   const effectiveSelectedId = selectedFrameId || null;
 
-  // Get time ranges that should be muted (silenced words only - cut words are handled differently)
+  // No longer needed for overlay-based rendering
   const getSilencedTimeRanges = useCallback((): Array<{start: number, end: number}> => {
-    if (!aiSubtitleData) return [];
-    
-    const silencedRanges: Array<{start: number, end: number}> = [];
-    
-    aiSubtitleData.frames.forEach(frame => {
-      frame.words.forEach(word => {
-        if (word.editState === 'silenced') {
-          silencedRanges.push({
-            start: word.start * 1000, // Convert to milliseconds
-            end: word.end * 1000
-          });
-        }
-      });
-    });
-    
-    return silencedRanges;
-  }, [aiSubtitleData]);
+    return [];
+  }, []);
 
-  // Get segments that should be cut (silenced + strikethrough)
+  // No longer needed for overlay-based rendering
   const getCutSegments = useCallback((): Array<{start: number, end: number}> => {
-    if (!aiSubtitleData) return [];
-    
-    const cutSegments: Array<{start: number, end: number}> = [];
-    
-    aiSubtitleData.frames.forEach(frame => {
-      frame.words.forEach(word => {
-        if (word.editState === 'silenced' || word.editState === 'strikethrough') {
-          cutSegments.push({
-            start: word.start * 1000, // Convert to milliseconds
-            end: word.end * 1000
-          });
-        }
-      });
-    });
-    
-    // Merge overlapping segments
-    const sortedSegments = cutSegments.sort((a, b) => a.start - b.start);
-    const mergedSegments: Array<{start: number, end: number}> = [];
-    
-    for (const segment of sortedSegments) {
-      if (mergedSegments.length === 0 || segment.start > mergedSegments[mergedSegments.length - 1].end) {
-        mergedSegments.push(segment);
-      } else {
-        mergedSegments[mergedSegments.length - 1].end = Math.max(mergedSegments[mergedSegments.length - 1].end, segment.end);
-      }
-    }
-    
-    return mergedSegments;
-  }, [aiSubtitleData]);
+    return [];
+  }, []);
 
   // Get current word being played (for more precise muting)
   const getCurrentPlayingWord = useCallback((time: number) => {
@@ -197,27 +153,15 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   // Check if current time should be muted (word-level precision)
   // Since we're cutting segments in export, we should also hide/mute them in preview
   const shouldBeMuted = useCallback((time: number): boolean => {
-    const currentWord = getCurrentPlayingWord(time);
-    return currentWord?.editState === 'silenced' || currentWord?.editState === 'strikethrough' || false;
-  }, [getCurrentPlayingWord]);
+    // No muting needed for overlay-based rendering
+    return false;
+  }, []);
 
   // Find the next valid (non-cut) time after the current time
+  // No longer needed for overlay-based rendering
   const findNextValidTime = useCallback((currentTimeMs: number): number | null => {
-    if (!aiSubtitleData) return null;
-    
-    const cutSegments = getCutSegments();
-    const currentTimeInMs = currentTimeMs;
-    
-    // Check if we're currently in a cut segment
-    for (const segment of cutSegments) {
-      if (currentTimeInMs >= segment.start && currentTimeInMs <= segment.end) {
-        // We're in a cut segment, find the end of this segment
-        return segment.end;
-      }
-    }
-    
-    return null; // Not in a cut segment
-  }, [aiSubtitleData, getCutSegments]);
+    return null;
+  }, []);
 
   // Auto-skip over cut segments during playback
   const handleAutoSkip = useCallback((currentTimeMs: number) => {
