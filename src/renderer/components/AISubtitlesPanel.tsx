@@ -7,6 +7,7 @@ import {
   WordEditState,
 } from '../../types';
 import { Copy, Edit3, Star, Hash, FileX, ChevronUp, ChevronDown } from 'lucide-react';
+import { formatTimeHHMMSS } from '../../utils/timeFormatting';
 
 interface AISubtitlesPanelProps {
   currentTime: number;
@@ -705,9 +706,9 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
         return `Caption hidden (stored: "${storedText}") - Click to restore`;
       case 'normal':
         if (word.isKeyword) return 'Keyword - Highlighted word';
-        return `Original: "${word.originalWord}" | Time: ${word.start.toFixed(2)}s - ${word.end.toFixed(2)}s`;
+        return `Original: "${word.originalWord}" | Time: ${formatTimeHHMMSS(word.start)} - ${formatTimeHHMMSS(word.end)}`;
       default:
-        return `Time: ${word.start.toFixed(2)}s - ${word.end.toFixed(2)}s`;
+        return `Time: ${formatTimeHHMMSS(word.start)} - ${formatTimeHHMMSS(word.end)}`;
     }
   };
 
@@ -928,7 +929,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
               justifyContent: 'space-between'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span>{(frame.startTime).toFixed(2)}s - {(frame.endTime).toFixed(2)}s</span>
+                <span>{formatTimeHHMMSS(frame.startTime)} - {formatTimeHHMMSS(frame.endTime)}</span>
                 {frame.isCustomBreak && (
                   <span style={{
                     fontSize: '10px',
