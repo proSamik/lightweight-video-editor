@@ -489,7 +489,7 @@ ipcMain.handle('render-video-with-ai-subtitles', async (event, videoPath: string
     // TODO: Update FFmpeg services to work directly with AI subtitles
     const captionsData = aiSubtitleData.frames.map((frame: any) => {
       const visibleWords = Array.isArray(frame.words)
-        ? frame.words.filter((w: any) => w && !w.isPause)
+        ? frame.words.filter((w: any) => w && !w.isPause && w.editState !== 'removedCaption')
         : [];
 
       const mergedStyle = {
