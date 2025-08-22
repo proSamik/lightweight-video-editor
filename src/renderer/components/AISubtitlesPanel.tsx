@@ -105,6 +105,31 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     return Math.max(0, effectiveTimeMs / 1000);
   }, [isClipMode, clips]);
 
+  // Convert effective time back to original time (for finding frames in original timeline)
+  const convertToOriginalTime = useCallback((effectiveTimeSeconds: number): number => {
+    if (!isClipMode || !clips?.length) return effectiveTimeSeconds;
+    
+    const effectiveTimeMs = effectiveTimeSeconds * 1000;
+    let originalTimeMs = effectiveTimeMs;
+    
+    // Add back duration of all removed clips that start before this effective time
+    const activeClips = clips.filter(clip => !clip.isRemoved);
+    let currentEffectiveTime = 0;
+    
+    for (const clip of activeClips) {
+      const clipDuration = clip.endTime - clip.startTime;
+      if (effectiveTimeMs <= currentEffectiveTime + clipDuration) {
+        // Time falls within this clip
+        const timeWithinClip = effectiveTimeMs - currentEffectiveTime;
+        originalTimeMs = clip.startTime + timeWithinClip;
+        break;
+      }
+      currentEffectiveTime += clipDuration;
+    }
+    
+    return originalTimeMs / 1000;
+  }, [isClipMode, clips]);
+
   // Filter subtitle frames based on clips (hide subtitles in removed clips)
   const filteredFrames = useMemo(() => {
     if (!aiSubtitleData?.frames || !isClipMode || clips.length === 0) {
@@ -212,21 +237,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     
     // In clip mode, convert effective time back to original time for frame finding
     if (isClipMode && clips.length > 0) {
-      // Convert effective time to original time
-      const activeClips = clips.filter(clip => !clip.isRemoved);
-      if (activeClips.length === 0) return highlighted;
-      
-      let effectiveTime = 0;
-      for (const clip of activeClips) {
-        const clipDuration = (clip.endTime - clip.startTime) / 1000;
-        if (currentTimeInSeconds <= effectiveTime + clipDuration) {
-          // Time falls within this clip
-          const timeWithinClip = currentTimeInSeconds - effectiveTime;
-          currentTimeInSeconds = (clip.startTime / 1000) + timeWithinClip;
-          break;
-        }
-        effectiveTime += clipDuration;
-      }
+      currentTimeInSeconds = convertToOriginalTime(currentTimeInSeconds);
     }
     
     // Find the current frame first
@@ -244,7 +255,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     }
     
     return highlighted;
-  }, [aiSubtitleData, currentTime, isClipMode, clips]);
+  }, [aiSubtitleData, currentTime, isClipMode, clips, convertToOriginalTime]);
 
   // Handle frame splitting with double-enter
   const handleFrameSplit = (frameId: string, wordId: string) => {

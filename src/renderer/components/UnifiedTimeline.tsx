@@ -302,8 +302,8 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   // Convert AI subtitle frames to virtual caption segments for timeline display
   type DisplaySegment = { id: string; startTime: number; endTime: number; text: string; style: SubtitleStyle };
   
-  // Simple function to avoid temporal dead zone errors
-  const getVirtualCaptionsFromAI = (): DisplaySegment[] => {
+  // Memoized function to convert AI subtitle frames to virtual caption segments
+  const virtualCaptionsFromAI = useMemo((): DisplaySegment[] => {
     // Type-safe early returns
     if (!aiSubtitleData?.frames || !Array.isArray(aiSubtitleData.frames)) {
       return [];
@@ -387,9 +387,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
     }
 
     return virtualCaptions.sort((a, b) => a.startTime - b.startTime);
-  };
-
-  const virtualCaptionsFromAI = getVirtualCaptionsFromAI();
+  }, [aiSubtitleData?.frames, localClipMode, localClips]);
 
   // Use AI-derived segments
   const effectiveCaptions = virtualCaptionsFromAI;
@@ -398,7 +396,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   /**
    * Assign tracks to segments to avoid overlaps and utilize vertical space
    */
-  const assignTracks = (segments: Array<{startTime: number, endTime: number, id: string}>): Array<{segment: any, track: number}> => {
+  const assignTracks = useCallback((segments: Array<{startTime: number, endTime: number, id: string}>): Array<{segment: any, track: number}> => {
     const tracks: Array<Array<{startTime: number, endTime: number}>> = [];
     const result: Array<{segment: any, track: number}> = [];
 
@@ -431,7 +429,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
     });
 
     return result;
-  };
+  }, []);
 
   // Timeline dimensions - dynamic based on content
   const CONTROL_HEIGHT = 40;
@@ -465,7 +463,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
       
       return Math.min(Math.max(tracksNeeded * (CAPTION_TRACK_HEIGHT + 5) + 50, MIN_TIMELINE_HEIGHT), MAX_TIMELINE_HEIGHT);
     }
-  }, [localClipMode, localClips, effectiveCaptions]);
+  }, [localClipMode, localClips, effectiveCaptions, assignTracks]);
   
   const TIMELINE_CONTENT_HEIGHT = TIMELINE_HEIGHT - CONTROL_HEIGHT - RULER_HEIGHT;
 

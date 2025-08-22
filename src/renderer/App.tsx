@@ -211,10 +211,10 @@ const AppContent: React.FC = () => {
     
     setClips(newClips);
     
-    // Store in localStorage for persistence (not auto-save to .lvep)
+    // Store clips in localStorage for persistence (not auto-save to .lvep)
     try {
       localStorage.setItem('tempClips', JSON.stringify(newClips));
-      localStorage.setItem('tempIsClipMode', JSON.stringify(isClipMode));
+      // Don't save clip mode - always default to subtitle mode
     } catch (error) {
       console.error('Failed to save clips to localStorage:', error);
     }
@@ -235,12 +235,7 @@ const AppContent: React.FC = () => {
       handleClipsChange(initialClips);
     }
     
-    // Store in localStorage
-    try {
-      localStorage.setItem('tempIsClipMode', JSON.stringify(newClipMode));
-    } catch (error) {
-      console.error('Failed to save clip mode to localStorage:', error);
-    }
+    // Don't save clip mode to localStorage - always default to subtitle mode on project load
   };
 
   // Update current time to skip removed clips during playback
@@ -343,17 +338,14 @@ const AppContent: React.FC = () => {
     // Load clips from localStorage if available
     try {
       const savedClips = localStorage.getItem('tempClips');
-      const savedClipMode = localStorage.getItem('tempIsClipMode');
       
       if (savedClips) {
         const parsedClips = JSON.parse(savedClips);
         setClips(parsedClips);
       }
       
-      if (savedClipMode) {
-        const parsedClipMode = JSON.parse(savedClipMode);
-        setIsClipMode(parsedClipMode);
-      }
+      // Always start in subtitle mode by default, regardless of saved state
+      setIsClipMode(false);
     } catch (error) {
       console.error('Failed to load clips from localStorage:', error);
     }
