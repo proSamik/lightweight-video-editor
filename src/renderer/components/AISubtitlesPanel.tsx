@@ -161,25 +161,55 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
       return !isInRemovedClip;
     });
 
-    // Convert times to effective times for the remaining frames
-    const adjustedFrames = filtered.map(frame => {
-      const effectiveStartTime = convertToEffectiveTime(frame.startTime);
-      const effectiveEndTime = convertToEffectiveTime(frame.endTime);
+    // Convert times to effective times for the remaining frames when clips are removed
+    const adjustedFrames = hasRemovedClips ? filtered.map(frame => {
+      // Calculate effective time by subtracting removed clip durations
+      let effectiveStartTime = frame.startTime;
+      let effectiveEndTime = frame.endTime;
+      
+      const frameStartMs = frame.startTime * 1000;
+      const frameEndMs = frame.endTime * 1000;
+      
+      // Calculate how much time to subtract from removed clips that come before this frame
+      const removedClips = clips.filter(clip => clip.isRemoved);
+      let timeToSubtract = 0;
+      
+      for (const clip of removedClips) {
+        if (clip.endTime <= frameStartMs) {
+          // Entire clip is before this frame
+          timeToSubtract += (clip.endTime - clip.startTime);
+        }
+      }
+      
+      effectiveStartTime = Math.max(0, (frameStartMs - timeToSubtract) / 1000);
+      effectiveEndTime = Math.max(0, (frameEndMs - timeToSubtract) / 1000);
       
       return {
         ...frame,
         startTime: effectiveStartTime,
         endTime: effectiveEndTime,
-        words: frame.words.map(word => ({
-          ...word,
-          start: convertToEffectiveTime(word.start),
-          end: convertToEffectiveTime(word.end)
-        }))
+        words: frame.words.map(word => {
+          const wordStartMs = word.start * 1000;
+          const wordEndMs = word.end * 1000;
+          
+          let wordTimeToSubtract = 0;
+          for (const clip of removedClips) {
+            if (clip.endTime <= wordStartMs) {
+              wordTimeToSubtract += (clip.endTime - clip.startTime);
+            }
+          }
+          
+          return {
+            ...word,
+            start: Math.max(0, (wordStartMs - wordTimeToSubtract) / 1000),
+            end: Math.max(0, (wordEndMs - wordTimeToSubtract) / 1000)
+          };
+        })
       };
-    });
+    }) : filtered;
     
     return adjustedFrames;
-  }, [aiSubtitleData?.frames, clips, convertToEffectiveTime]);
+  }, [aiSubtitleData?.frames, clips]);
 
   // Utility function to ensure frames don't overlap
   const ensureNonOverlappingFrames = (frames: SubtitleFrame[]): SubtitleFrame[] => {
@@ -260,32 +290,46 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
 
   // Get currently highlighted words based on current time
   const currentlyHighlightedWords = useMemo(() => {
-    if (!aiSubtitleData) return new Set<string>();
+    if (!renderFrames?.length) return new Set<string>();
     
     const highlighted = new Set<string>();
-    let currentTimeInSeconds = currentTime / 1000; // Convert currentTime (milliseconds) to seconds
     
-    // In clip mode, convert effective time back to original time for frame finding
-    if (isClipMode && clips.length > 0) {
-      currentTimeInSeconds = convertToOriginalTime(currentTimeInSeconds);
+    // Convert current time to effective time to match with frame times
+    let effectiveCurrentTime = currentTime / 1000;
+    
+    // If there are removed clips, convert original time to effective time
+    const hasRemovedClips = clips.some(clip => clip.isRemoved);
+    if (hasRemovedClips) {
+      const currentTimeMs = currentTime;
+      const removedClips = clips.filter(clip => clip.isRemoved);
+      let timeToSubtract = 0;
+      
+      for (const clip of removedClips) {
+        if (clip.endTime <= currentTimeMs) {
+          // Entire clip is before current time
+          timeToSubtract += (clip.endTime - clip.startTime);
+        }
+      }
+      
+      effectiveCurrentTime = Math.max(0, (currentTimeMs - timeToSubtract) / 1000);
     }
     
-    // Find the current frame first
-    const currentFrame = aiSubtitleData.frames.find(frame => 
-      currentTimeInSeconds >= frame.startTime && currentTimeInSeconds <= frame.endTime
+    // Find the current frame using effective time
+    const currentFrame = renderFrames.find(frame => 
+      effectiveCurrentTime >= frame.startTime && effectiveCurrentTime <= frame.endTime
     );
     
     if (currentFrame) {
       // Only highlight words in the current frame
       currentFrame.words.forEach(word => {
-        if (currentTimeInSeconds >= word.start && currentTimeInSeconds <= word.end) {
+        if (effectiveCurrentTime >= word.start && effectiveCurrentTime <= word.end) {
           highlighted.add(word.id);
         }
       });
     }
     
     return highlighted;
-  }, [aiSubtitleData, currentTime, isClipMode, clips, convertToOriginalTime]);
+  }, [renderFrames, currentTime, clips]);
 
   // Handle frame splitting with double-enter
   const handleFrameSplit = (frameId: string, wordId: string) => {
@@ -517,31 +561,31 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
   // Auto-scroll to selected frame
   useEffect(() => {
     const container = listRef.current;
-    if (!container || !filteredFrames?.length) return;
+    if (!container || !renderFrames?.length) return;
     
-    // Find the current frame based on effective time
-    let currentTimeInSeconds = currentTime / 1000;
+    // Convert current time to effective time to match with frame times
+    let effectiveCurrentTime = currentTime / 1000;
     
-    // In clip mode, convert effective time back to original time for frame finding
-    if (isClipMode && clips.length > 0) {
-      const activeClips = clips.filter(clip => !clip.isRemoved);
-      if (activeClips.length > 0) {
-        let effectiveTime = 0;
-        for (const clip of activeClips) {
-          const clipDuration = (clip.endTime - clip.startTime) / 1000;
-          if (currentTimeInSeconds <= effectiveTime + clipDuration) {
-            // Time falls within this clip
-            const timeWithinClip = currentTimeInSeconds - effectiveTime;
-            currentTimeInSeconds = (clip.startTime / 1000) + timeWithinClip;
-            break;
-          }
-          effectiveTime += clipDuration;
+    // If there are removed clips, convert original time to effective time
+    const hasRemovedClips = clips.some(clip => clip.isRemoved);
+    if (hasRemovedClips) {
+      const currentTimeMs = currentTime;
+      const removedClips = clips.filter(clip => clip.isRemoved);
+      let timeToSubtract = 0;
+      
+      for (const clip of removedClips) {
+        if (clip.endTime <= currentTimeMs) {
+          // Entire clip is before current time
+          timeToSubtract += (clip.endTime - clip.startTime);
         }
       }
+      
+      effectiveCurrentTime = Math.max(0, (currentTimeMs - timeToSubtract) / 1000);
     }
     
-    const currentFrame = filteredFrames.find(frame => 
-      currentTimeInSeconds >= frame.startTime && currentTimeInSeconds <= frame.endTime
+    // Find frame that contains the effective current time
+    const currentFrame = renderFrames.find(frame => 
+      effectiveCurrentTime >= frame.startTime && effectiveCurrentTime <= frame.endTime
     );
     
     const targetFrameId = currentFrame?.id || selectedFrameId;
@@ -555,7 +599,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
         });
       }
     }
-  }, [currentTime, selectedFrameId, filteredFrames?.length, isClipMode, clips]);
+  }, [currentTime, selectedFrameId, renderFrames?.length, clips]);
 
   // Find frame by ID
   const findFrameById = useCallback((frameId: string) => {
