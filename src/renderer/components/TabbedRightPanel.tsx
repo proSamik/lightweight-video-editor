@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
-import { AISubtitleData } from '../../types';
+import { AISubtitleData, VideoClip } from '../../types';
 import StylingPanel from './StylingPanel';
 import AISubtitlesPanel from './AISubtitlesPanel';
 import { Palette, Brain } from 'lucide-react';
@@ -21,6 +21,9 @@ interface TabbedRightPanelProps {
   onFrameSelect?: (frameId: string) => void;
   videoPath?: string | null;
   audioPath?: string | null;
+  // New: Clip editing support
+  clips?: VideoClip[];
+  isClipMode?: boolean;
 }
 
 type TabType = 'styling' | 'aiSubtitles';
@@ -35,6 +38,8 @@ const TabbedRightPanel: React.FC<TabbedRightPanelProps> = ({
   onFrameSelect,
   videoPath,
   audioPath,
+  clips = [],
+  isClipMode = false,
 }) => {
   const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState<TabType>('aiSubtitles');
@@ -104,11 +109,13 @@ const TabbedRightPanel: React.FC<TabbedRightPanelProps> = ({
             currentTime={currentTime}
             onTimeSeek={onTimeSeek}
             aiSubtitleData={aiSubtitleData}
-            onAISubtitleUpdate={onAISubtitleUpdate}
             selectedFrameId={selectedFrameId}
             onFrameSelect={onFrameSelect}
+            onAISubtitleUpdate={onAISubtitleUpdate}
             videoPath={videoPath}
             audioPath={audioPath}
+            clips={clips}
+            isClipMode={isClipMode}
           />
         )}
       </div>

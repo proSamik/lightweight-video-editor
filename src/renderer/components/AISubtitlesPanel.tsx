@@ -5,6 +5,7 @@ import {
   SubtitleFrame, 
   AISubtitleData, 
   WordEditState,
+  VideoClip,
 } from '../../types';
 import { Copy, Edit3, Star, Hash, FileX, ChevronUp, ChevronDown } from 'lucide-react';
 import { formatTimeHHMMSS } from '../../utils/timeFormatting';
@@ -20,6 +21,9 @@ interface AISubtitlesPanelProps {
   onFrameSelect?: (frameId: string) => void;
   videoPath?: string | null;
   audioPath?: string | null;
+  // New: Clip editing support
+  clips?: VideoClip[];
+  isClipMode?: boolean;
 }
 
 interface WordContextMenu {
@@ -42,7 +46,9 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
   selectedFrameId,
   onFrameSelect,
   videoPath,
-  audioPath
+  audioPath,
+  clips = [],
+  isClipMode = false,
 }) => {
   const { theme } = useTheme();
   const [internalAiSubtitleData, setInternalAiSubtitleData] = useState<AISubtitleData | null>(null);
@@ -83,6 +89,27 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
 
   // AI Subtitles are now the primary data source - no conversion needed
 
+  // Filter subtitle frames based on clips (hide subtitles in removed clips)
+  const filteredFrames = useMemo(() => {
+    if (!aiSubtitleData?.frames || !isClipMode || clips.length === 0) {
+      return aiSubtitleData?.frames || [];
+    }
+
+    return aiSubtitleData.frames.filter(frame => {
+      // Check if this frame overlaps with any removed clip
+      const frameStartMs = frame.startTime * 1000;
+      const frameEndMs = frame.endTime * 1000;
+      
+      const isInRemovedClip = clips.some(clip => 
+        clip.isRemoved && 
+        frameStartMs < clip.endTime && 
+        frameEndMs > clip.startTime
+      );
+      
+      return !isInRemovedClip;
+    });
+  }, [aiSubtitleData?.frames, isClipMode, clips]);
+
   // Utility function to ensure frames don't overlap
   const ensureNonOverlappingFrames = (frames: SubtitleFrame[]): SubtitleFrame[] => {
     const sortedFrames = [...frames].sort((a, b) => a.startTime - b.startTime);
@@ -120,15 +147,15 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
   // Always use sorted frames directly from aiSubtitleData - no local state needed
   // Also fix any duplicate IDs that might exist in the data and ensure non-overlapping times
   const renderFrames = useMemo(() => {
-    if (!aiSubtitleData) return [] as SubtitleFrame[];
+    if (!filteredFrames) return [] as SubtitleFrame[];
     
-    const frames = [...aiSubtitleData.frames];
+    const frames = [...filteredFrames];
     const seenIds = new Set<string>();
     const fixedFrames = frames.map((frame, index) => {
       if (seenIds.has(frame.id)) {
-        // Generate a new unique ID for duplicate frames
-        const newId = `${frame.id}-duplicate-fix-${Date.now()}-${index}`;
-        console.warn(`Fixed duplicate frame ID: ${frame.id} -> ${newId}`);
+        // Generate a new unique ID for duplicate frames (deterministic suffix)
+        const newId = `${frame.id}-dup-${index}`;
+        // console.warn suppressed to avoid noisy logs
         return { ...frame, id: newId };
       }
       seenIds.add(frame.id);
@@ -145,20 +172,46 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
                          Math.abs(frame.endTime - fixedFrames[index].endTime) > 0.001);
     
     if (needsUpdate) {
-      const fixedData = { ...aiSubtitleData, frames: nonOverlappingFrames, lastModified: Date.now() };
+      const fixedData = { 
+        ...aiSubtitleData, 
+        frames: nonOverlappingFrames, 
+        lastModified: Date.now(),
+        audioSegments: aiSubtitleData?.audioSegments || [],
+        maxWordsPerFrame: aiSubtitleData?.maxWordsPerFrame || 5,
+        maxCharsPerFrame: aiSubtitleData?.maxCharsPerFrame || 30
+      };
       // Schedule the update for the next tick to avoid infinite re-renders
       setTimeout(() => updateAISubtitleData(fixedData), 0);
     }
     
     return nonOverlappingFrames.sort((a, b) => a.startTime - b.startTime);
-  }, [aiSubtitleData?.frames]);
+  }, [filteredFrames, aiSubtitleData]);
 
   // Get currently highlighted words based on current time
   const currentlyHighlightedWords = useMemo(() => {
     if (!aiSubtitleData) return new Set<string>();
     
     const highlighted = new Set<string>();
-    const currentTimeInSeconds = currentTime / 1000; // Convert currentTime (milliseconds) to seconds
+    let currentTimeInSeconds = currentTime / 1000; // Convert currentTime (milliseconds) to seconds
+    
+    // In clip mode, convert effective time back to original time for frame finding
+    if (isClipMode && clips.length > 0) {
+      // Convert effective time to original time
+      const activeClips = clips.filter(clip => !clip.isRemoved);
+      if (activeClips.length === 0) return highlighted;
+      
+      let effectiveTime = 0;
+      for (const clip of activeClips) {
+        const clipDuration = (clip.endTime - clip.startTime) / 1000;
+        if (currentTimeInSeconds <= effectiveTime + clipDuration) {
+          // Time falls within this clip
+          const timeWithinClip = currentTimeInSeconds - effectiveTime;
+          currentTimeInSeconds = (clip.startTime / 1000) + timeWithinClip;
+          break;
+        }
+        effectiveTime += clipDuration;
+      }
+    }
     
     // Find the current frame first
     const currentFrame = aiSubtitleData.frames.find(frame => 
@@ -175,7 +228,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     }
     
     return highlighted;
-  }, [aiSubtitleData, currentTime]);
+  }, [aiSubtitleData, currentTime, isClipMode, clips]);
 
   // Handle frame splitting with double-enter
   const handleFrameSplit = (frameId: string, wordId: string) => {
@@ -397,40 +450,61 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     return () => {}; // Return empty cleanup function when contextMenu is not shown
   }, [contextMenu.show]);
 
-  // Auto-select first frame when AI subtitle data loads
+  // Auto-select first frame if none selected
   useEffect(() => {
-    if (aiSubtitleData?.frames && aiSubtitleData.frames.length > 0 && !selectedFrameId && onFrameSelect) {
-      const firstFrameId = aiSubtitleData.frames[0].id;
-      if (firstFrameId) {
-        onFrameSelect(firstFrameId);
-      }
+    if (filteredFrames && filteredFrames.length > 0 && !selectedFrameId && onFrameSelect) {
+      onFrameSelect(filteredFrames[0].id);
     }
-  }, [aiSubtitleData?.frames, selectedFrameId, onFrameSelect]);
+  }, [filteredFrames, selectedFrameId, onFrameSelect]);
 
-  // Auto-scroll to active/selected frame with stronger tracking
+  // Auto-scroll to selected frame
   useEffect(() => {
     const container = listRef.current;
-    if (!container || !aiSubtitleData?.frames?.length) return;
-    const currentSec = currentTime / 1000;
-    const active = aiSubtitleData.frames.find(f => currentSec >= f.startTime && currentSec <= f.endTime);
-    const targetId = active?.id || selectedFrameId;
-    if (!targetId) return;
-
-    const el = container.querySelector(`[data-frame-id="${targetId}"]`) as HTMLElement | null;
-    if (!el) return;
-
-    const elTop = el.offsetTop;
-    const elBottom = elTop + el.offsetHeight;
-    const viewTop = container.scrollTop;
-    const viewBottom = viewTop + container.clientHeight;
-    const padding = 32;
-
-    if (elTop < viewTop + padding) {
-      container.scrollTo({ top: Math.max(0, elTop - padding), behavior: 'smooth' });
-    } else if (elBottom > viewBottom - padding) {
-      container.scrollTo({ top: elBottom - container.clientHeight + padding, behavior: 'smooth' });
+    if (!container || !filteredFrames?.length) return;
+    
+    // Find the current frame based on effective time
+    let currentTimeInSeconds = currentTime / 1000;
+    
+    // In clip mode, convert effective time back to original time for frame finding
+    if (isClipMode && clips.length > 0) {
+      const activeClips = clips.filter(clip => !clip.isRemoved);
+      if (activeClips.length > 0) {
+        let effectiveTime = 0;
+        for (const clip of activeClips) {
+          const clipDuration = (clip.endTime - clip.startTime) / 1000;
+          if (currentTimeInSeconds <= effectiveTime + clipDuration) {
+            // Time falls within this clip
+            const timeWithinClip = currentTimeInSeconds - effectiveTime;
+            currentTimeInSeconds = (clip.startTime / 1000) + timeWithinClip;
+            break;
+          }
+          effectiveTime += clipDuration;
+        }
+      }
     }
-  }, [currentTime, selectedFrameId, aiSubtitleData?.frames?.length]);
+    
+    const currentFrame = filteredFrames.find(frame => 
+      currentTimeInSeconds >= frame.startTime && currentTimeInSeconds <= frame.endTime
+    );
+    
+    const targetFrameId = currentFrame?.id || selectedFrameId;
+    
+    if (targetFrameId) {
+      const selectedElement = container.querySelector(`[data-frame-id="${targetFrameId}"]`) as HTMLElement;
+      if (selectedElement) {
+        selectedElement.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' 
+        });
+      }
+    }
+  }, [currentTime, selectedFrameId, filteredFrames?.length, isClipMode, clips]);
+
+  // Find frame by ID
+  const findFrameById = useCallback((frameId: string) => {
+    const frame = filteredFrames.find(f => f.id === frameId);
+    return frame;
+  }, [filteredFrames]);
 
   // Handle word click
   const handleWordClick = (e: React.MouseEvent, wordId: string, frameId: string) => {

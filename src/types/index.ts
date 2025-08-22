@@ -98,6 +98,7 @@ export interface ProjectData {
   aiGeneratedTitles?: string[];
   tweets?: { hook: string; lineCount: number; wordCount: number }[];
   thumbnails?: string[];
+  clips?: VideoClip[]; // New: Video clips for editing
 }
 
 export interface AIModel {
@@ -226,4 +227,18 @@ export interface PresetCategory {
   name: string;
   description: string;
   presets: CaptionPreset[];
+}
+
+// New: Video clip types for timeline editing
+export interface VideoClip {
+  id: string;
+  startTime: number; // Start time in milliseconds
+  endTime: number; // End time in milliseconds
+  isRemoved: boolean; // If true, this clip should be excluded from playback and export
+}
+
+export interface ClipTimelineData {
+  clips: VideoClip[];
+  effectiveDuration: number; // Total duration excluding removed clips
+  originalDuration: number; // Original video duration
 }

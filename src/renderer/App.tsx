@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { VideoFile, ExportSettings, ProjectData, AISettings, GeneratedContent, AISubtitleData, SubtitleFrame } from '../types';
+import React, { useState, useEffect, useCallback } from 'react';
+import { VideoFile, ExportSettings, ProjectData, AISettings, GeneratedContent, AISubtitleData, SubtitleFrame, VideoClip } from '../types';
 import VideoPanel from './components/VideoPanel';
 import UnifiedTimeline from './components/UnifiedTimeline';
 import TabbedRightPanel from './components/TabbedRightPanel';
@@ -34,6 +34,8 @@ import {
 interface AppState {
   aiSubtitleData?: AISubtitleData | null;
   selectedFrameId?: string | null;
+  clips?: VideoClip[];
+  isClipMode?: boolean;
 }
 
 const AppContent: React.FC = () => {
@@ -90,6 +92,103 @@ const AppContent: React.FC = () => {
   const [elapsedTime, setElapsedTime] = useState(0);
   const timerRef = React.useRef<NodeJS.Timeout | null>(null);
 
+  // Clip editing state
+  const [clips, setClips] = useState<VideoClip[]>([]);
+  const [isClipMode, setIsClipMode] = useState(false);
+  const clipManager = {
+    initializeClips: (videoDurationMs: number): VideoClip[] => {
+      const initialClip: VideoClip = {
+        id: 'clip-1',
+        startTime: 0,
+        endTime: videoDurationMs,
+        isRemoved: false
+      };
+      return [initialClip];
+    },
+    isTimeInRemovedClip: (clips: VideoClip[], timeMs: number): boolean => {
+      return clips.some(clip => 
+        timeMs >= clip.startTime && timeMs <= clip.endTime && clip.isRemoved
+      );
+    },
+    getNextValidTime: (clips: VideoClip[], currentTimeMs: number): number => {
+      const removedClips = clips.filter(clip => clip.isRemoved);
+      
+      for (const removedClip of removedClips) {
+        if (currentTimeMs >= removedClip.startTime && currentTimeMs <= removedClip.endTime) {
+          return removedClip.endTime;
+        }
+      }
+      
+      return currentTimeMs;
+    },
+    getPreviousValidTime: (clips: VideoClip[], currentTimeMs: number): number => {
+      const removedClips = clips.filter(clip => clip.isRemoved);
+      
+      for (const removedClip of removedClips) {
+        if (currentTimeMs >= removedClip.startTime && currentTimeMs <= removedClip.endTime) {
+          return removedClip.startTime;
+        }
+      }
+      
+      return currentTimeMs;
+    },
+    calculateEffectiveDuration: (clips: VideoClip[]): number => {
+      if (clips.length === 0) return 0;
+
+      const activeClips = clips.filter(clip => !clip.isRemoved);
+      if (activeClips.length === 0) return 0;
+
+      return activeClips.reduce((total, clip) => total + (clip.endTime - clip.startTime), 0);
+    },
+    effectiveToOriginalTime: (clips: VideoClip[], effectiveTime: number): number => {
+      if (clips.length === 0) return effectiveTime;
+
+      const activeClips = clips.filter(clip => !clip.isRemoved);
+      if (activeClips.length === 0) return 0;
+
+      let accumulatedTime = 0;
+      for (const clip of activeClips) {
+        const clipDuration = clip.endTime - clip.startTime;
+        if (effectiveTime <= accumulatedTime + clipDuration) {
+          // Time falls within this clip
+          const timeWithinClip = effectiveTime - accumulatedTime;
+          return clip.startTime + timeWithinClip;
+        }
+        accumulatedTime += clipDuration;
+      }
+
+      return activeClips[activeClips.length - 1]?.endTime || 0;
+    },
+    originalToEffectiveTime: (clips: VideoClip[], originalTime: number): number => {
+      if (clips.length === 0) return originalTime;
+
+      const activeClips = clips.filter(clip => !clip.isRemoved);
+      if (activeClips.length === 0) return 0;
+
+      let effectiveTime = 0;
+      for (const clip of activeClips) {
+        if (originalTime >= clip.startTime && originalTime <= clip.endTime) {
+          // Time falls within this clip
+          return effectiveTime + (originalTime - clip.startTime);
+        }
+        effectiveTime += clip.endTime - clip.startTime;
+      }
+
+      return effectiveTime;
+    },
+    updateProjectClips: async (projectData: ProjectData, newClips: VideoClip[]) => {
+      // Update the project data with new clips
+      const updatedProjectData = {
+        ...projectData,
+        clips: newClips,
+        lastModified: Date.now()
+      };
+      
+      // Save the updated project
+      await window.electronAPI.saveProject(updatedProjectData);
+    }
+  };
+
   // Handle cancel operation
   const handleCancel = () => {
     if (cancelController) {
@@ -100,21 +199,166 @@ const AppContent: React.FC = () => {
     try {
       window.electronAPI.cancelRendering();
     } catch (error) {
-      console.warn('Error cancelling rendering:', error);
+      console.log('No active rendering to cancel');
     }
-    setIsLoading(false);
-    setLoadingProgress(undefined);
-    setLoadingMessage('');
   };
+
+  // Clip handling functions
+  const handleClipsChange = async (newClips: VideoClip[]) => {
+    // Save current state to history before making changes
+    saveToHistory();
+    
+    setClips(newClips);
+    
+    // Store in localStorage for persistence (not auto-save to .lvep)
+    try {
+      localStorage.setItem('tempClips', JSON.stringify(newClips));
+      localStorage.setItem('tempIsClipMode', JSON.stringify(isClipMode));
+    } catch (error) {
+      console.error('Failed to save clips to localStorage:', error);
+    }
+    
+    // Update project modified status
+    setCurrentProjectInfo(prev => ({ ...prev, isModified: true }));
+  };
+
+  const handleClipModeChange = (newClipMode: boolean) => {
+    // Save current state to history before making changes
+    saveToHistory();
+    
+    setIsClipMode(newClipMode);
+    
+    // Initialize clips if entering clip mode and no clips exist
+    if (newClipMode && clips.length === 0 && videoFile?.duration) {
+      const initialClips = clipManager.initializeClips(videoFile.duration * 1000);
+      handleClipsChange(initialClips);
+    }
+    
+    // Store in localStorage
+    try {
+      localStorage.setItem('tempIsClipMode', JSON.stringify(newClipMode));
+    } catch (error) {
+      console.error('Failed to save clip mode to localStorage:', error);
+    }
+  };
+
+  // Update current time to skip removed clips during playback
+  const handleTimeUpdate = (newTime: number) => {
+    if (isClipMode && clips.length > 0) {
+      // Check if current time is in a removed clip
+      const isInRemovedClip = clipManager.isTimeInRemovedClip(clips, newTime);
+      if (isInRemovedClip) {
+        // Skip to next valid time
+        const nextValidTime = clipManager.getNextValidTime(clips, newTime);
+        setCurrentTime(nextValidTime);
+        return;
+      }
+    }
+    setCurrentTime(newTime);
+  };
+
+  // Handle time seeking with clip awareness
+  const handleTimeSeek = (newTime: number) => {
+    if (isClipMode && clips.length > 0) {
+      // Check if target time is in a removed clip
+      const isInRemovedClip = clipManager.isTimeInRemovedClip(clips, newTime);
+      if (isInRemovedClip) {
+        // Find the next valid time
+        const nextValidTime = clipManager.getNextValidTime(clips, newTime);
+        setCurrentTime(nextValidTime);
+        return;
+      }
+    }
+    setCurrentTime(newTime);
+  };
+
+  /**
+   * Get clipped subtitles - excludes subtitles within removed clip time ranges
+   */
+  const getClippedSubtitles = useCallback((): AISubtitleData | null => {
+    if (!aiSubtitleData) {
+      return aiSubtitleData;
+    }
+
+    // Always filter subtitles based on clips, regardless of mode
+    if (!clips || clips.length === 0) {
+      return aiSubtitleData; // No clips, return all subtitles
+    }
+
+    const activeClips = clips.filter(clip => !clip.isRemoved);
+    if (activeClips.length === 0) {
+      return { ...aiSubtitleData, frames: [] }; // All clips removed, no subtitles
+    }
+
+    const filteredFrames = aiSubtitleData.frames.filter(frame => {
+      // Check if this frame overlaps with any active clip
+      const frameStartMs = frame.startTime * 1000;
+      const frameEndMs = frame.endTime * 1000;
+      
+      const isInActiveClip = activeClips.some(clip => 
+        frameStartMs < clip.endTime && frameEndMs > clip.startTime
+      );
+      
+      return isInActiveClip;
+    });
+
+    return {
+      ...aiSubtitleData,
+      frames: filteredFrames
+    };
+  }, [aiSubtitleData, clips]);
+
+  /**
+   * Get effective current time (original time in subtitle mode, effective time in clip mode)
+   */
+  const getEffectiveCurrentTime = useCallback((): number => {
+    if (!isClipMode || clips.length === 0) {
+      return currentTime; // Return original time in subtitle mode
+    }
+    
+    // Convert original time to effective time in clip mode
+    return clipManager.originalToEffectiveTime(clips, currentTime);
+  }, [currentTime, isClipMode, clips]);
+
+  /**
+   * Get effective duration (original duration in subtitle mode, effective duration in clip mode)
+   */
+  const getEffectiveDuration = useCallback((): number => {
+    if (!isClipMode || clips.length === 0) {
+      return videoFile?.duration ? videoFile.duration * 1000 : 60000; // Return original duration
+    }
+    
+    // Return effective duration in clip mode
+    return clipManager.calculateEffectiveDuration(clips);
+  }, [videoFile?.duration, isClipMode, clips]);
 
   // Initialize history and load project info
   useEffect(() => {
-    if (historyIndex === -1) {
-      setHistory([{ aiSubtitleData: null, selectedFrameId: null }]);
-      setHistoryIndex(0);
+    // Initialize history with current state
+    const initialState = { aiSubtitleData: null, selectedFrameId: null, clips: [], isClipMode: false };
+    setHistory([initialState]);
+    setHistoryIndex(0);
+
+    // Load clips from localStorage if available
+    try {
+      const savedClips = localStorage.getItem('tempClips');
+      const savedClipMode = localStorage.getItem('tempIsClipMode');
+      
+      if (savedClips) {
+        const parsedClips = JSON.parse(savedClips);
+        setClips(parsedClips);
+      }
+      
+      if (savedClipMode) {
+        const parsedClipMode = JSON.parse(savedClipMode);
+        setIsClipMode(parsedClipMode);
+      }
+    } catch (error) {
+      console.error('Failed to load clips from localStorage:', error);
     }
+
     loadCurrentProjectInfo();
-  }, [historyIndex]);
+  }, []);
 
   // Load current project info
   const loadCurrentProjectInfo = async () => {
@@ -138,7 +382,7 @@ const AppContent: React.FC = () => {
 
   // Save state to history
   const saveToHistory = () => {
-    const currentState = { aiSubtitleData, selectedFrameId };
+    const currentState = { aiSubtitleData, selectedFrameId, clips, isClipMode };
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push(currentState);
     setHistory(newHistory);
@@ -171,6 +415,8 @@ const AppContent: React.FC = () => {
       const state = history[newIndex];
       setAiSubtitleData(state.aiSubtitleData || null);
       setSelectedFrameId(state.selectedFrameId || null);
+      setClips(state.clips || []); // Restore clips
+      setIsClipMode(state.isClipMode || false); // Restore clip mode
       setHistoryIndex(newIndex);
     }
   };
@@ -181,6 +427,8 @@ const AppContent: React.FC = () => {
       const state = history[newIndex];
       setAiSubtitleData(state.aiSubtitleData || null);
       setSelectedFrameId(state.selectedFrameId || null);
+      setClips(state.clips || []); // Restore clips
+      setIsClipMode(state.isClipMode || false); // Restore clip mode
       setHistoryIndex(newIndex);
     }
   };
@@ -593,6 +841,8 @@ const AppContent: React.FC = () => {
             return;
           }
           setLoadingMessage('Exporting video with new audio...');
+          
+          // Export video with new audio
           await window.electronAPI.exportVideoWithNewAudio(
             videoFile.path,
             replacementAudioPath,
@@ -691,6 +941,14 @@ const AppContent: React.FC = () => {
       const savedPath = await window.electronAPI.saveProject(projectData);
       console.log(`Project saved: ${savedPath}`);
       
+      // Clear localStorage after successful save
+      try {
+        localStorage.removeItem('tempClips');
+        localStorage.removeItem('tempIsClipMode');
+      } catch (error) {
+        console.error('Failed to clear localStorage:', error);
+      }
+      
       // Update project info
       await loadCurrentProjectInfo();
       
@@ -732,9 +990,19 @@ const AppContent: React.FC = () => {
       setSelectedFrameId(null);
       setCurrentTime(0);
       setGeneratedContent(null);
+      setClips([]); // Reset clips
+      setIsClipMode(false); // Reset clip mode
+      
+      // Clear localStorage
+      try {
+        localStorage.removeItem('tempClips');
+        localStorage.removeItem('tempIsClipMode');
+      } catch (error) {
+        console.error('Failed to clear localStorage:', error);
+      }
       
       // Reset history
-      setHistory([{ aiSubtitleData: null, selectedFrameId: null }]);
+      setHistory([{ aiSubtitleData: null, selectedFrameId: null, clips: [], isClipMode: false }]);
       setHistoryIndex(0);
       
       // Update project info
@@ -871,10 +1139,25 @@ const AppContent: React.FC = () => {
       setAiSubtitleData(projectData.aiSubtitleData);
     }
     
+    // Load clips from project data
+    if (projectData.clips) {
+      setClips(projectData.clips);
+    } else {
+      setClips([]);
+    }
+    
     setReplacementAudioPath(projectData.replacementAudioPath || null);
     setExtractedAudioPath(projectData.extractedAudioPath || null); // Restore extracted audio path for waveforms
     setSelectedFrameId(null); // Reset frame selection
     setCurrentTime(0);
+
+    // Clear localStorage when loading a project
+    try {
+      localStorage.removeItem('tempClips');
+      localStorage.removeItem('tempIsClipMode');
+    } catch (error) {
+      console.error('Failed to clear localStorage:', error);
+    }
 
     // If no extracted audio exists but we have AI subtitles and a video file, 
     // extract audio for better waveform performance
@@ -988,8 +1271,6 @@ const AppContent: React.FC = () => {
       setLoadingMessage('');
     }
   };
-
-
 
   // Start/stop timer for export progress
   useEffect(() => {
@@ -1338,8 +1619,8 @@ const AppContent: React.FC = () => {
                 <VideoPanel
                   videoFile={videoFile}
                   currentTime={currentTime}
-                  onTimeUpdate={setCurrentTime}
-                  onTimeSeek={setCurrentTime}
+                  onTimeUpdate={handleTimeUpdate}
+                  onTimeSeek={handleTimeSeek}
                   onVideoSelect={handleVideoSelect}
                   onVideoDropped={handleVideoDropped}
                   onPlayPause={handlePlayPause}
@@ -1354,8 +1635,8 @@ const AppContent: React.FC = () => {
                 
                 {/* Unified Timeline - Only show when video is loaded */}
                 <UnifiedTimeline
-                  currentTime={currentTime}
-                  onTimeSeek={setCurrentTime}
+                  currentTime={getEffectiveCurrentTime()}
+                  onTimeSeek={handleTimeSeek}
                   videoFile={videoFile}
                   onPlayPause={handlePlayPause}
                   isPlaying={isPlaying}
@@ -1365,9 +1646,14 @@ const AppContent: React.FC = () => {
                   canRedo={historyIndex < history.length - 1}
                   replacementAudioPath={replacementAudioPath}
                   onAudioPreviewToggle={setIsAudioPreviewEnabled}
-                  aiSubtitleData={aiSubtitleData}
+                  aiSubtitleData={getClippedSubtitles()}
                   selectedFrameId={selectedFrameId}
                   onFrameSelect={setSelectedFrameId}
+                  clips={clips}
+                  onClipsChange={handleClipsChange}
+                  onClipModeChange={handleClipModeChange}
+                  isClipMode={isClipMode}
+
                 />
               </Card>
 
@@ -1385,15 +1671,17 @@ const AppContent: React.FC = () => {
                 }}
               >
                 <TabbedRightPanel
-                  onTimeSeek={setCurrentTime}
+                  onTimeSeek={handleTimeSeek}
                   transcriptionStatus={transcriptionStatus}
-                  currentTime={currentTime}
-                  aiSubtitleData={aiSubtitleData}
+                  currentTime={getEffectiveCurrentTime()}
+                  aiSubtitleData={getClippedSubtitles()}
                   onAISubtitleUpdate={handleAISubtitleUpdate}
                   selectedFrameId={selectedFrameId}
                   onFrameSelect={setSelectedFrameId}
                   videoPath={videoFile?.path || null}
                   audioPath={replacementAudioPath || extractedAudioPath || null}
+                  clips={clips}
+                  isClipMode={isClipMode}
                 />
               </Card>
             </>
@@ -1409,8 +1697,8 @@ const AppContent: React.FC = () => {
               <VideoPanel
                 videoFile={videoFile}
                 currentTime={currentTime}
-                onTimeUpdate={setCurrentTime}
-                onTimeSeek={setCurrentTime}
+                onTimeUpdate={handleTimeUpdate}
+                onTimeSeek={handleTimeSeek}
                 onVideoSelect={handleVideoSelect}
                 onVideoDropped={handleVideoDropped}
                 onPlayPause={handlePlayPause}
