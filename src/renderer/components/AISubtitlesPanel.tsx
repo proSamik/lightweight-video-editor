@@ -87,7 +87,23 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  // AI Subtitles are now the primary data source - no conversion needed
+  // Convert original time to effective time (accounting for removed clips)
+  const convertToEffectiveTime = useCallback((originalTimeSeconds: number): number => {
+    if (!isClipMode || !clips?.length) return originalTimeSeconds;
+    
+    const originalTimeMs = originalTimeSeconds * 1000;
+    let effectiveTimeMs = originalTimeMs;
+    
+    // Subtract duration of all removed clips that start before this time
+    const deletedClips = clips.filter(clip => clip.isRemoved && clip.startTime < originalTimeMs);
+    
+    for (const clip of deletedClips) {
+      const clipDuration = clip.endTime - clip.startTime;
+      effectiveTimeMs -= clipDuration;
+    }
+    
+    return Math.max(0, effectiveTimeMs / 1000);
+  }, [isClipMode, clips]);
 
   // Filter subtitle frames based on clips (hide subtitles in removed clips)
   const filteredFrames = useMemo(() => {
@@ -780,9 +796,9 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
         return `Caption hidden (stored: "${storedText}") - Click to restore`;
       case 'normal':
         if (word.isKeyword) return 'Keyword - Highlighted word';
-        return `Original: "${word.originalWord}" | Time: ${formatTimeHHMMSS(word.start)} - ${formatTimeHHMMSS(word.end)}`;
+        return `Original: "${word.originalWord}" | Time: ${isClipMode ? formatTimeHHMMSS(convertToEffectiveTime(word.start)) : formatTimeHHMMSS(word.start)} - ${isClipMode ? formatTimeHHMMSS(convertToEffectiveTime(word.end)) : formatTimeHHMMSS(word.end)}`;
       default:
-        return `Time: ${formatTimeHHMMSS(word.start)} - ${formatTimeHHMMSS(word.end)}`;
+        return `Time: ${isClipMode ? formatTimeHHMMSS(convertToEffectiveTime(word.start)) : formatTimeHHMMSS(word.start)} - ${isClipMode ? formatTimeHHMMSS(convertToEffectiveTime(word.end)) : formatTimeHHMMSS(word.end)}`;
     }
   };
 
@@ -1003,7 +1019,12 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
               justifyContent: 'space-between'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span>{formatTimeHHMMSS(frame.startTime)} - {formatTimeHHMMSS(frame.endTime)}</span>
+                <span>
+                  {isClipMode ? 
+                    `${formatTimeHHMMSS(convertToEffectiveTime(frame.startTime))} - ${formatTimeHHMMSS(convertToEffectiveTime(frame.endTime))}` :
+                    `${formatTimeHHMMSS(frame.startTime)} - ${formatTimeHHMMSS(frame.endTime)}`
+                  }
+                </span>
                 {frame.isCustomBreak && (
                   <span style={{
                     fontSize: '10px',

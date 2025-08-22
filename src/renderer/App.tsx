@@ -95,6 +95,7 @@ const AppContent: React.FC = () => {
   // Clip editing state
   const [clips, setClips] = useState<VideoClip[]>([]);
   const [isClipMode, setIsClipMode] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1); // Shared zoom level between modes (1 = 100% base zoom)
   const clipManager = {
     initializeClips: (videoDurationMs: number): VideoClip[] => {
       const initialClip: VideoClip = {
@@ -1631,11 +1632,14 @@ const AppContent: React.FC = () => {
                   selectedFrameId={selectedFrameId}
                   onFrameSelect={setSelectedFrameId}
                   onAISubtitleUpdate={handleAISubtitleUpdate}
+                  clips={clips}
+                  isClipMode={isClipMode}
                 />
                 
-                {/* Unified Timeline - Only show when video is loaded */}
+                {/* Unified Timeline - Only show when video is loaded and data is ready */}
+                {!isLoading && aiSubtitleData && aiSubtitleData.frames && Array.isArray(aiSubtitleData.frames) && aiSubtitleData.frames.length > 0 && (
                 <UnifiedTimeline
-                  currentTime={getEffectiveCurrentTime()}
+                  currentTime={currentTime}
                   onTimeSeek={handleTimeSeek}
                   videoFile={videoFile}
                   onPlayPause={handlePlayPause}
@@ -1646,15 +1650,17 @@ const AppContent: React.FC = () => {
                   canRedo={historyIndex < history.length - 1}
                   replacementAudioPath={replacementAudioPath}
                   onAudioPreviewToggle={setIsAudioPreviewEnabled}
-                  aiSubtitleData={getClippedSubtitles()}
+                  aiSubtitleData={aiSubtitleData}
                   selectedFrameId={selectedFrameId}
                   onFrameSelect={setSelectedFrameId}
                   clips={clips}
                   onClipsChange={handleClipsChange}
                   onClipModeChange={handleClipModeChange}
                   isClipMode={isClipMode}
-
+                  zoomLevel={zoomLevel}
+                  onZoomChange={setZoomLevel}
                 />
+                )}
               </Card>
 
               {/* Right Panel - Tabbed Controls - Only show when video is loaded */}
@@ -1673,8 +1679,8 @@ const AppContent: React.FC = () => {
                 <TabbedRightPanel
                   onTimeSeek={handleTimeSeek}
                   transcriptionStatus={transcriptionStatus}
-                  currentTime={getEffectiveCurrentTime()}
-                  aiSubtitleData={getClippedSubtitles()}
+                  currentTime={currentTime}
+                  aiSubtitleData={aiSubtitleData}
                   onAISubtitleUpdate={handleAISubtitleUpdate}
                   selectedFrameId={selectedFrameId}
                   onFrameSelect={setSelectedFrameId}
@@ -1705,6 +1711,8 @@ const AppContent: React.FC = () => {
                 isPlaying={isPlaying}
                 replacementAudioPath={replacementAudioPath}
                 isAudioPreviewEnabled={isAudioPreviewEnabled}
+                clips={clips}
+                isClipMode={isClipMode}
               />
             </div>
           )}

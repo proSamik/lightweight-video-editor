@@ -38,6 +38,9 @@ interface UnifiedTimelineProps {
   onClipsChange?: (clips: VideoClip[]) => void;
   onClipModeChange?: (isClipMode: boolean) => void;
   isClipMode?: boolean;
+  // Shared zoom state
+  zoomLevel?: number;
+  onZoomChange?: (level: number) => void;
 }
 
 /**
@@ -64,7 +67,14 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   onClipsChange,
   onClipModeChange,
   isClipMode = false,
+  zoomLevel = 0,
+  onZoomChange,
 }) => {
+  // Early return if data is not ready to prevent initialization errors
+  if (!aiSubtitleData?.frames || !Array.isArray(aiSubtitleData.frames)) {
+    return null;
+  }
+
   const { theme } = useTheme();
   const timelineRef = useRef<HTMLDivElement>(null);
   const timelineContainerRef = useRef<HTMLDivElement>(null);
@@ -73,7 +83,6 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
 
   const [contextMenu, setContextMenu] = useState<{x: number, y: number, segmentId: string} | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{segmentId: string, text: string} | null>(null);
-  const [zoomLevel, setZoomLevel] = useState(0);
 
   // Clip editing state
   const [localClipMode, setLocalClipMode] = useState(isClipMode);
@@ -106,10 +115,11 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   }, [localClips.length, videoFile?.duration, onClipsChange]);
 
   /**
-   * Calculate effective duration (excluding removed clips)
+   * Calculate effective duration (excluding removed clips) - always use clips as source of truth
    */
   const effectiveDuration = useMemo(() => {
-    if (!localClipMode || localClips.length === 0) {
+    // Always use clips timeline if clips exist, regardless of mode
+    if (localClips.length === 0) {
       return videoFile?.duration ? videoFile.duration * 1000 : 60000;
     }
 
@@ -117,13 +127,14 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
     if (activeClips.length === 0) return 0;
 
     return activeClips.reduce((total, clip) => total + (clip.endTime - clip.startTime), 0);
-  }, [localClipMode, localClips, videoFile?.duration]);
+  }, [localClips, videoFile?.duration]);
 
   /**
    * Convert effective time to original video time
    */
   const effectiveToOriginalTime = useCallback((effectiveTime: number): number => {
-    if (!localClipMode || localClips.length === 0) return effectiveTime;
+    // Always use clips timeline if clips exist, regardless of mode
+    if (localClips.length === 0) return effectiveTime;
 
     const activeClips = localClips.filter(clip => !clip.isRemoved);
     if (activeClips.length === 0) return 0;
@@ -140,13 +151,14 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
     }
 
     return activeClips[activeClips.length - 1]?.endTime || 0;
-  }, [localClipMode, localClips]);
+  }, [localClips]);
 
   /**
    * Convert original video time to effective time
    */
   const originalToEffectiveTime = useCallback((originalTime: number): number => {
-    if (!localClipMode || localClips.length === 0) return originalTime;
+    // Always use clips timeline if clips exist, regardless of mode
+    if (localClips.length === 0) return originalTime;
 
     const activeClips = localClips.filter(clip => !clip.isRemoved);
     if (activeClips.length === 0) return 0;
@@ -161,7 +173,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
     }
 
     return effectiveTime;
-  }, [localClipMode, localClips]);
+  }, [localClips]);
 
   /**
    * Handle clip mode toggle
@@ -236,7 +248,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
           // Second part
           newClips.push({
             ...clip,
-            id: `clip-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            id: `clip-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
             startTime: currentTimeMs
           });
         }
@@ -289,14 +301,36 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
 
   // Convert AI subtitle frames to virtual caption segments for timeline display
   type DisplaySegment = { id: string; startTime: number; endTime: number; text: string; style: SubtitleStyle };
-  const virtualCaptionsFromAI = useMemo((): DisplaySegment[] => {
-    if (!aiSubtitleData) return [];
+  
+  // Simple function to avoid temporal dead zone errors
+  const getVirtualCaptionsFromAI = (): DisplaySegment[] => {
+    // Type-safe early returns
+    if (!aiSubtitleData?.frames || !Array.isArray(aiSubtitleData.frames)) {
+      return [];
+    }
     
     const virtualCaptions: DisplaySegment[] = [];
     
-    aiSubtitleData.frames.forEach(frame => {
-      // Use the actual frame style, with safe fallback only for missing properties
-      const fallbackStyle = {
+    // Helper function to check if a frame overlaps with deleted clips
+    const isFrameInDeletedClip = (frameStartMs: number, frameEndMs: number): boolean => {
+      if (!localClipMode || !localClips?.length) return false;
+      
+      const deletedClips = localClips.filter(clip => clip?.isRemoved);
+      return deletedClips.some(clip => {
+        if (!clip || typeof clip.startTime !== 'number' || typeof clip.endTime !== 'number') return false;
+        return frameStartMs < clip.endTime && frameEndMs > clip.startTime;
+      });
+    };
+
+    // Process each frame safely
+    const frames = aiSubtitleData.frames;
+    
+    for (let i = 0; i < frames.length; i++) {
+      const frame = frames[i];
+      if (!frame || typeof frame !== 'object' || !frame.id) continue;
+      
+      // Type-safe style creation
+      const defaultStyle = {
         font: 'Segoe UI',
         fontSize: 85,
         textColor: '#ffffff',
@@ -310,44 +344,133 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
         textAlign: 'center',
         scale: 1,
         emphasizeMode: true,
-        burnInSubtitles: true,
-      } as any;
+        burnInSubtitles: true
+      };
       
-      const baseStyle = { ...fallbackStyle, ...frame.style };
+      // Merge with frame style if it exists and is valid
+      const frameStyle = (frame.style && typeof frame.style === 'object') ? frame.style : {};
+      const baseStyle = Object.assign({}, defaultStyle, frameStyle);
 
-      // Get visible words from the frame
-      const visibleWords = frame.words.filter(word => 
+      // Type-safe word filtering
+      const words = Array.isArray(frame.words) ? frame.words : [];
+      const visibleWords = words.filter(word => 
+        word && 
+        typeof word === 'object' && 
         word.editState !== 'removedCaption' &&
         !word.isPause
       );
 
-      if (visibleWords.length === 0) return; // Skip empty frames
+      if (visibleWords.length === 0) continue;
 
-      // Create virtual caption segment for timeline
+      // Type-safe time validation
+      const frameStartTime = typeof frame.startTime === 'number' ? frame.startTime : 0;
+      const frameEndTime = typeof frame.endTime === 'number' ? frame.endTime : 0;
+      const frameStartMs = frameStartTime * 1000;
+      const frameEndMs = frameEndTime * 1000;
+      
+      if (isFrameInDeletedClip(frameStartMs, frameEndMs)) {
+        continue;
+      }
+
+      // Create display segment with type safety
+      const text = visibleWords.map(w => (w && typeof w.word === 'string') ? w.word : '').join(' ');
+      
       const virtualCaption: DisplaySegment = {
         id: frame.id,
-        startTime: frame.startTime * 1000, // Convert seconds to milliseconds
-        endTime: frame.endTime * 1000,
-        text: visibleWords.map(w => w.word).join(' '),
-        style: baseStyle
+        startTime: frameStartMs,
+        endTime: frameEndMs,
+        text: text,
+        style: baseStyle as SubtitleStyle
       };
 
       virtualCaptions.push(virtualCaption);
-    });
+    }
 
     return virtualCaptions.sort((a, b) => a.startTime - b.startTime);
-  }, [aiSubtitleData]);
+  };
+
+  const virtualCaptionsFromAI = getVirtualCaptionsFromAI();
 
   // Use AI-derived segments
   const effectiveCaptions = virtualCaptionsFromAI;
   const effectiveSelectedId = selectedFrameId || null;
 
-  // Timeline dimensions
-  const TIMELINE_HEIGHT = 180;
-  const CAPTION_TRACK_HEIGHT = 140;
+  /**
+   * Assign tracks to segments to avoid overlaps and utilize vertical space
+   */
+  const assignTracks = (segments: Array<{startTime: number, endTime: number, id: string}>): Array<{segment: any, track: number}> => {
+    const tracks: Array<Array<{startTime: number, endTime: number}>> = [];
+    const result: Array<{segment: any, track: number}> = [];
 
-  // Use effective duration for timeline calculations
-  const actualDuration = localClipMode ? effectiveDuration : (
+    // Sort segments by start time
+    const sortedSegments = [...segments].sort((a, b) => a.startTime - b.startTime);
+
+    sortedSegments.forEach(segment => {
+      // Find the first track where this segment fits
+      let assignedTrack = -1;
+
+      for (let trackIndex = 0; trackIndex < tracks.length; trackIndex++) {
+        const track = tracks[trackIndex];
+        const lastSegmentInTrack = track[track.length - 1];
+
+        // Check if this segment can fit in this track (no overlap)
+        if (!lastSegmentInTrack || segment.startTime >= lastSegmentInTrack.endTime) {
+          track.push(segment);
+          assignedTrack = trackIndex;
+          break;
+        }
+      }
+
+      // If no existing track can accommodate this segment, create a new track
+      if (assignedTrack === -1) {
+        tracks.push([segment]);
+        assignedTrack = tracks.length - 1;
+      }
+
+      result.push({ segment, track: assignedTrack });
+    });
+
+    return result;
+  };
+
+  // Timeline dimensions - dynamic based on content
+  const CONTROL_HEIGHT = 40;
+  const RULER_HEIGHT = 30;
+  const CAPTION_TRACK_HEIGHT = 45; // Height per track/row
+  const MIN_TIMELINE_HEIGHT = 200;
+  const MAX_TIMELINE_HEIGHT = 600;
+  
+  // Calculate timeline height (moved to useMemo to ensure proper dependency tracking)
+  const TIMELINE_HEIGHT = useMemo(() => {
+    if (localClipMode) {
+      // In clip mode, use simple layout for now
+      return Math.min(Math.max(2 * CAPTION_TRACK_HEIGHT + 100, MIN_TIMELINE_HEIGHT), MAX_TIMELINE_HEIGHT);
+    } else {
+      // In subtitle mode, calculate based on actual track assignment
+      const activeClips = localClips.filter(clip => !clip.isRemoved);
+      const visibleSegments = effectiveCaptions.filter(segment => {
+        if (activeClips.length === 0) return true;
+        return activeClips.some(clip => 
+          segment.startTime < clip.endTime && segment.endTime > clip.startTime
+        );
+      });
+      
+      if (visibleSegments.length === 0) {
+        return MIN_TIMELINE_HEIGHT;
+      }
+      
+      const segmentsWithTracks = assignTracks(visibleSegments);
+      const maxTrack = Math.max(...segmentsWithTracks.map(s => s.track), 0);
+      const tracksNeeded = maxTrack + 1;
+      
+      return Math.min(Math.max(tracksNeeded * (CAPTION_TRACK_HEIGHT + 5) + 50, MIN_TIMELINE_HEIGHT), MAX_TIMELINE_HEIGHT);
+    }
+  }, [localClipMode, localClips, effectiveCaptions]);
+  
+  const TIMELINE_CONTENT_HEIGHT = TIMELINE_HEIGHT - CONTROL_HEIGHT - RULER_HEIGHT;
+
+  // Always use effective duration when clips exist, regardless of mode
+  const actualDuration = localClips.length > 0 ? effectiveDuration : (
     videoFile?.duration 
       ? videoFile.duration * 1000 // Convert from seconds to milliseconds
       : effectiveCaptions.length > 0 
@@ -355,8 +478,8 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
         : 60000 // Default 1 minute
   );
 
-  // Ensure we always use the correct duration based on mode
-  const displayDuration = localClipMode ? effectiveDuration : actualDuration;
+  // Always use actualDuration (which includes effective duration when clips exist)
+  const displayDuration = actualDuration;
 
   // Force re-render of time display when mode changes
   useEffect(() => {
@@ -384,8 +507,10 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
     }
   };
 
-  // Calculate the actual zoom multiplier for this video
-  const zoomMultiplier = getZoomMultiplier(actualDuration);
+  // Use consistent zoom multiplier based on original video duration only
+  // This ensures zoom behavior is the same regardless of clip mode
+  const baselineDuration = videoFile?.duration ? videoFile.duration * 1000 : 60000;
+  const zoomMultiplier = getZoomMultiplier(baselineDuration);
 
   /**
    * Format time display in MM:SS.ms format
@@ -396,6 +521,56 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
     const seconds = Math.floor(totalSeconds % 60);
     const milliseconds = Math.floor((ms % 1000) / 10);
     return `${minutes}:${seconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(2, '0')}`;
+  };
+
+  /**
+   * Format time for ruler display (simplified)
+   */
+  const formatRulerTime = (ms: number): string => {
+    const minutes = Math.floor(ms / 60000);
+    const seconds = Math.floor((ms % 60000) / 1000);
+    if (minutes > 0) {
+      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+    return `${seconds}s`;
+  };
+
+  /**
+   * Generate time markers for the ruler
+   */
+  const generateTimeMarkers = (): Array<{time: number, label: string, isMajor: boolean}> => {
+    const markers: Array<{time: number, label: string, isMajor: boolean}> = [];
+    const duration = displayDuration;
+    
+    // Determine marker interval based on zoom and duration
+    let majorInterval: number; // in milliseconds
+    let minorInterval: number;
+    
+    if (duration <= 30000) { // 30 seconds or less
+      majorInterval = 5000; // 5 seconds
+      minorInterval = 1000; // 1 second
+    } else if (duration <= 300000) { // 5 minutes or less
+      majorInterval = 30000; // 30 seconds
+      minorInterval = 5000; // 5 seconds
+    } else if (duration <= 1800000) { // 30 minutes or less
+      majorInterval = 60000; // 1 minute
+      minorInterval = 15000; // 15 seconds
+    } else {
+      majorInterval = 300000; // 5 minutes
+      minorInterval = 60000; // 1 minute
+    }
+
+    // Generate markers
+    for (let time = 0; time <= duration; time += minorInterval) {
+      const isMajor = time % majorInterval === 0;
+      markers.push({
+        time,
+        label: isMajor ? formatRulerTime(time) : '',
+        isMajor
+      });
+    }
+
+    return markers;
   };
 
   /**
@@ -410,12 +585,12 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
     
     let seekTime: number;
     
-    if (localClipMode) {
-      // In clip mode, convert effective timeline position to original video time
+    if (localClipMode && localClips.length > 0) {
+      // In clip mode: convert effective timeline position to original video time
       const effectiveTime = percentage * actualDuration;
       seekTime = effectiveToOriginalTime(effectiveTime);
     } else {
-      // In subtitle mode, use direct time
+      // In subtitle mode: direct conversion since timeline shows original time
       seekTime = percentage * actualDuration;
     }
     
@@ -435,17 +610,17 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
     
     let seekTime: number;
     
-    if (localClipMode) {
-      // In clip mode, convert effective timeline position to original video time
+    if (localClipMode && localClips.length > 0) {
+      // In clip mode: convert effective timeline position to original video time
       const effectiveTime = percentage * actualDuration;
       seekTime = effectiveToOriginalTime(effectiveTime);
     } else {
-      // In subtitle mode, use direct time
+      // In subtitle mode: direct conversion since timeline shows original time
       seekTime = percentage * actualDuration;
     }
     
     onTimeSeek(seekTime);
-  }, [isDragging, actualDuration, onTimeSeek, localClipMode, effectiveToOriginalTime]);
+  }, [isDragging, actualDuration, onTimeSeek, localClipMode, localClips, effectiveToOriginalTime]);
 
   /**
    * Handle timeline mouse up to stop dragging
@@ -500,7 +675,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
       }
     };
 
-    const handleClick = (e: MouseEvent) => {
+    const handleClick = (_e: MouseEvent) => {
       // Close context menu on outside click
       if (contextMenu) {
         setContextMenu(null);
@@ -582,9 +757,11 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
       
       // Normal auto-scroll behavior for playback (not zoom)
       if (zoomLevel > 1) {
-        const playheadPosition = localClipMode 
-          ? (originalToEffectiveTime(currentTime) / actualDuration) * timeline.offsetWidth
-          : (currentTime / actualDuration) * timeline.offsetWidth;
+        // Use appropriate time based on mode
+        const timeForPosition = localClipMode && localClips.length > 0 
+          ? originalToEffectiveTime(currentTime) 
+          : currentTime;
+        const playheadPosition = (timeForPosition / actualDuration) * timeline.offsetWidth;
         const scrollLeft = container.scrollLeft;
         const scrollRight = scrollLeft + containerWidth;
         
@@ -621,9 +798,11 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
       
       // Use current zoom level for accurate position calculation
       const currentTimelineWidth = timelineRef.current.offsetWidth;
-      const playheadPixelPosition = localClipMode
-        ? (originalToEffectiveTime(currentTime) / actualDuration) * currentTimelineWidth
-        : (currentTime / actualDuration) * currentTimelineWidth;
+      // Use appropriate time based on mode
+      const timeForPosition = localClipMode && localClips.length > 0 
+        ? originalToEffectiveTime(currentTime) 
+        : currentTime;
+      const playheadPixelPosition = (timeForPosition / actualDuration) * currentTimelineWidth;
       
       // Calculate where the playhead appears in the viewport (0 = left edge, 1 = right edge)
       let viewportRatio;
@@ -639,8 +818,8 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
       setPlayheadViewportRatio(viewportRatio);
     }
     
-    // Always update zoom level immediately
-    setZoomLevel(newZoomLevel);
+    // Always update zoom level immediately via prop callback
+    onZoomChange?.(newZoomLevel);
   };
 
   /**
@@ -681,27 +860,31 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
     }
   }, [selectedFrameId]);
 
-  // Update selected frame when playhead enters a new segment (if none selected or playhead left selected)
+  // Update selected frame when playhead enters a new segment (debounced to prevent race conditions)
   useEffect(() => {
-    if (localClipMode) {
-      // In clip mode, find the clip at current time
-      if (!localClips.length || !onFrameSelect) return;
-      const currentTimeMs = currentTime;
-      const clipAtTime = localClips.find(clip => 
-        currentTimeMs >= clip.startTime && currentTimeMs <= clip.endTime && !clip.isRemoved
-      );
-      if (clipAtTime && clipAtTime.id !== selectedFrameId) {
-        onFrameSelect(clipAtTime.id);
+    const timeoutId = setTimeout(() => {
+      if (localClipMode) {
+        // In clip mode, find the clip at current time
+        if (!localClips.length || !onFrameSelect) return;
+        const currentTimeMs = currentTime;
+        const clipAtTime = localClips.find(clip => 
+          currentTimeMs >= clip.startTime && currentTimeMs <= clip.endTime && !clip.isRemoved
+        );
+        if (clipAtTime && clipAtTime.id !== selectedFrameId) {
+          onFrameSelect(clipAtTime.id);
+        }
+      } else {
+        // In subtitle mode, find the subtitle frame at current time
+        if (!aiSubtitleData?.frames?.length || !onFrameSelect) return;
+        const ms = currentTime;
+        const within = virtualCaptionsFromAI.find(seg => ms >= seg.startTime && ms <= seg.endTime);
+        if (within && within.id !== selectedFrameId) {
+          onFrameSelect(within.id);
+        }
       }
-    } else {
-      // In subtitle mode, find the subtitle frame at current time
-      if (!aiSubtitleData?.frames?.length || !onFrameSelect) return;
-      const ms = currentTime;
-      const within = virtualCaptionsFromAI.find(seg => ms >= seg.startTime && ms <= seg.endTime);
-      if (within && within.id !== selectedFrameId) {
-        onFrameSelect(within.id);
-      }
-    }
+    }, 100); // 100ms debounce to prevent rapid-fire selection changes
+
+    return () => clearTimeout(timeoutId);
   }, [currentTime, aiSubtitleData?.frames, onFrameSelect, localClipMode, localClips, selectedFrameId, virtualCaptionsFromAI]);
 
   return (
@@ -735,7 +918,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
             fontWeight: '500'
           }}
         >
-          {localClipMode 
+          {localClipMode && localClips.length > 0 
             ? `${formatTime(originalToEffectiveTime(currentTime))} / ${formatTime(displayDuration)}`
             : `${formatTime(currentTime)} / ${formatTime(displayDuration)}`
           }
@@ -1221,25 +1404,63 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
         </div>
       </div>
 
+      {/* Timeline Ruler */}
+      <div style={{
+        height: `${RULER_HEIGHT}px`,
+        borderBottom: `1px solid ${theme.colors.border}`,
+        background: theme.colors.surface,
+        position: 'relative',
+        overflow: 'hidden'
+      }}>
+        <div style={{
+          width: `${Math.max(100 * (zoomLevel * zoomMultiplier), 100)}%`,
+          height: '100%',
+          position: 'relative',
+          marginLeft: '10px',
+        }}>
+          {generateTimeMarkers().map((marker, index) => (
+            <div
+              key={index}
+              style={{
+                position: 'absolute',
+                left: `${(marker.time / displayDuration) * 100}%`,
+                top: 0,
+                height: '100%',
+                borderLeft: `1px solid ${marker.isMajor ? theme.colors.border : theme.colors.surfaceHover}`,
+                fontSize: '10px',
+                color: theme.colors.textSecondary,
+                paddingLeft: '2px',
+                paddingTop: '2px',
+                pointerEvents: 'none',
+                zIndex: 1
+              }}
+            >
+              {marker.label}
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Main Timeline Area */}
       <div 
         ref={timelineContainerRef}
         style={{
-          height: `${TIMELINE_HEIGHT - 32}px`,
+          height: `${TIMELINE_CONTENT_HEIGHT}px`,
           position: 'relative',
           background: theme.colors.background,
           overflowX: 'auto',
-          overflowY: 'hidden',
+          overflowY: 'auto', // Enable Y-scrolling
         }}
       >
         <div 
           ref={timelineRef}
           style={{
-            height: '95%',
+            minHeight: `${TIMELINE_CONTENT_HEIGHT - 20}px`,
+            height: localClipMode ? 'auto' : `${Math.max(effectiveCaptions.length * 15 + 100, TIMELINE_CONTENT_HEIGHT - 20)}px`, // Dynamic height for many segments
             position: 'relative',
             cursor: isDragging ? 'grabbing' : 'pointer',
             background: theme.colors.background,
-            width: `${Math.max(100 * (zoomLevel * zoomMultiplier), 100)}%`, // Minimum 100% width, scales with adaptive zoom
+            width: `${Math.max(100 * (zoomLevel * zoomMultiplier), 100)}%`, // Consistent zoom scaling based on original duration
             minWidth: '100%',
             marginLeft: '10px',
           }}
@@ -1250,7 +1471,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
           <div
             style={{
               position: 'absolute',
-              left: `${localClipMode ? (originalToEffectiveTime(currentTime) / actualDuration) * 100 : (currentTime / actualDuration) * 100}%`,
+              left: `${(localClipMode && localClips.length > 0 ? (originalToEffectiveTime(currentTime) / actualDuration) : (currentTime / actualDuration)) * 100}%`,
               top: 0,
               bottom: 0,
               width: '2px',
@@ -1267,7 +1488,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
               top: '8px',
               left: 0,
               right: 0,
-              height: `${CAPTION_TRACK_HEIGHT}px`,
+              bottom: '8px', // Use full height instead of fixed height
               zIndex: 10
             }}
           >
@@ -1352,19 +1573,49 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                 );
               }).filter(Boolean)
             ) : (
-              effectiveCaptions.map((segment, index) => {
-                const left = (segment.startTime / actualDuration) * 100;
-                const width = ((segment.endTime - segment.startTime) / actualDuration) * 100;
-                const isSelected = segment.id === effectiveSelectedId;
+              (() => {
+                // In subtitle mode with clips, filter segments that are within active clips
+                const activeClips = localClips.filter(clip => !clip.isRemoved);
                 
-                // Use consistent blue border color for all segments
-                const segmentBorderColor = isSelected 
-                  ? theme.colors.primary 
-                  : theme.colors.secondary;
-                
-                const segmentBackgroundColor = isSelected 
-                  ? theme.colors.secondary 
-                  : theme.colors.surface;
+                const visibleSegments = effectiveCaptions.filter(segment => {
+                  // Check if segment overlaps with any active clip
+                  const segmentOverlapsActiveClip = activeClips.some(clip => 
+                    segment.startTime < clip.endTime && segment.endTime > clip.startTime
+                  );
+                  
+                  // Skip segments that don't overlap with any active clips when clips exist
+                  return activeClips.length === 0 || segmentOverlapsActiveClip;
+                });
+
+                // Assign tracks to avoid overlaps
+                const segmentsWithTracks = assignTracks(visibleSegments);
+
+                return segmentsWithTracks.map(({ segment, track }) => {
+                  // Calculate position based on compressed timeline when clips exist
+                  let left: number, width: number;
+                  
+                  if (activeClips.length > 0) {
+                    // Use compressed timeline - convert original times to effective times
+                    const effectiveStartTime = originalToEffectiveTime(segment.startTime);
+                    const effectiveEndTime = originalToEffectiveTime(segment.endTime);
+                    left = (effectiveStartTime / actualDuration) * 100;
+                    width = ((effectiveEndTime - effectiveStartTime) / actualDuration) * 100;
+                  } else {
+                    // No clips - use original timeline
+                    left = (segment.startTime / actualDuration) * 100;
+                    width = ((segment.endTime - segment.startTime) / actualDuration) * 100;
+                  }
+                  
+                  const isSelected = segment.id === effectiveSelectedId;
+                  
+                  // Use consistent blue border color for all segments
+                  const segmentBorderColor = isSelected 
+                    ? theme.colors.primary 
+                    : theme.colors.secondary;
+                  
+                  const segmentBackgroundColor = isSelected 
+                    ? theme.colors.secondary 
+                    : theme.colors.surface;
                 
                 return (
                   <div
@@ -1374,8 +1625,8 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                       position: 'absolute',
                       left: `${left}%`,
                       width: `${width}%`,
-                      top: 0,
-                      height: '100%',
+                      top: `${track * (CAPTION_TRACK_HEIGHT + 5)}px`, // Use track for Y positioning
+                      height: `${CAPTION_TRACK_HEIGHT}px`, // Fixed track height
                       background: segmentBackgroundColor,
                       border: `2px solid ${segmentBorderColor}`,
                       borderRadius: '4px',
@@ -1426,7 +1677,8 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                     </div>
                   </div>
                 );
-              })
+              });
+              })()
             )}
           </div>
         </div>

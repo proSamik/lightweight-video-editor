@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
-import { VideoFile, AISubtitleData, SubtitleFrame } from '../../types';
+import { VideoFile, AISubtitleData, SubtitleFrame, VideoClip } from '../../types';
 import { useTheme } from '../contexts/ThemeContext';
 import { FiEye } from 'react-icons/fi';
 import { Video, AlertTriangle } from 'lucide-react';
@@ -21,6 +21,9 @@ interface VideoPanelProps {
   selectedFrameId?: string | null;
   onFrameSelect?: (frameId: string) => void;
   onAISubtitleUpdate?: (data: AISubtitleData | null) => void;
+  // Clip support - sync only with clips mode
+  clips?: VideoClip[];
+  isClipMode?: boolean;
 }
 
 const VideoPanel: React.FC<VideoPanelProps> = ({
@@ -38,6 +41,8 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   selectedFrameId,
   onFrameSelect,
   onAISubtitleUpdate,
+  clips = [],
+  isClipMode = false,
 }) => {
   const { theme } = useTheme();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -54,6 +59,55 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   const [scaleFactor, setScaleFactor] = useState(1);
   const lastUpdateTimeRef = useRef<number>(0);
   const [isHoveringCaption, setIsHoveringCaption] = useState(false);
+  const [lastSkipTime, setLastSkipTime] = useState<number>(-1);
+  const skipCooldownRef = useRef<NodeJS.Timeout | null>(null);
+
+  /**
+   * Convert effective time to original video time (always use clips as source of truth)
+   */
+  const effectiveToOriginalTime = useCallback((effectiveTime: number): number => {
+    // Always use clips timeline if clips exist, regardless of mode
+    if (clips.length === 0) return effectiveTime;
+
+    const activeClips = clips.filter(clip => !clip.isRemoved);
+    if (activeClips.length === 0) return 0;
+
+    let accumulatedTime = 0;
+    for (const clip of activeClips) {
+      const clipDuration = clip.endTime - clip.startTime;
+      if (effectiveTime <= accumulatedTime + clipDuration) {
+        // Time falls within this clip
+        const timeWithinClip = effectiveTime - accumulatedTime;
+        return clip.startTime + timeWithinClip;
+      }
+      accumulatedTime += clipDuration;
+    }
+
+    // If we reach here, return the last clip's end time
+    return activeClips[activeClips.length - 1].endTime;
+  }, [clips]);
+
+  /**
+   * Convert original video time to effective time (always use clips as source of truth)
+   */
+  const originalToEffectiveTime = useCallback((originalTime: number): number => {
+    // Always use clips timeline if clips exist, regardless of mode
+    if (clips.length === 0) return originalTime;
+
+    const activeClips = clips.filter(clip => !clip.isRemoved);
+    if (activeClips.length === 0) return 0;
+
+    let effectiveTime = 0;
+    for (const clip of activeClips) {
+      if (originalTime >= clip.startTime && originalTime <= clip.endTime) {
+        // Time falls within this clip
+        return effectiveTime + (originalTime - clip.startTime);
+      }
+      effectiveTime += clip.endTime - clip.startTime;
+    }
+
+    return effectiveTime;
+  }, [clips]);
   const tempDragPositionRef = useRef<{ x: number; y: number } | null>(null);
   const [videoFileExists, setVideoFileExists] = useState<boolean | null>(null);
   const [videoLoadError, setVideoLoadError] = useState<boolean>(false);
@@ -145,31 +199,80 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     return null;
   }, [aiSubtitleData]);
 
-  // Check if current time should be muted (word-level precision)
-  // Since we're cutting segments in export, we should also hide/mute them in preview
-  const shouldBeMuted = useCallback((time: number): boolean => {
-    // No muting needed for overlay-based rendering
-    return false;
-  }, []);
-
-  // Find the next valid (non-cut) time after the current time
-  // No longer needed for overlay-based rendering
-  const findNextValidTime = useCallback((currentTimeMs: number): number | null => {
-    return null;
-  }, []);
-
-  // Auto-skip over cut segments during playback
-  const handleAutoSkip = useCallback((currentTimeMs: number) => {
-    const video = videoRef.current;
-    if (!video || video.paused) return;
+  // Check if current original time is within removed clips (for skip functionality only)
+  const shouldSkip = useCallback((originalTimeMs: number): boolean => {
+    // Only apply clip-based skipping in clip mode
+    if (!isClipMode || clips.length === 0) return false;
     
-    const nextValidTime = findNextValidTime(currentTimeMs);
-    if (nextValidTime !== null) {
-      // Skip to the end of the cut segment
-      video.currentTime = nextValidTime / 1000;
-      onTimeUpdate(nextValidTime);
+    const activeClips = clips.filter(clip => !clip.isRemoved);
+    if (activeClips.length === 0) return true; // All clips removed, skip everything
+    
+    // Check if time is within any active clip
+    const isInActiveClip = activeClips.some(clip => 
+      originalTimeMs >= clip.startTime && originalTimeMs <= clip.endTime
+    );
+    
+    return !isInActiveClip; // Skip if NOT in active clip
+  }, [clips, isClipMode]);
+
+  // Find the next valid (active clip) time after the current time
+  const findNextValidTime = useCallback((currentOriginalTimeMs: number): number | null => {
+    if (clips.length === 0) return null;
+    
+    const activeClips = clips.filter(clip => !clip.isRemoved);
+    if (activeClips.length === 0) return null;
+    
+    // Find the next active clip that starts after current time
+    const nextClip = activeClips
+      .filter(clip => clip.startTime > currentOriginalTimeMs)
+      .sort((a, b) => a.startTime - b.startTime)[0];
+    
+    return nextClip ? nextClip.startTime : null;
+  }, [clips]);
+
+  // Auto-skip over deleted clips during playback
+  const handleAutoSkip = useCallback((originalTimeMs: number) => {
+    const video = videoRef.current;
+    if (!video || video.paused || !isClipMode || clips.length === 0) return;
+    
+    // Check if we need to skip (in a deleted clip)
+    const needsSkip = shouldSkip(originalTimeMs);
+    if (!needsSkip) return;
+    
+    // Prevent multiple skips within 500ms of the same position
+    const timeDiff = Math.abs(originalTimeMs - lastSkipTime);
+    if (timeDiff < 500) return;
+    
+    const nextValidTime = findNextValidTime(originalTimeMs);
+    if (nextValidTime === null) return;
+    
+    console.log(`Auto-skipping from ${originalTimeMs}ms to ${nextValidTime}ms`);
+    
+    // Clear any existing cooldown
+    if (skipCooldownRef.current) {
+      clearTimeout(skipCooldownRef.current);
     }
-  }, [findNextValidTime, onTimeUpdate]);
+    
+    // Track this skip
+    setLastSkipTime(originalTimeMs);
+    
+    // Perform the skip
+    const wasPlaying = !video.paused;
+    video.currentTime = nextValidTime / 1000;
+    
+    // Set a cooldown to prevent immediate re-skipping
+    skipCooldownRef.current = setTimeout(() => {
+      if (wasPlaying && video.paused) {
+        video.play().catch((error) => {
+          console.error('Failed to resume playback after skip:', error);
+        });
+      }
+    }, 100);
+    
+    // Convert to effective time for parent update
+    const effectiveTime = originalToEffectiveTime(nextValidTime);
+    onTimeUpdate(effectiveTime);
+  }, [shouldSkip, findNextValidTime, originalToEffectiveTime, onTimeUpdate, clips.length, lastSkipTime, isClipMode]);
 
   // Check if video file exists when videoFile changes
   useEffect(() => {
@@ -250,9 +353,13 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     const mouseX = (e.clientX - rect.left) * scaleX;
     const mouseY = (e.clientY - rect.top) * scaleY;
     
-    // Find captions that's currently visible
+    // Find captions that's currently visible - use video time
+    const video = videoRef.current;
+    if (!video) return;
+    const videoTimeMs = video.currentTime * 1000;
+    
     const currentCaptions = effectiveCaptions.filter(
-      caption => currentTime >= caption.startTime && currentTime <= caption.endTime
+      caption => videoTimeMs >= caption.startTime && videoTimeMs <= caption.endTime
     );
     
     // Check if click is on any visible caption text
@@ -291,9 +398,13 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     const mouseX = (e.clientX - rect.left) * scaleX;
     const mouseY = (e.clientY - rect.top) * scaleY;
     
-    // Find captions that's currently visible
+    // Find captions that's currently visible - use video time
+    const video = videoRef.current;
+    if (!video) return;
+    const videoTimeMs = video.currentTime * 1000;
+    
     const currentCaptions = effectiveCaptions.filter(
-      caption => currentTime >= caption.startTime && currentTime <= caption.endTime
+      caption => videoTimeMs >= caption.startTime && videoTimeMs <= caption.endTime
     );
     
     // Check if hovering over any caption
@@ -312,9 +423,13 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   const handleCanvasRightClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     
-    // Find caption at current time
+    // Find caption at current time - use video time
+    const video = videoRef.current;
+    if (!video) return;
+    const videoTimeMs = video.currentTime * 1000;
+    
     const currentCaption = effectiveCaptions.find(
-      caption => currentTime >= caption.startTime && currentTime <= caption.endTime
+      caption => videoTimeMs >= caption.startTime && videoTimeMs <= caption.endTime
     );
     
     if (currentCaption) {
@@ -395,8 +510,9 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     const renderCaptionsOnCanvas = useCallback(() => {
       const canvas = canvasRef.current;
       const ctx = canvas?.getContext('2d');
+      const video = videoRef.current;
       
-      if (!canvas || !ctx) return;
+      if (!canvas || !ctx || !video) return;
       
       // Don't render if canvas doesn't have valid dimensions yet
       if (canvas.width === 0 || canvas.height === 0) return;
@@ -404,18 +520,21 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
       // Clear canvas
       ctx.clearRect(0, 0, canvas.width, canvas.height);
   
+      // Use actual video time (original time) for caption filtering
+      const videoTimeMs = video.currentTime * 1000;
+      
       // Render regular captions using Caption Styling
       const currentCaptions = effectiveCaptions.filter(
-        caption => currentTime >= caption.startTime && currentTime <= caption.endTime
+        caption => videoTimeMs >= caption.startTime && videoTimeMs <= caption.endTime
       );
   
       if (currentCaptions.length === 0) return;
   
-      // Render all captions using cached scale factor
+      // Render all captions using cached scale factor - use video time for rendering
       currentCaptions.forEach(caption => {
-        renderCaptionOnCanvas(ctx, caption, canvas.width, canvas.height, currentTime, scaleFactor);
+        renderCaptionOnCanvas(ctx, caption, canvas.width, canvas.height, videoTimeMs, scaleFactor);
       });
-    }, [effectiveCaptions, currentTime, effectiveSelectedId, scaleFactor]);
+    }, [effectiveCaptions, effectiveSelectedId, scaleFactor]);
 
   // Set up global mouse event listeners for dragging
   useEffect(() => {
@@ -501,12 +620,13 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     const video = videoRef.current;
     if (video) {
       const handleTimeUpdate = () => {
-        const currentTimeMs = video.currentTime * 1000;
+        const originalTimeMs = video.currentTime * 1000;
         
-        // Auto-skip over cut segments during playback
-        handleAutoSkip(currentTimeMs);
+        // Auto-skip over cut segments during playback (use original time for this check)
+        handleAutoSkip(originalTimeMs);
         
-        onTimeUpdate(currentTimeMs);
+        // Report original time to parent (consistent with new architecture)
+        onTimeUpdate(originalTimeMs);
         // Force canvas re-render will be handled by the renderCaptionsOnCanvas useEffect
       };
       
@@ -522,14 +642,20 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
       };
     }
     return undefined;
-  }, [onTimeUpdate, handleAutoSkip]);
+  }, [onTimeUpdate, handleAutoSkip, originalToEffectiveTime]);
 
   // Sync video time when currentTime prop changes (for seeking)
   useEffect(() => {
     const video = videoRef.current;
-    if (video && Math.abs(video.currentTime * 1000 - currentTime) > 100) {
-      // Only seek if the difference is significant (> 100ms) to avoid loops
-      video.currentTime = currentTime / 1000;
+    if (!video) return;
+    
+    // currentTime is now always original time, so we can use it directly
+    const videoTime = currentTime;
+    
+    // Use a larger threshold and debounce to prevent seek loops
+    if (Math.abs(video.currentTime * 1000 - videoTime) > 500) {
+      // Only seek if the difference is significant (> 500ms) to avoid loops
+      video.currentTime = videoTime / 1000;
     }
   }, [currentTime]);
 
@@ -646,9 +772,15 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    // Use actual video time (original time) for caption filtering
+    const video = videoRef.current;
+    if (!video) return;
+    
+    const videoTimeMs = video.currentTime * 1000;
+
     // Get all current captions (for potential overlapping)
     const currentCaptions = effectiveCaptions.filter(
-      caption => currentTime >= caption.startTime && currentTime <= caption.endTime
+      caption => videoTimeMs >= caption.startTime && videoTimeMs <= caption.endTime
     );
 
     if (currentCaptions.length === 0) return;
@@ -672,9 +804,9 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
         };
       }
       
-      renderCaptionOnCanvas(ctx, renderCaption, canvas.width, canvas.height, currentTime, scaleFactor);
+      renderCaptionOnCanvas(ctx, renderCaption, canvas.width, canvas.height, videoTimeMs, scaleFactor);
     });
-  }, [effectiveCaptions, currentTime, effectiveSelectedId, scaleFactor]);
+  }, [effectiveCaptions, effectiveSelectedId, scaleFactor]);
 
   // Force re-render when caption styles change - optimized
   useEffect(() => {
@@ -684,11 +816,16 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     }
   }, [effectiveCaptions.map(c => JSON.stringify(c.style)).join('|'), isDragging]); // Trigger when any style property changes
 
-  // Re-render when captions or time changes - but not during dragging
+  // Re-render when captions or time changes - but not during dragging (throttled)
   useEffect(() => {
     if (!isDragging) {
-      renderCaptionsOnCanvas();
+      const timeoutId = setTimeout(() => {
+        renderCaptionsOnCanvas();
+      }, 16); // Throttle to ~60fps for smooth rendering
+      
+      return () => clearTimeout(timeoutId);
     }
+    return undefined;
   }, [renderCaptionsOnCanvas, isDragging]);
 
   // CRITICAL: Force re-render when canvas dimensions change to fix font truncation
@@ -726,12 +863,12 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
           (window as any).setVideoPlaying(true);
         }
         
-        // Start frequent time updates during playback
+        // Start frequent time updates during playback (canvas rendering handled by useEffect)
         playbackInterval = setInterval(() => {
           if (!video.paused && !video.ended) {
             const currentTimeMs = video.currentTime * 1000;
             onTimeUpdate(currentTimeMs);
-            renderCaptionsOnCanvas();
+            // Canvas rendering is handled by renderCaptionsOnCanvas useEffect
           } else {
             if (playbackInterval) {
               clearInterval(playbackInterval);
@@ -842,17 +979,9 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
           replacementAudio.currentTime = video.currentTime;
         }
         
-        // Apply dynamic muting based on silenced/cut words
-        const currentTimeMs = video.currentTime * 1000;
-        const isMuted = shouldBeMuted(currentTimeMs);
-        
-        if (isMuted) {
-          replacementAudio.volume = 0;
-          video.volume = 0; // Also mute video audio
-        } else {
-          replacementAudio.volume = isAudioPreviewEnabled ? 1 : 0;
-          video.volume = isAudioPreviewEnabled ? 0 : 1;
-        }
+        // Maintain proper volume levels (no dynamic muting - only skip/jump)
+        replacementAudio.volume = isAudioPreviewEnabled ? 1 : 0;
+        video.volume = isAudioPreviewEnabled ? 0 : 1;
         
         syncTimeoutId = null;
       }, 16); // More frequent updates for precise control
@@ -895,30 +1024,20 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
         clearTimeout(syncTimeoutId);
       }
     };
-  }, [isAudioPreviewEnabled, replacementAudioPath, shouldBeMuted]); // Include dependencies for current state access
+  }, [isAudioPreviewEnabled, replacementAudioPath]); // Include dependencies for current state access
 
-  // Handle dynamic muting for original video audio when no replacement audio
+  // Ensure video audio is always at proper volume (no dynamic muting - only skip/jump)
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-
-    const handleVideoTimeUpdate = () => {
-      // Only apply muting when using original video audio (no replacement audio or preview disabled)
-      if (replacementAudioPath && isAudioPreviewEnabled) return;
-      
-      const currentTimeMs = video.currentTime * 1000;
-      const isMuted = shouldBeMuted(currentTimeMs);
-      
-      // Apply muting smoothly without jumping
-      video.volume = isMuted ? 0 : 1;
-    };
-
-    video.addEventListener('timeupdate', handleVideoTimeUpdate);
-
-    return () => {
-      video.removeEventListener('timeupdate', handleVideoTimeUpdate);
-    };
-  }, [replacementAudioPath, isAudioPreviewEnabled, shouldBeMuted]);
+    
+    // Set proper volume based on audio preview setting only
+    if (replacementAudioPath && isAudioPreviewEnabled) {
+      video.volume = 0; // Use replacement audio
+    } else {
+      video.volume = 1; // Use original video audio - ALWAYS audible
+    }
+  }, [replacementAudioPath, isAudioPreviewEnabled]);
 
   // Handle audio preview toggle - simplified for debugging
   useEffect(() => {
@@ -1240,11 +1359,9 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
             objectFit: 'contain',
             display: videoLoadError ? 'none' : 'block'
           }}
-          onTimeUpdate={(e) => {
-            const video = e.currentTarget;
-            const currentTimeMs = video.currentTime * 1000;
-            onTimeUpdate(currentTimeMs);
-            renderCaptionsOnCanvas();
+          onTimeUpdate={() => {
+            // This is handled by the useEffect timeupdate listener above
+            // Removing redundant call to prevent double rendering
           }}
           onSeeking={() => {
             // Force canvas re-render on seeking
@@ -1306,7 +1423,12 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
             maxWidth: '100%',
             maxHeight: '100%',
             objectFit: 'contain',
-            pointerEvents: effectiveCaptions.some(c => currentTime >= c.startTime && currentTime <= c.endTime) ? 'auto' : 'none',
+            pointerEvents: (() => {
+              const video = videoRef.current;
+              if (!video) return 'none';
+              const videoTimeMs = video.currentTime * 1000;
+              return effectiveCaptions.some(c => videoTimeMs >= c.startTime && videoTimeMs <= c.endTime) ? 'auto' : 'none';
+            })(),
             cursor: isDragging ? 'grabbing' : (isHoveringCaption ? 'grab' : 'default'),
             zIndex: 10,
             // Show canvas background when video fails to load
