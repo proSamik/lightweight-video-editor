@@ -122,7 +122,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
 
 
   // Timeline dimensions
-  const TIMELINE_HEIGHT = 160;
+  const TIMELINE_HEIGHT = 180;
   const CAPTION_TRACK_HEIGHT = 140;
 
   // Use video duration if available, otherwise fallback to caption duration
@@ -438,7 +438,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
     }}>
       {/* Timeline Controls */}
       <div style={{ 
-        height: '32px',
+        height: '40px',
         padding: '4px 8px',
         borderBottom: `1px solid ${theme.colors.border}`,
         display: 'flex',
@@ -489,7 +489,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                 minHeight: '20px'
               }}
             >
-              Preview with new audio
+              Replace Audio
             </Button>
           </div>
         )}
