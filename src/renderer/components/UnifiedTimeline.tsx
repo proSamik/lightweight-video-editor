@@ -313,7 +313,11 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
     
     // Helper function to check if a frame overlaps with deleted clips
     const isFrameInDeletedClip = (frameStartMs: number, frameEndMs: number): boolean => {
-      if (!localClipMode || !localClips?.length) return false;
+      if (!localClips?.length) return false;
+      
+      // Check if there are any removed clips
+      const hasRemovedClips = localClips.some(clip => clip?.isRemoved);
+      if (!hasRemovedClips) return false;
       
       const deletedClips = localClips.filter(clip => clip?.isRemoved);
       return deletedClips.some(clip => {
@@ -387,7 +391,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
     }
 
     return virtualCaptions.sort((a, b) => a.startTime - b.startTime);
-  }, [aiSubtitleData?.frames, localClipMode, localClips]);
+  }, [aiSubtitleData?.frames, localClips]);
 
   // Use AI-derived segments
   const effectiveCaptions = virtualCaptionsFromAI;
@@ -1572,18 +1576,8 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
               }).filter(Boolean)
             ) : (
               (() => {
-                // In subtitle mode with clips, filter segments that are within active clips
-                const activeClips = localClips.filter(clip => !clip.isRemoved);
-                
-                const visibleSegments = effectiveCaptions.filter(segment => {
-                  // Check if segment overlaps with any active clip
-                  const segmentOverlapsActiveClip = activeClips.some(clip => 
-                    segment.startTime < clip.endTime && segment.endTime > clip.startTime
-                  );
-                  
-                  // Skip segments that don't overlap with any active clips when clips exist
-                  return activeClips.length === 0 || segmentOverlapsActiveClip;
-                });
+                // In subtitle mode, use the already filtered segments from virtualCaptionsFromAI
+                const visibleSegments = effectiveCaptions;
 
                 // Assign tracks to avoid overlaps
                 const segmentsWithTracks = assignTracks(visibleSegments);
@@ -1592,7 +1586,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                   // Calculate position based on compressed timeline when clips exist
                   let left: number, width: number;
                   
-                  if (activeClips.length > 0) {
+                  if (localClips.length > 0) {
                     // Use compressed timeline - convert original times to effective times
                     const effectiveStartTime = originalToEffectiveTime(segment.startTime);
                     const effectiveEndTime = originalToEffectiveTime(segment.endTime);

@@ -7,7 +7,7 @@ import {
   WordEditState,
   VideoClip,
 } from '../../types';
-import { Copy, Edit3, Star, Hash, FileX, ChevronUp, ChevronDown } from 'lucide-react';
+import { Copy, Edit3, Hash, FileX, ChevronUp, ChevronDown } from 'lucide-react';
 import { formatTimeHHMMSS } from '../../utils/timeFormatting';
 
 interface AISubtitlesPanelProps {
@@ -132,11 +132,22 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
 
   // Filter subtitle frames based on clips (hide subtitles in removed clips)
   const filteredFrames = useMemo(() => {
-    if (!aiSubtitleData?.frames || !isClipMode || clips.length === 0) {
-      return aiSubtitleData?.frames || [];
+    if (!aiSubtitleData?.frames) {
+      return [];
     }
 
-    return aiSubtitleData.frames.filter(frame => {
+    // If no clips exist, return all frames
+    if (clips.length === 0) {
+      return aiSubtitleData.frames;
+    }
+
+    // Check if there are any removed clips
+    const hasRemovedClips = clips.some(clip => clip.isRemoved);
+    if (!hasRemovedClips) {
+      return aiSubtitleData.frames;
+    }
+
+    const filtered = aiSubtitleData.frames.filter(frame => {
       // Check if this frame overlaps with any removed clip
       const frameStartMs = frame.startTime * 1000;
       const frameEndMs = frame.endTime * 1000;
@@ -149,7 +160,9 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
       
       return !isInRemovedClip;
     });
-  }, [aiSubtitleData?.frames, isClipMode, clips]);
+    
+    return filtered;
+  }, [aiSubtitleData?.frames, clips]);
 
   // Utility function to ensure frames don't overlap
   const ensureNonOverlappingFrames = (frames: SubtitleFrame[]): SubtitleFrame[] => {
@@ -539,7 +552,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     e.stopPropagation();
 
     // Find the word and frame for seeking
-    const frame = aiSubtitleData?.frames.find(f => f.id === frameId);
+    const frame = renderFrames.find(f => f.id === frameId);
     const word = frame?.words.find(w => w.id === wordId);
 
     if (isShiftPressed) {
@@ -608,7 +621,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     }
     
     // Also seek to the start of the selected frame to sync with timeline
-    const frame = aiSubtitleData?.frames.find(f => f.id === frameId);
+    const frame = renderFrames.find(f => f.id === frameId);
     if (frame && onTimeSeek) {
       onTimeSeek(frame.startTime * 1000); // Convert seconds to milliseconds
     }
@@ -691,7 +704,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     if (!aiSubtitleData || wordIds.length < 2) return;
 
     // Find the frame containing these words
-    const frameWithWords = aiSubtitleData.frames.find(frame => 
+    const frameWithWords = renderFrames.find(frame => 
       wordIds.every(id => frame.words.some(w => w.id === id))
     );
 
@@ -751,7 +764,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     const targetWordIds = contextMenu.isMultiSelect ? Array.from(selectedWordIds) : [contextMenu.wordId];
     
     targetWordIds.forEach(wordId => {
-      const frame = aiSubtitleData.frames.find(f => f.words.some(w => w.id === wordId));
+      const frame = renderFrames.find(f => f.words.some(w => w.id === wordId));
       const word = frame?.words.find(w => w.id === wordId);
       
       if (!word) return;
@@ -886,7 +899,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
   const renderContextMenu = () => {
     if (!contextMenu.show) return null;
 
-    const word = aiSubtitleData?.frames
+    const word = renderFrames
       .find(f => f.id === contextMenu.frameId)?.words
       .find(w => w.id === contextMenu.wordId);
 
@@ -990,7 +1003,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
           fontSize: '12px', 
           color: theme.colors.textSecondary 
         }}>
-          {aiSubtitleData.frames.length} frames • Max {maxWordsPerFrame} words, {maxCharsPerFrame} chars per frame
+          {renderFrames.length} frames • Max {maxWordsPerFrame} words, {maxCharsPerFrame} chars per frame
         </p>
       </div>
 
