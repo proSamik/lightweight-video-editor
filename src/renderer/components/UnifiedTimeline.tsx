@@ -283,19 +283,22 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
     
     const virtualCaptions: DisplaySegment[] = [];
     
-    // Helper function to check if a frame overlaps with deleted clips
-    const isFrameInDeletedClip = (frameStartMs: number, frameEndMs: number): boolean => {
+    // Helper function to check if a frame is ENTIRELY within deleted clips
+    const isFrameEntirelyInDeletedClip = (frameStartMs: number, frameEndMs: number): boolean => {
       if (!localClips?.length) return false;
       
-      // Check if there are any removed clips
-      const hasRemovedClips = localClips.some(clip => clip?.isRemoved);
-      if (!hasRemovedClips) return false;
+      // Check if there are any active clips
+      const activeClips = localClips.filter(clip => !clip?.isRemoved);
+      if (activeClips.length === 0) return true; // All clips removed
       
-      const deletedClips = localClips.filter(clip => clip?.isRemoved);
-      return deletedClips.some(clip => {
+      // Check if the frame has ANY overlap with active clips
+      const hasOverlapWithActiveClip = activeClips.some(clip => {
         if (!clip || typeof clip.startTime !== 'number' || typeof clip.endTime !== 'number') return false;
         return frameStartMs < clip.endTime && frameEndMs > clip.startTime;
       });
+      
+      // If frame has no overlap with any active clip, it's entirely in deleted area
+      return !hasOverlapWithActiveClip;
     };
 
     // Process each frame safely
@@ -344,7 +347,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
       const frameStartMs = frameStartTime * 1000;
       const frameEndMs = frameEndTime * 1000;
       
-      if (isFrameInDeletedClip(frameStartMs, frameEndMs)) {
+      if (isFrameEntirelyInDeletedClip(frameStartMs, frameEndMs)) {
         continue;
       }
 
