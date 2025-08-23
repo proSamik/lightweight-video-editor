@@ -871,6 +871,7 @@ const AppContent: React.FC = () => {
       timeline: [], // Empty for now, could be used for timeline selections
       replacementAudioPath,
       extractedAudioPath, // Include the extracted audio path for waveforms
+      clips, // Include clips in project data
       lastModified: Date.now(),
       description: generatedContent?.description,
       title: generatedContent?.titles?.[0]?.title,
