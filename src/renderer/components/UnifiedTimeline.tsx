@@ -1541,7 +1541,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
               left: localClips.length > 0 
                 ? `${(originalToEffectiveTime(currentTime) / actualDuration) * 100}%`
                 : `${(currentTime / actualDuration) * 100}%`,
-              top: 0,
+              top: '20px',
               bottom: 0,
               width: '2px',
               backgroundColor: theme.colors.error,
@@ -1554,10 +1554,10 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
           <div
             style={{
               position: 'absolute',
-              top: '8px',
+              top: '40px', // Move items down to better utilize vertical space
               left: 0,
               right: 0,
-              bottom: '8px', // Use full height instead of fixed height
+              bottom: '20px', // Increase bottom margin to balance the top margin
               zIndex: 10
             }}
           >
@@ -1624,7 +1624,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                         position: 'absolute',
                         left: `${left}%`,
                         width: `${width}%`,
-                        top: 0, // Clips always on track 0
+                        top: '12px', // Move clips down to align with the new positioning
                         height: `${CAPTION_TRACK_HEIGHT}px`,
                         background: segmentBackgroundColor,
                         border: `2px solid ${segmentBorderColor}`,
@@ -1711,7 +1711,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                         position: 'absolute',
                         left: `${left}%`,
                         width: `${width}%`,
-                        top: `${track * (CAPTION_TRACK_HEIGHT + 5)}px`, // Use track for Y positioning
+                        top: `${12 + track * (CAPTION_TRACK_HEIGHT + 5)}px`, // Use track for Y positioning, offset by clip position
                         height: `${CAPTION_TRACK_HEIGHT}px`, // Fixed track height
                         background: segmentBackgroundColor,
                         border: `2px solid ${segmentBorderColor}`,
