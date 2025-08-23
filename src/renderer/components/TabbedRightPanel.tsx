@@ -23,7 +23,6 @@ interface TabbedRightPanelProps {
   audioPath?: string | null;
   // New: Clip editing support
   clips?: VideoClip[];
-  isClipMode?: boolean;
 }
 
 type TabType = 'styling' | 'aiSubtitles';
@@ -39,7 +38,6 @@ const TabbedRightPanel: React.FC<TabbedRightPanelProps> = ({
   videoPath,
   audioPath,
   clips = [],
-  isClipMode = false,
 }) => {
   const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState<TabType>('aiSubtitles');
@@ -115,7 +113,6 @@ const TabbedRightPanel: React.FC<TabbedRightPanelProps> = ({
             videoPath={videoPath}
             audioPath={audioPath}
             clips={clips}
-            isClipMode={isClipMode}
           />
         )}
       </div>

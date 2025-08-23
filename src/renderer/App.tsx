@@ -35,7 +35,7 @@ interface AppState {
   aiSubtitleData?: AISubtitleData | null;
   selectedFrameId?: string | null;
   clips?: VideoClip[];
-  isClipMode?: boolean;
+
 }
 
 const AppContent: React.FC = () => {
@@ -94,7 +94,6 @@ const AppContent: React.FC = () => {
 
   // Clip editing state
   const [clips, setClips] = useState<VideoClip[]>([]);
-  const [isClipMode, setIsClipMode] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1); // Shared zoom level between modes (1 = 100% base zoom)
   const clipManager = {
     initializeClips: (videoDurationMs: number): VideoClip[] => {
@@ -223,24 +222,11 @@ const AppContent: React.FC = () => {
     setCurrentProjectInfo(prev => ({ ...prev, isModified: true }));
   };
 
-  const handleClipModeChange = (newClipMode: boolean) => {
-    // Save current state to history before making changes
-    saveToHistory();
-    
-    setIsClipMode(newClipMode);
-    
-    // Initialize clips if entering clip mode and no clips exist
-    if (newClipMode && clips.length === 0 && videoFile?.duration) {
-      const initialClips = clipManager.initializeClips(videoFile.duration * 1000);
-      handleClipsChange(initialClips);
-    }
-    
-    // Don't save clip mode to localStorage - always default to subtitle mode on project load
-  };
+
 
   // Update current time to skip removed clips during playback
   const handleTimeUpdate = (newTime: number) => {
-    if (isClipMode && clips.length > 0) {
+    if (clips.length > 0) {
       // Check if current time is in a removed clip
       const isInRemovedClip = clipManager.isTimeInRemovedClip(clips, newTime);
       if (isInRemovedClip) {
@@ -255,7 +241,7 @@ const AppContent: React.FC = () => {
 
   // Handle time seeking with clip awareness
   const handleTimeSeek = (newTime: number) => {
-    if (isClipMode && clips.length > 0) {
+    if (clips.length > 0) {
       // Check if target time is in a removed clip
       const isInRemovedClip = clipManager.isTimeInRemovedClip(clips, newTime);
       if (isInRemovedClip) {
@@ -304,34 +290,10 @@ const AppContent: React.FC = () => {
     };
   }, [aiSubtitleData, clips]);
 
-  /**
-   * Get effective current time (original time in subtitle mode, effective time in clip mode)
-   */
-  const getEffectiveCurrentTime = useCallback((): number => {
-    if (!isClipMode || clips.length === 0) {
-      return currentTime; // Return original time in subtitle mode
-    }
-    
-    // Convert original time to effective time in clip mode
-    return clipManager.originalToEffectiveTime(clips, currentTime);
-  }, [currentTime, isClipMode, clips]);
-
-  /**
-   * Get effective duration (original duration in subtitle mode, effective duration in clip mode)
-   */
-  const getEffectiveDuration = useCallback((): number => {
-    if (!isClipMode || clips.length === 0) {
-      return videoFile?.duration ? videoFile.duration * 1000 : 60000; // Return original duration
-    }
-    
-    // Return effective duration in clip mode
-    return clipManager.calculateEffectiveDuration(clips);
-  }, [videoFile?.duration, isClipMode, clips]);
-
   // Initialize history and load project info
   useEffect(() => {
     // Initialize history with current state
-    const initialState = { aiSubtitleData: null, selectedFrameId: null, clips: [], isClipMode: false };
+    const initialState = { aiSubtitleData: null, selectedFrameId: null, clips: [] };
     setHistory([initialState]);
     setHistoryIndex(0);
 
@@ -344,8 +306,7 @@ const AppContent: React.FC = () => {
         setClips(parsedClips);
       }
       
-      // Always start in subtitle mode by default, regardless of saved state
-      setIsClipMode(false);
+      
     } catch (error) {
       console.error('Failed to load clips from localStorage:', error);
     }
@@ -375,7 +336,7 @@ const AppContent: React.FC = () => {
 
   // Save state to history
   const saveToHistory = () => {
-    const currentState = { aiSubtitleData, selectedFrameId, clips, isClipMode };
+    const currentState = { aiSubtitleData, selectedFrameId, clips };
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push(currentState);
     setHistory(newHistory);
@@ -409,7 +370,6 @@ const AppContent: React.FC = () => {
       setAiSubtitleData(state.aiSubtitleData || null);
       setSelectedFrameId(state.selectedFrameId || null);
       setClips(state.clips || []); // Restore clips
-      setIsClipMode(state.isClipMode || false); // Restore clip mode
       setHistoryIndex(newIndex);
     }
   };
@@ -421,7 +381,6 @@ const AppContent: React.FC = () => {
       setAiSubtitleData(state.aiSubtitleData || null);
       setSelectedFrameId(state.selectedFrameId || null);
       setClips(state.clips || []); // Restore clips
-      setIsClipMode(state.isClipMode || false); // Restore clip mode
       setHistoryIndex(newIndex);
     }
   };
@@ -937,7 +896,6 @@ const AppContent: React.FC = () => {
       // Clear localStorage after successful save
       try {
         localStorage.removeItem('tempClips');
-        localStorage.removeItem('tempIsClipMode');
       } catch (error) {
         console.error('Failed to clear localStorage:', error);
       }
@@ -984,18 +942,16 @@ const AppContent: React.FC = () => {
       setCurrentTime(0);
       setGeneratedContent(null);
       setClips([]); // Reset clips
-      setIsClipMode(false); // Reset clip mode
       
       // Clear localStorage
       try {
         localStorage.removeItem('tempClips');
-        localStorage.removeItem('tempIsClipMode');
       } catch (error) {
         console.error('Failed to clear localStorage:', error);
       }
       
       // Reset history
-      setHistory([{ aiSubtitleData: null, selectedFrameId: null, clips: [], isClipMode: false }]);
+      setHistory([{ aiSubtitleData: null, selectedFrameId: null, clips: [] }]);
       setHistoryIndex(0);
       
       // Update project info
@@ -1147,7 +1103,6 @@ const AppContent: React.FC = () => {
     // Clear localStorage when loading a project
     try {
       localStorage.removeItem('tempClips');
-      localStorage.removeItem('tempIsClipMode');
     } catch (error) {
       console.error('Failed to clear localStorage:', error);
     }
@@ -1208,20 +1163,9 @@ const AppContent: React.FC = () => {
 
 
   const handlePlayPause = () => {
-    if ((window as any).videoPlayPause) {
-      (window as any).videoPlayPause();
-    }
-    // Note: isPlaying state will be updated by the video's play/pause events
+    setIsPlaying(prev => !prev);
   };
 
-  // Setup video play state listener
-  useEffect(() => {
-    (window as any).setVideoPlaying = setIsPlaying;
-    
-    return () => {
-      delete (window as any).setVideoPlaying;
-    };
-  }, []);
 
   const handleAudioImport = async () => {
     if (!videoFile) {
@@ -1615,7 +1559,6 @@ const AppContent: React.FC = () => {
                   onTimeUpdate={handleTimeUpdate}
                   onTimeSeek={handleTimeSeek}
                   onVideoSelect={handleVideoSelect}
-                  onVideoDropped={handleVideoDropped}
                   onPlayPause={handlePlayPause}
                   isPlaying={isPlaying}
                   replacementAudioPath={replacementAudioPath}
@@ -1625,7 +1568,6 @@ const AppContent: React.FC = () => {
                   onFrameSelect={setSelectedFrameId}
                   onAISubtitleUpdate={handleAISubtitleUpdate}
                   clips={clips}
-                  isClipMode={isClipMode}
                 />
                 
                 {/* Unified Timeline - Only show when video is loaded and data is ready */}
@@ -1647,8 +1589,7 @@ const AppContent: React.FC = () => {
                   onFrameSelect={setSelectedFrameId}
                   clips={clips}
                   onClipsChange={handleClipsChange}
-                  onClipModeChange={handleClipModeChange}
-                  isClipMode={isClipMode}
+          
                   zoomLevel={zoomLevel}
                   onZoomChange={setZoomLevel}
                 />
@@ -1679,7 +1620,6 @@ const AppContent: React.FC = () => {
                   videoPath={videoFile?.path || null}
                   audioPath={replacementAudioPath || extractedAudioPath || null}
                   clips={clips}
-                  isClipMode={isClipMode}
                 />
               </Card>
             </>
@@ -1698,13 +1638,11 @@ const AppContent: React.FC = () => {
                 onTimeUpdate={handleTimeUpdate}
                 onTimeSeek={handleTimeSeek}
                 onVideoSelect={handleVideoSelect}
-                onVideoDropped={handleVideoDropped}
                 onPlayPause={handlePlayPause}
                 isPlaying={isPlaying}
                 replacementAudioPath={replacementAudioPath}
                 isAudioPreviewEnabled={isAudioPreviewEnabled}
                 clips={clips}
-                isClipMode={isClipMode}
               />
             </div>
           )}

@@ -23,7 +23,6 @@ interface AISubtitlesPanelProps {
   audioPath?: string | null;
   // New: Clip editing support
   clips?: VideoClip[];
-  isClipMode?: boolean;
 }
 
 interface WordContextMenu {
@@ -48,7 +47,6 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
   videoPath,
   audioPath,
   clips = [],
-  isClipMode = false,
 }) => {
   const { theme } = useTheme();
   const [internalAiSubtitleData, setInternalAiSubtitleData] = useState<AISubtitleData | null>(null);
@@ -89,7 +87,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
 
   // Convert original time to effective time (accounting for removed clips)
   const convertToEffectiveTime = useCallback((originalTimeSeconds: number): number => {
-    if (!isClipMode || !clips?.length) return originalTimeSeconds;
+    if (!clips?.length) return originalTimeSeconds;
     
     const originalTimeMs = originalTimeSeconds * 1000;
     let effectiveTimeMs = originalTimeMs;
@@ -103,11 +101,11 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     }
     
     return Math.max(0, effectiveTimeMs / 1000);
-  }, [isClipMode, clips]);
+  }, [clips]);
 
   // Convert effective time back to original time (for finding frames in original timeline)
   const convertToOriginalTime = useCallback((effectiveTimeSeconds: number): number => {
-    if (!isClipMode || !clips?.length) return effectiveTimeSeconds;
+    if (!clips?.length) return effectiveTimeSeconds;
     
     const effectiveTimeMs = effectiveTimeSeconds * 1000;
     let originalTimeMs = effectiveTimeMs;
@@ -128,7 +126,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     }
     
     return originalTimeMs / 1000;
-  }, [isClipMode, clips]);
+  }, [clips]);
 
   // Filter subtitle frames based on clips (hide subtitles in removed clips)
   const filteredFrames = useMemo(() => {

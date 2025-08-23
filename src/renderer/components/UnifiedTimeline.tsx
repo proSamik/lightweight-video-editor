@@ -36,8 +36,6 @@ interface UnifiedTimelineProps {
   // New: Clip editing support
   clips?: VideoClip[];
   onClipsChange?: (clips: VideoClip[]) => void;
-  onClipModeChange?: (isClipMode: boolean) => void;
-  isClipMode?: boolean;
   // Shared zoom state
   zoomLevel?: number;
   onZoomChange?: (level: number) => void;
@@ -65,8 +63,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   onFrameSelect,
   clips = [],
   onClipsChange,
-  onClipModeChange,
-  isClipMode = false,
+
   zoomLevel = 0,
   onZoomChange,
 }) => {
@@ -85,17 +82,14 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   const [deleteConfirm, setDeleteConfirm] = useState<{segmentId: string, text: string} | null>(null);
 
   // Clip editing state
-  const [localClipMode, setLocalClipMode] = useState(isClipMode);
   const [localClips, setLocalClips] = useState<VideoClip[]>(clips);
 
   // Update local state when props change
   useEffect(() => {
-    setLocalClipMode(isClipMode);
-  }, [isClipMode]);
-
-  useEffect(() => {
     setLocalClips(clips);
   }, [clips]);
+
+
 
   /**
    * Initialize clips if none exist and we're in clip mode
@@ -113,6 +107,13 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
       onClipsChange?.(newClips);
     }
   }, [localClips.length, videoFile?.duration, onClipsChange]);
+
+  // Always initialize clips if none exist - ensure we always show unified timeline
+  useEffect(() => {
+    if (localClips.length === 0 && videoFile?.duration) {
+      initializeClips();
+    }
+  }, [localClips.length, videoFile?.duration, initializeClips]);
 
   /**
    * Calculate effective duration (excluding removed clips) - always use clips as source of truth
@@ -176,53 +177,19 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   }, [localClips]);
 
   /**
-   * Handle clip mode toggle
+   * Initialize clips if needed
    */
-  const handleClipModeToggle = useCallback(() => {
-    // Capture current playhead viewport ratio so we can restore scroll after toggle
-    if (timelineContainerRef.current && timelineRef.current) {
-      const container = timelineContainerRef.current;
-      const containerWidth = container.offsetWidth;
-      const scrollLeft = container.scrollLeft;
-      const currentTimelineWidth = timelineRef.current.offsetWidth;
-
-      // Calculate actual duration for this calculation
-      const currentActualDuration = localClipMode ? effectiveDuration : (
-        videoFile?.duration 
-          ? videoFile.duration * 1000
-          : 60000
-      );
-
-      // Determine displayed timeline time base depending on current mode
-      const displayedTime = localClipMode
-        ? originalToEffectiveTime(currentTime) // currently in clips -> timeline uses effective time
-        : currentTime; // in subtitles -> timeline uses original time
-
-      const playheadPixelPosition = (displayedTime / currentActualDuration) * currentTimelineWidth;
-
-      let viewportRatioLocal: number;
-      if (currentTimelineWidth <= containerWidth) {
-        viewportRatioLocal = playheadPixelPosition / containerWidth;
-      } else {
-        viewportRatioLocal = Math.max(0, Math.min(1, (playheadPixelPosition - scrollLeft) / containerWidth));
-      }
-      setPlayheadViewportRatio(viewportRatioLocal);
-    }
-
-    const newClipMode = !localClipMode;
-    setLocalClipMode(newClipMode);
-    onClipModeChange?.(newClipMode);
-    
-    if (newClipMode) {
+  const initializeClipsIfNeeded = useCallback(() => {
+    if (localClips.length === 0) {
       initializeClips();
     }
-  }, [localClipMode, onClipModeChange, initializeClips, currentTime, originalToEffectiveTime, effectiveDuration, videoFile?.duration]);
+  }, [localClips.length, initializeClips]);
 
   /**
    * Split clip at current playhead position
    */
   const handleSplitClip = useCallback(() => {
-    if (!localClipMode || localClips.length === 0) return;
+    if (localClips.length === 0) return;
 
     const currentTimeMs = currentTime;
     const clipToSplit = localClips.find(clip => 
@@ -259,13 +226,13 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
 
     setLocalClips(newClips);
     onClipsChange?.(newClips);
-  }, [localClipMode, localClips, currentTime, onClipsChange]);
+  }, [localClips, currentTime, onClipsChange]);
 
   /**
    * Delete clip at current playhead position
    */
   const handleDeleteClip = useCallback(() => {
-    if (!localClipMode || localClips.length === 0) return;
+    if (localClips.length === 0) return;
 
     const currentTimeMs = currentTime;
     const clipToDelete = localClips.find(clip => 
@@ -297,7 +264,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
     
     // Move playhead to the previous clip's end
     onTimeSeek?.(previousClipEnd);
-  }, [localClipMode, localClips, currentTime, onClipsChange, onTimeSeek]);
+  }, [localClips, currentTime, onClipsChange, onTimeSeek]);
 
   // Convert AI subtitle frames to virtual caption segments for timeline display
   type DisplaySegment = { id: string; startTime: number; endTime: number; text: string; style: SubtitleStyle };
@@ -438,36 +405,40 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   // Timeline dimensions - dynamic based on content
   const CONTROL_HEIGHT = 40;
   const RULER_HEIGHT = 30;
-  const CAPTION_TRACK_HEIGHT = 45; // Height per track/row
+  const CAPTION_TRACK_HEIGHT = 30; // Reduced height per track/row for better compactness
   const MIN_TIMELINE_HEIGHT = 200;
   const MAX_TIMELINE_HEIGHT = 600;
   
-  // Calculate timeline height (moved to useMemo to ensure proper dependency tracking)
+  // Calculate timeline height for unified layout
   const TIMELINE_HEIGHT = useMemo(() => {
-    if (localClipMode) {
-      // In clip mode, use simple layout for now
-      return Math.min(Math.max(2 * CAPTION_TRACK_HEIGHT + 100, MIN_TIMELINE_HEIGHT), MAX_TIMELINE_HEIGHT);
+    // Calculate tracks needed for subtitles
+    let subtitleTracks = 0;
+    
+    // Always show subtitles that overlap with active clips (or all subtitles if no clips)
+    const activeClips = localClips.filter(clip => !clip.isRemoved);
+    let overlappingSubtitles;
+    
+    if (activeClips.length === 0) {
+      // No active clips - show all subtitles
+      overlappingSubtitles = effectiveCaptions;
     } else {
-      // In subtitle mode, calculate based on actual track assignment
-      const activeClips = localClips.filter(clip => !clip.isRemoved);
-      const visibleSegments = effectiveCaptions.filter(segment => {
-        if (activeClips.length === 0) return true;
+      // Show subtitles that overlap with active clips
+      overlappingSubtitles = effectiveCaptions.filter(segment => {
         return activeClips.some(clip => 
           segment.startTime < clip.endTime && segment.endTime > clip.startTime
         );
       });
-      
-      if (visibleSegments.length === 0) {
-        return MIN_TIMELINE_HEIGHT;
-      }
-      
-      const segmentsWithTracks = assignTracks(visibleSegments);
-      const maxTrack = Math.max(...segmentsWithTracks.map(s => s.track), 0);
-      const tracksNeeded = maxTrack + 1;
-      
-      return Math.min(Math.max(tracksNeeded * (CAPTION_TRACK_HEIGHT + 5) + 50, MIN_TIMELINE_HEIGHT), MAX_TIMELINE_HEIGHT);
     }
-  }, [localClipMode, localClips, effectiveCaptions, assignTracks]);
+    
+    const segmentsWithTracks = assignTracks(overlappingSubtitles);
+    subtitleTracks = Math.max(...segmentsWithTracks.map(s => s.track), 0) + 1;
+    
+    // Clips always use 1 track, subtitles use their calculated tracks
+    const totalTracks = subtitleTracks + 1; // Always reserve space for clips
+    const totalHeight = totalTracks * (CAPTION_TRACK_HEIGHT + 5) + 50;
+    
+    return Math.min(Math.max(totalHeight, MIN_TIMELINE_HEIGHT), MAX_TIMELINE_HEIGHT);
+  }, [localClips, effectiveCaptions, assignTracks]);
   
   const TIMELINE_CONTENT_HEIGHT = TIMELINE_HEIGHT - CONTROL_HEIGHT - RULER_HEIGHT;
 
@@ -486,7 +457,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   // Force re-render of time display when mode changes
   useEffect(() => {
     // This effect ensures the time display updates immediately when mode changes
-  }, [localClipMode, currentTime, actualDuration]);
+  }, [localClips, currentTime, actualDuration]);
 
   /**
    * Calculate adaptive zoom multiplier based on video duration
@@ -587,7 +558,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
     
     let seekTime: number;
     
-    if (localClipMode && localClips.length > 0) {
+    if (localClips.length > 0) {
       // In clip mode: convert effective timeline position to original video time
       const effectiveTime = percentage * actualDuration;
       seekTime = effectiveToOriginalTime(effectiveTime);
@@ -612,7 +583,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
     
     let seekTime: number;
     
-    if (localClipMode && localClips.length > 0) {
+    if (localClips.length > 0) {
       // In clip mode: convert effective timeline position to original video time
       const effectiveTime = percentage * actualDuration;
       seekTime = effectiveToOriginalTime(effectiveTime);
@@ -622,7 +593,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
     }
     
     onTimeSeek(seekTime);
-  }, [isDragging, actualDuration, onTimeSeek, localClipMode, localClips, effectiveToOriginalTime]);
+  }, [isDragging, actualDuration, onTimeSeek, localClips, effectiveToOriginalTime]);
 
   /**
    * Handle timeline mouse up to stop dragging
@@ -664,7 +635,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
       }
 
       // Clip editing shortcuts - only active in clip mode
-      if (localClipMode) {
+      if (localClips.length > 0) {
         if ((e.metaKey || e.ctrlKey) && e.key === 's') {
           e.preventDefault();
           handleSplitClip();
@@ -691,7 +662,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('click', handleClick);
     };
-  }, [onPlayPause, onUndo, onRedo, canUndo, canRedo, contextMenu, localClipMode, handleSplitClip, handleDeleteClip]);
+  }, [onPlayPause, onUndo, onRedo, canUndo, canRedo, contextMenu, localClips, handleSplitClip, handleDeleteClip]);
 
   /**
    * Update container width when timeline container changes
@@ -759,8 +730,8 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
       
       // Normal auto-scroll behavior for playback (not zoom)
       if (zoomLevel > 1) {
-        // Use appropriate time based on mode
-        const timeForPosition = localClipMode && localClips.length > 0 
+        // Use appropriate time based on clips
+        const timeForPosition = localClips.length > 0 
           ? originalToEffectiveTime(currentTime) 
           : currentTime;
         const playheadPosition = (timeForPosition / actualDuration) * timeline.offsetWidth;
@@ -787,7 +758,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
         }
       }
     }
-  }, [currentTime, actualDuration, zoomLevel, playheadViewportRatio, localClipMode, originalToEffectiveTime]);
+  }, [currentTime, actualDuration, zoomLevel, playheadViewportRatio, originalToEffectiveTime]);
 
   /**
    * Store playhead viewport position before zoom changes
@@ -800,8 +771,8 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
       
       // Use current zoom level for accurate position calculation
       const currentTimelineWidth = timelineRef.current.offsetWidth;
-      // Use appropriate time based on mode
-      const timeForPosition = localClipMode && localClips.length > 0 
+      // Use appropriate time based on clips
+      const timeForPosition = localClips.length > 0 
         ? originalToEffectiveTime(currentTime) 
         : currentTime;
       const playheadPixelPosition = (timeForPosition / actualDuration) * currentTimelineWidth;
@@ -865,7 +836,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   // Update selected frame when playhead enters a new segment (debounced to prevent race conditions)
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      if (localClipMode) {
+      if (localClips.length > 0) {
         // In clip mode, find the clip at current time
         if (!localClips.length || !onFrameSelect) return;
         const currentTimeMs = currentTime;
@@ -887,7 +858,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
     }, 100); // 100ms debounce to prevent rapid-fire selection changes
 
     return () => clearTimeout(timeoutId);
-  }, [currentTime, aiSubtitleData?.frames, onFrameSelect, localClipMode, localClips, selectedFrameId, virtualCaptionsFromAI]);
+  }, [currentTime, aiSubtitleData?.frames, onFrameSelect, localClips, selectedFrameId, virtualCaptionsFromAI]);
 
   return (
     <div style={{ 
@@ -913,69 +884,41 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
       }}>
         {/* Time Display */}
         <div 
-          key={`time-display-${localClipMode}`}
+          key={`time-display-${localClips.length > 0}`}
           style={{ 
             fontSize: '11px', 
             color: theme.colors.textSecondary,
             fontWeight: '500'
           }}
         >
-          {localClipMode && localClips.length > 0 
+          {localClips.length > 0 
             ? `${formatTime(originalToEffectiveTime(currentTime))} / ${formatTime(displayDuration)}`
             : `${formatTime(currentTime)} / ${formatTime(displayDuration)}`
           }
         </div>
 
-        {/* Mode Toggle: Subtitle | Clips */}
+        {/* Unified Timeline Controls */}
         <div style={{ 
           display: 'flex', 
           alignItems: 'center', 
-          gap: '2px',
+          gap: '4px',
           background: theme.colors.surface,
           border: `1px solid ${theme.colors.border}`,
           borderRadius: '4px',
-          padding: '2px'
+          padding: '4px 8px',
+          fontSize: '10px',
+          color: theme.colors.textSecondary
         }}>
-          <button
-            onClick={() => handleClipModeToggle()}
-            style={{
-              padding: '4px 8px',
-              fontSize: '10px',
-              fontWeight: '500',
-              backgroundColor: !localClipMode ? theme.colors.primary : 'transparent',
-              color: !localClipMode ? theme.colors.primaryForeground : theme.colors.textSecondary,
-              border: 'none',
-              borderRadius: '3px',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-              minWidth: '60px'
-            }}
-            title="Subtitle Mode"
-          >
-            Subtitle
-          </button>
-          <button
-            onClick={() => handleClipModeToggle()}
-            style={{
-              padding: '4px 8px',
-              fontSize: '10px',
-              fontWeight: '500',
-              backgroundColor: localClipMode ? theme.colors.primary : 'transparent',
-              color: localClipMode ? theme.colors.primaryForeground : theme.colors.textSecondary,
-              border: 'none',
-              borderRadius: '3px',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-              minWidth: '60px'
-            }}
-            title="Clip Mode"
-          >
-            Clips
-          </button>
+          <span>Unified Timeline</span>
+          {localClips.length > 0 && (
+            <span style={{ color: theme.colors.primary }}>
+              • {localClips.filter(c => !c.isRemoved).length} Active Clips
+            </span>
+          )}
         </div>
 
-        {/* Clip Editing Controls - Only show in clip mode */}
-        {localClipMode && (
+        {/* Clip Editing Controls - Only show when clips exist */}
+        {localClips.length > 0 && (
           <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
             {/* Split Clip Button */}
             <button
@@ -1458,7 +1401,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
           ref={timelineRef}
           style={{
             minHeight: `${TIMELINE_CONTENT_HEIGHT - 20}px`,
-            height: localClipMode ? 'auto' : `${Math.max(effectiveCaptions.length * 15 + 100, TIMELINE_CONTENT_HEIGHT - 20)}px`, // Dynamic height for many segments
+            height: `${TIMELINE_CONTENT_HEIGHT}px`, // Use calculated timeline height
             position: 'relative',
             cursor: isDragging ? 'grabbing' : 'pointer',
             background: theme.colors.background,
@@ -1473,7 +1416,9 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
           <div
             style={{
               position: 'absolute',
-              left: `${(localClipMode && localClips.length > 0 ? (originalToEffectiveTime(currentTime) / actualDuration) : (currentTime / actualDuration)) * 100}%`,
+              left: localClips.length > 0 
+                ? `${(originalToEffectiveTime(currentTime) / actualDuration) * 100}%`
+                : `${(currentTime / actualDuration) * 100}%`,
               top: 0,
               bottom: 0,
               width: '2px',
@@ -1494,111 +1439,138 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
               zIndex: 10
             }}
           >
-            {localClipMode ? (
-              localClips.map((clip, index) => {
-                // Calculate effective position for clips
-                const effectiveStartTime = originalToEffectiveTime(clip.startTime);
-                const effectiveEndTime = originalToEffectiveTime(clip.endTime);
-                const left = (effectiveStartTime / actualDuration) * 100;
-                const width = ((effectiveEndTime - effectiveStartTime) / actualDuration) * 100;
-                const isSelected = clip.id === selectedFrameId;
-                
-                // Use consistent blue border color for all segments
-                const segmentBorderColor = isSelected 
-                  ? theme.colors.primary 
-                  : clip.isRemoved 
-                    ? theme.colors.error 
+            {/* Unified Timeline: Clips and Subtitles together */}
+            {(() => {
+              const allSegments: Array<{type: 'clip', data: VideoClip, index: number} | {type: 'subtitle', data: any, track: number}> = [];
+              
+              // Add only active clips as segments (always on track 0)
+              const activeClipsForDisplay = localClips.filter(clip => !clip.isRemoved);
+              activeClipsForDisplay.forEach((clip, displayIndex) => {
+                // Find original index in full clips array for display purposes
+                const originalIndex = localClips.findIndex(c => c.id === clip.id);
+                allSegments.push({ type: 'clip', data: clip, index: originalIndex });
+              });
+              
+                             // Add subtitle segments with proper track assignment
+               // Always show subtitles that overlap with active clips (or all subtitles if no clips)
+               const activeClips = localClips.filter(clip => !clip.isRemoved);
+               let overlappingSubtitles;
+               
+               if (activeClips.length === 0) {
+                 // No active clips - show all subtitles
+                 overlappingSubtitles = effectiveCaptions;
+               } else {
+                 // Show subtitles that overlap with active clips
+                 overlappingSubtitles = effectiveCaptions.filter(segment => {
+                   return activeClips.some(clip => 
+                     segment.startTime < clip.endTime && segment.endTime > clip.startTime
+                   );
+                 });
+               }
+               
+               const segmentsWithTracks = assignTracks(overlappingSubtitles);
+               segmentsWithTracks.forEach(({ segment, track }) => {
+                 allSegments.push({ type: 'subtitle', data: segment, track: track + 1 }); // Offset by 1 to leave space for clips
+               });
+              
+              return allSegments.map((segment, globalIndex) => {
+                if (segment.type === 'clip') {
+                  const clip = segment.data;
+                  const index = segment.index;
+                  
+                  // Calculate effective position for clips
+                  const effectiveStartTime = originalToEffectiveTime(clip.startTime);
+                  const effectiveEndTime = originalToEffectiveTime(clip.endTime);
+                  const left = (effectiveStartTime / actualDuration) * 100;
+                  const width = ((effectiveEndTime - effectiveStartTime) / actualDuration) * 100;
+                  const isSelected = clip.id === selectedFrameId;
+                  
+                  // Use consistent blue border color for all segments (removed clips not shown)
+                  const segmentBorderColor = isSelected 
+                    ? theme.colors.primary 
                     : theme.colors.secondary;
-                
-                const segmentBackgroundColor = isSelected 
-                  ? theme.colors.secondary 
-                  : clip.isRemoved 
-                    ? theme.colors.error + '20' // Semi-transparent error color
+                  
+                  const segmentBackgroundColor = isSelected 
+                    ? theme.colors.secondary 
                     : theme.colors.surface;
-                
-                return (
-                  <div
-                    key={clip.id}
-                    data-segment-id={clip.id}
-                    style={{
-                      position: 'absolute',
-                      left: `${left}%`,
-                      width: `${width}%`,
-                      top: 0,
-                      height: '100%',
-                      background: segmentBackgroundColor,
-                      border: `2px solid ${segmentBorderColor}`,
-                      borderRadius: '4px',
-                      padding: '4px 6px',
-                      fontSize: '11px',
-                      color: isSelected ? theme.colors.primaryForeground : theme.colors.text,
-                      cursor: 'pointer',
-                      overflow: 'hidden',
-                      display: 'flex',
-                      alignItems: 'center',
-                      transition: 'all 0.2s ease',
-                      minWidth: '2px',
-                      opacity: clip.isRemoved ? 0.6 : 1,
-                      textDecoration: clip.isRemoved ? 'line-through' : 'none'
-                    }}
-                    onClick={() => handleSegmentClick(clip)}
-                    onDoubleClick={() => handleSegmentDoubleClick(clip)}
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      setContextMenu({
-                        x: e.clientX,
-                        y: e.clientY,
-                        segmentId: clip.id
-                      });
-                    }}
-                    title={`Clip ${index + 1}: ${formatTime(clip.startTime)} - ${formatTime(clip.endTime)}${clip.isRemoved ? ' (Removed)' : ''}`}
-                  >
-                    <div style={{
-                      width: '100%',
-                      height: '100%',
-                      overflow: 'hidden',
-                      display: 'flex',
-                      alignItems: 'center',
-                      fontSize: '10px',
-                      lineHeight: '1.2',
-                      justifyContent: 'center'
-                    }}>
+                  
+                  return (
+                    <div
+                      key={`clip-${clip.id}`}
+                      data-segment-id={clip.id}
+                      style={{
+                        position: 'absolute',
+                        left: `${left}%`,
+                        width: `${width}%`,
+                        top: 0, // Clips always on track 0
+                        height: `${CAPTION_TRACK_HEIGHT}px`,
+                        background: segmentBackgroundColor,
+                        border: `2px solid ${segmentBorderColor}`,
+                        borderRadius: '4px',
+                        padding: '2px 4px',
+                        fontSize: '10px',
+                        color: isSelected ? theme.colors.primaryForeground : theme.colors.text,
+                        cursor: 'pointer',
+                        overflow: 'hidden',
+                        display: 'flex',
+                        alignItems: 'center',
+                        transition: 'all 0.2s ease',
+                        minWidth: '2px',
+                        zIndex: 20 // Clips on top
+                      }}
+                      onClick={() => handleSegmentClick(clip)}
+                      onDoubleClick={() => handleSegmentDoubleClick(clip)}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        setContextMenu({
+                          x: e.clientX,
+                          y: e.clientY,
+                          segmentId: clip.id
+                        });
+                      }}
+                      title={`Clip ${index + 1}: ${formatTime(clip.startTime)} - ${formatTime(clip.endTime)}`}
+                    >
                       <div style={{
-                        textAlign: 'center',
-                        width: '100%'
+                        width: '100%',
+                        height: '100%',
+                        overflow: 'hidden',
+                        display: 'flex',
+                        alignItems: 'center',
+                        fontSize: '9px',
+                        lineHeight: '1.2',
+                        justifyContent: 'center'
                       }}>
-                        Clip {index + 1}
-                        {clip.isRemoved && <span style={{ color: theme.colors.error }}> (×)</span>}
+                        <div style={{
+                          textAlign: 'center',
+                          width: '100%'
+                        }}>
+                          Clip {index + 1}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              }).filter(Boolean)
-            ) : (
-              (() => {
-                // In subtitle mode, use the already filtered segments from virtualCaptionsFromAI
-                const visibleSegments = effectiveCaptions;
-
-                // Assign tracks to avoid overlaps
-                const segmentsWithTracks = assignTracks(visibleSegments);
-
-                return segmentsWithTracks.map(({ segment, track }) => {
+                  );
+                } else {
+                  // Subtitle segment
+                  const subtitle = segment.data;
+                  const track = segment.track;
+                  
                   // Calculate position based on compressed timeline when clips exist
                   let left: number, width: number;
                   
+                  // Always use effective time positioning when clips exist
                   if (localClips.length > 0) {
                     // Use compressed timeline - convert original times to effective times
-                    const effectiveStartTime = originalToEffectiveTime(segment.startTime);
-                    const effectiveEndTime = originalToEffectiveTime(segment.endTime);
+                    const effectiveStartTime = originalToEffectiveTime(subtitle.startTime);
+                    const effectiveEndTime = originalToEffectiveTime(subtitle.endTime);
                     left = (effectiveStartTime / actualDuration) * 100;
                     width = ((effectiveEndTime - effectiveStartTime) / actualDuration) * 100;
                   } else {
                     // No clips - use original timeline
-                    left = (segment.startTime / actualDuration) * 100;
-                    width = ((segment.endTime - segment.startTime) / actualDuration) * 100;
+                    left = (subtitle.startTime / actualDuration) * 100;
+                    width = ((subtitle.endTime - subtitle.startTime) / actualDuration) * 100;
                   }
                   
-                  const isSelected = segment.id === effectiveSelectedId;
+                  const isSelected = subtitle.id === effectiveSelectedId;
                   
                   // Use consistent blue border color for all segments
                   const segmentBorderColor = isSelected 
@@ -1608,70 +1580,71 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                   const segmentBackgroundColor = isSelected 
                     ? theme.colors.secondary 
                     : theme.colors.surface;
-                
-                return (
-                  <div
-                    key={segment.id}
-                    data-segment-id={segment.id}
-                    style={{
-                      position: 'absolute',
-                      left: `${left}%`,
-                      width: `${width}%`,
-                      top: `${track * (CAPTION_TRACK_HEIGHT + 5)}px`, // Use track for Y positioning
-                      height: `${CAPTION_TRACK_HEIGHT}px`, // Fixed track height
-                      background: segmentBackgroundColor,
-                      border: `2px solid ${segmentBorderColor}`,
-                      borderRadius: '4px',
-                      padding: '4px 6px',
-                      fontSize: '11px',
-                      color: isSelected ? theme.colors.primaryForeground : theme.colors.text,
-                      cursor: 'pointer',
-                      overflow: 'hidden',
-                      display: 'flex',
-                      alignItems: 'center',
-                      transition: 'all 0.2s ease',
-                      minWidth: '2px'
-                    }}
-                    onClick={() => handleSegmentClick(segment)}
-                    onDoubleClick={() => handleSegmentDoubleClick(segment)}
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      setContextMenu({
-                        x: e.clientX,
-                        y: e.clientY,
-                        segmentId: segment.id
-                      });
-                    }}
-                    title={segment.text}
-                  >
-                    <div style={{
-                      width: '100%',
-                      height: '100%',
-                      overflow: 'hidden',
-                      display: 'flex',
-                      alignItems: 'center',
-                      fontSize: '10px',
-                      lineHeight: '1.2',
-                      textDecoration: segment.style?.burnInSubtitles === false ? 'line-through' : 'none',
-                      opacity: segment.style?.burnInSubtitles === false ? 0.6 : 1
-                    }}>
-                      <div style={{
-                        wordBreak: 'break-word',
+                  
+                  return (
+                    <div
+                      key={`subtitle-${subtitle.id}`}
+                      data-segment-id={subtitle.id}
+                      style={{
+                        position: 'absolute',
+                        left: `${left}%`,
+                        width: `${width}%`,
+                        top: `${track * (CAPTION_TRACK_HEIGHT + 5)}px`, // Use track for Y positioning
+                        height: `${CAPTION_TRACK_HEIGHT}px`, // Fixed track height
+                        background: segmentBackgroundColor,
+                        border: `2px solid ${segmentBorderColor}`,
+                        borderRadius: '4px',
+                        padding: '2px 4px',
+                        fontSize: '10px',
+                        color: isSelected ? theme.colors.primaryForeground : theme.colors.text,
+                        cursor: 'pointer',
                         overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        display: '-webkit-box',
-                        WebkitLineClamp: 3,
-                        WebkitBoxOrient: 'vertical',
-                        width: '100%'
+                        display: 'flex',
+                        alignItems: 'center',
+                        transition: 'all 0.2s ease',
+                        minWidth: '2px',
+                        zIndex: 10 // Subtitles below clips
+                      }}
+                      onClick={() => handleSegmentClick(subtitle)}
+                      onDoubleClick={() => handleSegmentDoubleClick(subtitle)}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        setContextMenu({
+                          x: e.clientX,
+                          y: e.clientY,
+                          segmentId: subtitle.id
+                        });
+                      }}
+                      title={subtitle.text}
+                    >
+                      <div style={{
+                        width: '100%',
+                        height: '100%',
+                        overflow: 'hidden',
+                        display: 'flex',
+                        alignItems: 'center',
+                        fontSize: '9px',
+                        lineHeight: '1.2',
+                        textDecoration: subtitle.style?.burnInSubtitles === false ? 'line-through' : 'none',
+                        opacity: subtitle.style?.burnInSubtitles === false ? 0.6 : 1
                       }}>
-                        {segment.text}
+                        <div style={{
+                          wordBreak: 'break-word',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          width: '100%'
+                        }}>
+                          {subtitle.text}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
+                  );
+                }
               });
-              })()
-            )}
+            })()}
           </div>
         </div>
       </div>
