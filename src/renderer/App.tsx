@@ -1402,16 +1402,17 @@ const AppContent: React.FC = () => {
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
               }}>
-                {currentProjectInfo.projectName.replace(/\.lvep$/, '')}
                 {currentProjectInfo.isModified && (
                   <span style={{ 
                     color: theme.colors.primary,
                     fontSize: theme.typography.fontSize.xs,
-                    fontWeight: theme.typography.fontWeight.bold 
+                    fontWeight: theme.typography.fontWeight.bold,
+                    marginRight: '4px'
                   }}>
                     ●
                   </span>
                 )}
+                {currentProjectInfo.projectName.replace(/\.lvep$/, '')}
               </div>
               </Card>
             </div>
