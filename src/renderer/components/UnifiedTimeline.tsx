@@ -140,18 +140,23 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
     const activeClips = localClips.filter(clip => !clip.isRemoved);
     if (activeClips.length === 0) return 0;
 
+    // Clamp effective time to valid range to prevent seeking beyond clips
+    const maxEffectiveTime = activeClips.reduce((total, clip) => total + (clip.endTime - clip.startTime), 0);
+    const clampedEffectiveTime = Math.max(0, Math.min(effectiveTime, maxEffectiveTime));
+
     let accumulatedTime = 0;
     for (const clip of activeClips) {
       const clipDuration = clip.endTime - clip.startTime;
-      if (effectiveTime <= accumulatedTime + clipDuration) {
+      if (clampedEffectiveTime <= accumulatedTime + clipDuration) {
         // Time falls within this clip
-        const timeWithinClip = effectiveTime - accumulatedTime;
+        const timeWithinClip = clampedEffectiveTime - accumulatedTime;
         return clip.startTime + timeWithinClip;
       }
       accumulatedTime += clipDuration;
     }
 
-    return activeClips[activeClips.length - 1]?.endTime || 0;
+    // If we reach here, return the start of the last clip (safer than end)
+    return activeClips[activeClips.length - 1]?.startTime || 0;
   }, [localClips]);
 
   /**
@@ -562,6 +567,34 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
       // In clip mode: convert effective timeline position to original video time
       const effectiveTime = percentage * actualDuration;
       seekTime = effectiveToOriginalTime(effectiveTime);
+      
+      // Additional safety: ensure seekTime is within an active clip
+      const activeClips = localClips.filter(clip => !clip.isRemoved);
+      const isInActiveClip = activeClips.some(clip => 
+        seekTime >= clip.startTime && seekTime <= clip.endTime
+      );
+      
+      if (!isInActiveClip && activeClips.length > 0) {
+        // Find the closest active clip
+        const closestClip = activeClips.reduce((closest, clip) => {
+          const currentDistance = Math.min(
+            Math.abs(seekTime - clip.startTime),
+            Math.abs(seekTime - clip.endTime)
+          );
+          const closestDistance = Math.min(
+            Math.abs(seekTime - closest.startTime),
+            Math.abs(seekTime - closest.endTime)
+          );
+          return currentDistance < closestDistance ? clip : closest;
+        });
+        
+        // Seek to the closest point within the closest clip
+        if (seekTime < closestClip.startTime) {
+          seekTime = closestClip.startTime;
+        } else if (seekTime > closestClip.endTime) {
+          seekTime = closestClip.endTime;
+        }
+      }
     } else {
       // In subtitle mode: direct conversion since timeline shows original time
       seekTime = percentage * actualDuration;
@@ -587,6 +620,34 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
       // In clip mode: convert effective timeline position to original video time
       const effectiveTime = percentage * actualDuration;
       seekTime = effectiveToOriginalTime(effectiveTime);
+      
+      // Additional safety: ensure seekTime is within an active clip
+      const activeClips = localClips.filter(clip => !clip.isRemoved);
+      const isInActiveClip = activeClips.some(clip => 
+        seekTime >= clip.startTime && seekTime <= clip.endTime
+      );
+      
+      if (!isInActiveClip && activeClips.length > 0) {
+        // Find the closest active clip
+        const closestClip = activeClips.reduce((closest, clip) => {
+          const currentDistance = Math.min(
+            Math.abs(seekTime - clip.startTime),
+            Math.abs(seekTime - clip.endTime)
+          );
+          const closestDistance = Math.min(
+            Math.abs(seekTime - closest.startTime),
+            Math.abs(seekTime - closest.endTime)
+          );
+          return currentDistance < closestDistance ? clip : closest;
+        });
+        
+        // Seek to the closest point within the closest clip
+        if (seekTime < closestClip.startTime) {
+          seekTime = closestClip.startTime;
+        } else if (seekTime > closestClip.endTime) {
+          seekTime = closestClip.endTime;
+        }
+      }
     } else {
       // In subtitle mode: direct conversion since timeline shows original time
       seekTime = percentage * actualDuration;
