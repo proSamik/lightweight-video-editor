@@ -752,12 +752,20 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
 
   // Store the relative playhead position within viewport when zoom changes
   const [playheadViewportRatio, setPlayheadViewportRatio] = React.useState<number | null>(null);
+  const [preventAutoScroll, setPreventAutoScroll] = React.useState(false);
+  
+  // Prevent auto-scroll temporarily when clips change
+  useEffect(() => {
+    setPreventAutoScroll(true);
+    const timer = setTimeout(() => setPreventAutoScroll(false), 100);
+    return () => clearTimeout(timer);
+  }, [localClips]);
   
   /**
    * Auto-scroll timeline to maintain playhead position during zoom
    */
   useEffect(() => {
-    if (timelineContainerRef.current && timelineRef.current && zoomLevel > 0.1) {
+    if (timelineContainerRef.current && timelineRef.current && zoomLevel > 0.1 && !preventAutoScroll) {
       const container = timelineContainerRef.current;
       const timeline = timelineRef.current;
       const containerWidth = container.offsetWidth;
@@ -822,7 +830,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
         }
       }
     }
-  }, [currentTime, actualDuration, zoomLevel, playheadViewportRatio, originalToEffectiveTime]);
+  }, [currentTime, actualDuration, zoomLevel, playheadViewportRatio, localClips, preventAutoScroll]);
 
   /**
    * Store playhead viewport position before zoom changes
