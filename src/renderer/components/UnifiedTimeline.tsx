@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
-import { AISubtitleData, SubtitleFrame, SubtitleStyle, VideoClip, ClipTimelineData } from '../../types';
+import { AISubtitleData, SubtitleStyle, VideoClip } from '../../types';
 import { useTheme } from '../contexts/ThemeContext';
 import { Button } from './ui';
 import { 
@@ -12,9 +12,7 @@ import {
   FiTrash2,
   FiMaximize2,
   FiCheck,
-  FiSquare,
   FiScissors,
-  FiX
 } from 'react-icons/fi';
 
 interface UnifiedTimelineProps {
@@ -181,15 +179,6 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
 
     return effectiveTime;
   }, [localClips]);
-
-  /**
-   * Initialize clips if needed
-   */
-  const initializeClipsIfNeeded = useCallback(() => {
-    if (localClips.length === 0) {
-      initializeClips();
-    }
-  }, [localClips.length, initializeClips]);
 
   /**
    * Split clip at current playhead position
@@ -412,11 +401,11 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   }, []);
 
   // Timeline dimensions - dynamic based on content
-  const CONTROL_HEIGHT = 40;
-  const RULER_HEIGHT = 30;
-  const CAPTION_TRACK_HEIGHT = 30; // Reduced height per track/row for better compactness
-  const MIN_TIMELINE_HEIGHT = 200;
-  const MAX_TIMELINE_HEIGHT = 600;
+  const CONTROL_HEIGHT = 40; // Increased to accommodate controls properly
+  const RULER_HEIGHT = 25; // Reduced to minimize whitespace
+  const CAPTION_TRACK_HEIGHT = 25; // Reduced height per track/row for better compactness
+  const MIN_TIMELINE_HEIGHT = 150; // Reduced minimum height
+  const MAX_TIMELINE_HEIGHT = 300; // Reduced maximum height
   
   // Calculate timeline height for unified layout
   const TIMELINE_HEIGHT = useMemo(() => {
@@ -444,7 +433,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
     
     // Clips always use 1 track, subtitles use their calculated tracks
     const totalTracks = subtitleTracks + 1; // Always reserve space for clips
-    const totalHeight = totalTracks * (CAPTION_TRACK_HEIGHT + 5) + 50;
+    const totalHeight = totalTracks * (CAPTION_TRACK_HEIGHT + 1); // Minimal spacing
     
     return Math.min(Math.max(totalHeight, MIN_TIMELINE_HEIGHT), MAX_TIMELINE_HEIGHT);
   }, [localClips, effectiveCaptions, assignTracks]);
@@ -489,10 +478,10 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
     }
   };
 
-  // Use consistent zoom multiplier based on original video duration only
-  // This ensures zoom behavior is the same regardless of clip mode
-  const baselineDuration = videoFile?.duration ? videoFile.duration * 1000 : 60000;
-  const zoomMultiplier = getZoomMultiplier(baselineDuration);
+  // Use zoom multiplier based on actual timeline duration (clips or original video)
+  // This ensures zoom behavior adapts to the actual content being displayed
+  const timelineDuration = localClips.length > 0 ? effectiveDuration : (videoFile?.duration ? videoFile.duration * 1000 : 60000);
+  const zoomMultiplier = getZoomMultiplier(timelineDuration);
 
   /**
    * Format time display in MM:SS.ms format
@@ -892,13 +881,12 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
       borderRadius: '4px',
       overflow: 'hidden',
       display: 'flex',
-      flexDirection: 'column',
-      paddingBottom: '10px'
+      flexDirection: 'column'
     }}>
       {/* Timeline Controls */}
       <div style={{ 
-        height: '40px',
-        padding: '4px 8px',
+        height: `${CONTROL_HEIGHT}px`,
+        padding: '6px 8px',
         borderBottom: `1px solid ${theme.colors.border}`,
         display: 'flex',
         alignItems: 'center',
@@ -1376,7 +1364,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
       <div 
         ref={rulerRef}
         style={{
-          height: '30px',
+          height: `${RULER_HEIGHT}px`,
           position: 'relative',
           background: `linear-gradient(180deg, ${theme.colors.surface} 0%, ${theme.colors.background} 100%)`,
           borderBottom: `1px solid ${theme.colors.border}`,
@@ -1405,9 +1393,9 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
             // Calculate time intervals based on zoom level and prevent overlapping
             const getTimeInterval = (zoom: number, containerWidth: number, timelineWidth: number): number => {
               // Adjust minimum width based on duration format
-              const minLabelWidth = actualDuration < 60000 ? 30 : // "30s" format
-                                   actualDuration < 3600000 ? 50 : // "5:30" format  
-                                   70; // "1:23:45" format
+              const minLabelWidth = actualDuration < 60000 ? 40 : // "30s" format
+                                   actualDuration < 3600000 ? 60 : // "5:30" format  
+                                   80; // "1:23:45" format
               
               // Calculate the actual timeline width considering zoom
               const effectiveTimelineWidth = timelineWidth || containerWidth;
@@ -1420,6 +1408,16 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
               
               // Define nice intervals in milliseconds
               const niceIntervals = [250, 500, 1000, 2000, 5000, 10000, 15000, 30000, 60000, 120000, 300000, 600000];
+              
+              // For very short durations, use fixed intervals to prevent repetition
+              if (duration < 10000) {
+                // For videos under 10 seconds, use fixed intervals based on duration
+                if (duration <= 5000) {
+                  return 1000; // 1 second intervals for videos under 5 seconds
+                } else if (duration <= 10000) {
+                  return 2000; // 2 second intervals for videos 5-10 seconds
+                }
+              }
               
               // Find the smallest nice interval that's larger than our minimum
               let selectedInterval = niceIntervals.find(interval => interval >= minIntervalMs);
@@ -1439,11 +1437,71 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
               : actualDuration;
               
             const interval = getTimeInterval(zoomLevel, containerWidth, timelineWidth);
+            
+            // Use the calculated interval directly - no artificial limits
+            const effectiveInterval = interval;
             const ticks = [];
 
-            // Generate time ticks with better spacing
-            for (let time = 0; time <= duration; time += interval) {
+            // Generate time ticks for the entire duration - no artificial limits
+            const maxTicks = Math.floor(duration / effectiveInterval) + 1;
+            
+            for (let i = 0; i < maxTicks; i++) {
+              const time = i * effectiveInterval;
+              if (time > duration) break;
+              
               const percentage = (time / duration) * 100;
+              
+              // Always include the final tick at the end of the video
+              if (i === maxTicks - 1 && time < duration) {
+                const finalTime = duration;
+                const finalPercentage = (finalTime / duration) * 100;
+                
+                ticks.push(
+                  <div key={`final-${finalTime}`} style={{ position: 'absolute', left: `${finalPercentage}%`, bottom: 0, height: '100%' }}>
+                    <div
+                      style={{
+                        position: 'absolute',
+                        bottom: 0,
+                        width: '1px',
+                        height: '50%',
+                        backgroundColor: theme.colors.textSecondary,
+                        opacity: 0.7,
+                      }}
+                    />
+                    <div
+                      style={{
+                        position: 'absolute',
+                        bottom: '8px',
+                        left: actualDuration < 60000 ? '-15px' : // "30s" format
+                              actualDuration < 3600000 ? '-25px' : // "5:30" format
+                              '-35px', // "1:23:45" format
+                        width: actualDuration < 60000 ? '30px' : // "30s" format
+                               actualDuration < 3600000 ? '50px' : // "5:30" format  
+                               '70px', // "1:23:45" format
+                        fontSize: '10px',
+                        color: theme.colors.textSecondary,
+                        textAlign: 'center',
+                        fontFamily: 'system-ui, -apple-system, sans-serif',
+                        fontWeight: '400',
+                        whiteSpace: 'nowrap',
+                        userSelect: 'none',
+                      }}
+                    >
+                      {(() => {
+                        if (actualDuration < 60000) {
+                          return `${Math.floor(finalTime / 1000)}s`;
+                        } else if (actualDuration < 3600000) {
+                          const minutes = Math.floor(finalTime / 60000);
+                          const seconds = Math.floor((finalTime % 60000) / 1000);
+                          return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                        } else {
+                          return formatTime(finalTime);
+                        }
+                      })()}
+                    </div>
+                  </div>
+                );
+              }
               
               ticks.push(
                 <div key={time} style={{ position: 'absolute', left: `${percentage}%`, bottom: 0, height: '100%' }}>
@@ -1462,7 +1520,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                   <div
                     style={{
                       position: 'absolute',
-                      bottom: '15px',
+                      bottom: '8px',
                       left: actualDuration < 60000 ? '-15px' : // "30s" format
                             actualDuration < 3600000 ? '-25px' : // "5:30" format
                             '-35px', // "1:23:45" format
@@ -1475,6 +1533,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                       fontFamily: 'system-ui, -apple-system, sans-serif',
                       fontWeight: '400',
                       whiteSpace: 'nowrap',
+                      userSelect: 'none', // Prevent text selection during dragging
                     }}
                   >
                         {(() => {
@@ -1510,7 +1569,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
           position: 'relative',
           background: theme.colors.background,
           overflowX: 'auto',
-          overflowY: 'auto', // Enable Y-scrolling
+          overflowY: 'hidden', // Disable Y-scrolling to fit content
         }}
         onScroll={(e) => {
           // Sync scroll with ruler
@@ -1522,7 +1581,6 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
         <div 
           ref={timelineRef}
           style={{
-            minHeight: `${TIMELINE_CONTENT_HEIGHT - 20}px`,
             height: `${TIMELINE_CONTENT_HEIGHT}px`, // Use calculated timeline height
             position: 'relative',
             cursor: isDragging ? 'grabbing' : 'pointer',
@@ -1541,8 +1599,8 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
               left: localClips.length > 0 
                 ? `${(originalToEffectiveTime(currentTime) / actualDuration) * 100}%`
                 : `${(currentTime / actualDuration) * 100}%`,
-              top: '20px',
-              bottom: 0,
+              top: '2px',
+              bottom: '2px',
               width: '2px',
               backgroundColor: theme.colors.error,
               zIndex: 100,
@@ -1554,10 +1612,10 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
           <div
             style={{
               position: 'absolute',
-              top: '40px', // Move items down to better utilize vertical space
+              top: '0px', // Minimal top margin
               left: 0,
               right: 0,
-              bottom: '20px', // Increase bottom margin to balance the top margin
+              bottom: '0px', // Minimal bottom margin
               zIndex: 10
             }}
           >
@@ -1624,7 +1682,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                         position: 'absolute',
                         left: `${left}%`,
                         width: `${width}%`,
-                        top: '12px', // Move clips down to align with the new positioning
+                        top: '0px', // Align clips to the top of the segment area
                         height: `${CAPTION_TRACK_HEIGHT}px`,
                         background: segmentBackgroundColor,
                         border: `2px solid ${segmentBorderColor}`,
@@ -1711,7 +1769,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                         position: 'absolute',
                         left: `${left}%`,
                         width: `${width}%`,
-                        top: `${12 + track * (CAPTION_TRACK_HEIGHT + 5)}px`, // Use track for Y positioning, offset by clip position
+                        top: `${4 + track * (CAPTION_TRACK_HEIGHT)}px`, // Use track for Y positioning, offset by clip position
                         height: `${CAPTION_TRACK_HEIGHT}px`, // Fixed track height
                         background: segmentBackgroundColor,
                         border: `2px solid ${segmentBorderColor}`,
