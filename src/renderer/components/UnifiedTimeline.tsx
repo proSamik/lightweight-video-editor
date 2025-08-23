@@ -75,6 +75,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   const { theme } = useTheme();
   const timelineRef = useRef<HTMLDivElement>(null);
   const timelineContainerRef = useRef<HTMLDivElement>(null);
+  const rulerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isAudioPreviewEnabled, setIsAudioPreviewEnabled] = useState(true); // Default to enabled when replacement audio is loaded
 
@@ -502,56 +503,6 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
     const seconds = Math.floor(totalSeconds % 60);
     const milliseconds = Math.floor((ms % 1000) / 10);
     return `${minutes}:${seconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(2, '0')}`;
-  };
-
-  /**
-   * Format time for ruler display (simplified)
-   */
-  const formatRulerTime = (ms: number): string => {
-    const minutes = Math.floor(ms / 60000);
-    const seconds = Math.floor((ms % 60000) / 1000);
-    if (minutes > 0) {
-      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    }
-    return `${seconds}s`;
-  };
-
-  /**
-   * Generate time markers for the ruler
-   */
-  const generateTimeMarkers = (): Array<{time: number, label: string, isMajor: boolean}> => {
-    const markers: Array<{time: number, label: string, isMajor: boolean}> = [];
-    const duration = displayDuration;
-    
-    // Determine marker interval based on zoom and duration
-    let majorInterval: number; // in milliseconds
-    let minorInterval: number;
-    
-    if (duration <= 30000) { // 30 seconds or less
-      majorInterval = 5000; // 5 seconds
-      minorInterval = 1000; // 1 second
-    } else if (duration <= 300000) { // 5 minutes or less
-      majorInterval = 30000; // 30 seconds
-      minorInterval = 5000; // 5 seconds
-    } else if (duration <= 1800000) { // 30 minutes or less
-      majorInterval = 60000; // 1 minute
-      minorInterval = 15000; // 15 seconds
-    } else {
-      majorInterval = 300000; // 5 minutes
-      minorInterval = 60000; // 1 minute
-    }
-
-    // Generate markers
-    for (let time = 0; time <= duration; time += minorInterval) {
-      const isMajor = time % majorInterval === 0;
-      markers.push({
-        time,
-        label: isMajor ? formatRulerTime(time) : '',
-        isMajor
-      });
-    }
-
-    return markers;
   };
 
   /**
@@ -1421,40 +1372,133 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
         </div>
       </div>
 
-      {/* Timeline Ruler */}
-      <div style={{
-        height: `${RULER_HEIGHT}px`,
-        borderBottom: `1px solid ${theme.colors.border}`,
-        background: theme.colors.surface,
-        position: 'relative',
-        overflow: 'hidden'
-      }}>
-        <div style={{
-          width: `${Math.max(100 * (zoomLevel * zoomMultiplier), 100)}%`,
-          height: '100%',
+      {/* Time Ruler */}
+      <div 
+        ref={rulerRef}
+        style={{
+          height: '30px',
           position: 'relative',
-          marginLeft: '10px',
-        }}>
-          {generateTimeMarkers().map((marker, index) => (
-            <div
-              key={index}
-              style={{
-                position: 'absolute',
-                left: `${(marker.time / displayDuration) * 100}%`,
-                top: 0,
-                height: '100%',
-                borderLeft: `1px solid ${marker.isMajor ? theme.colors.border : theme.colors.surfaceHover}`,
-                fontSize: '10px',
-                color: theme.colors.textSecondary,
-                paddingLeft: '2px',
-                paddingTop: '2px',
-                pointerEvents: 'none',
-                zIndex: 1
-              }}
-            >
-              {marker.label}
-            </div>
-          ))}
+          background: `linear-gradient(180deg, ${theme.colors.surface} 0%, ${theme.colors.background} 100%)`,
+          borderBottom: `1px solid ${theme.colors.border}`,
+          overflowX: 'auto',
+          overflowY: 'hidden',
+          scrollbarWidth: 'none', // Firefox
+          msOverflowStyle: 'none', // IE/Edge
+        }}
+        onScroll={(e) => {
+          // Sync scroll with main timeline
+          if (timelineContainerRef.current && timelineContainerRef.current.scrollLeft !== e.currentTarget.scrollLeft) {
+            timelineContainerRef.current.scrollLeft = e.currentTarget.scrollLeft;
+          }
+        }}
+      >
+        <div
+          style={{
+            width: `${Math.max(100 * (zoomLevel * zoomMultiplier), 100)}%`,
+            minWidth: '100%',
+            height: '100%',
+            position: 'relative',
+            marginLeft: '10px',
+          }}
+        >
+          {(() => {
+            // Calculate time intervals based on zoom level and prevent overlapping
+            const getTimeInterval = (zoom: number, containerWidth: number, timelineWidth: number): number => {
+              // Adjust minimum width based on duration format
+              const minLabelWidth = actualDuration < 60000 ? 30 : // "30s" format
+                                   actualDuration < 3600000 ? 50 : // "5:30" format  
+                                   70; // "1:23:45" format
+              
+              // Calculate the actual timeline width considering zoom
+              const effectiveTimelineWidth = timelineWidth || containerWidth;
+              
+              // Calculate how much space we have per millisecond of duration
+              const pixelsPerMs = effectiveTimelineWidth / duration;
+              
+              // Calculate minimum interval needed to prevent overlapping
+              const minIntervalMs = minLabelWidth / pixelsPerMs;
+              
+              // Define nice intervals in milliseconds
+              const niceIntervals = [250, 500, 1000, 2000, 5000, 10000, 15000, 30000, 60000, 120000, 300000, 600000];
+              
+              // Find the smallest nice interval that's larger than our minimum
+              let selectedInterval = niceIntervals.find(interval => interval >= minIntervalMs);
+              
+              // If no interval works, use the largest one
+              if (!selectedInterval) {
+                selectedInterval = niceIntervals[niceIntervals.length - 1];
+              }
+              
+              return selectedInterval;
+            };
+
+            const containerWidth = timelineContainerRef.current?.offsetWidth || 1000;
+            const timelineWidth = timelineRef.current?.offsetWidth || containerWidth;
+            const duration = localClips.length > 0 
+              ? localClips.filter(clip => !clip.isRemoved).reduce((total, clip) => total + (clip.endTime - clip.startTime), 0)
+              : actualDuration;
+              
+            const interval = getTimeInterval(zoomLevel, containerWidth, timelineWidth);
+            const ticks = [];
+
+            // Generate time ticks with better spacing
+            for (let time = 0; time <= duration; time += interval) {
+              const percentage = (time / duration) * 100;
+              
+              ticks.push(
+                <div key={time} style={{ position: 'absolute', left: `${percentage}%`, bottom: 0, height: '100%' }}>
+                  {/* Tick mark - aligned to bottom like reference */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      width: '1px',
+                      height: '50%',
+                      backgroundColor: theme.colors.textSecondary,
+                      opacity: 0.7,
+                    }}
+                  />
+                  {/* Time label for all ticks */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      bottom: '15px',
+                      left: actualDuration < 60000 ? '-15px' : // "30s" format
+                            actualDuration < 3600000 ? '-25px' : // "5:30" format
+                            '-35px', // "1:23:45" format
+                      width: actualDuration < 60000 ? '30px' : // "30s" format
+                             actualDuration < 3600000 ? '50px' : // "5:30" format  
+                             '70px', // "1:23:45" format
+                      fontSize: '10px',
+                      color: theme.colors.textSecondary,
+                      textAlign: 'center',
+                      fontFamily: 'system-ui, -apple-system, sans-serif',
+                      fontWeight: '400',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                        {(() => {
+                          // Use shorter format for smaller durations to save space
+                          if (actualDuration < 60000) {
+                            // Under 1 minute: show "0s", "5s", "10s"
+                            return `${Math.floor(time / 1000)}s`;
+                          } else if (actualDuration < 3600000) {
+                            // Under 1 hour: show "0:05", "0:10", "1:30"
+                            const minutes = Math.floor(time / 60000);
+                            const seconds = Math.floor((time % 60000) / 1000);
+                            return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                          } else {
+                            // Full format: "0:05:30", "1:23:45"
+                            return formatTime(time);
+                          }
+                        })()}
+                  </div>
+                </div>
+              );
+            }
+
+            return ticks;
+          })()}
         </div>
       </div>
 
@@ -1467,6 +1511,12 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
           background: theme.colors.background,
           overflowX: 'auto',
           overflowY: 'auto', // Enable Y-scrolling
+        }}
+        onScroll={(e) => {
+          // Sync scroll with ruler
+          if (rulerRef.current && rulerRef.current.scrollLeft !== e.currentTarget.scrollLeft) {
+            rulerRef.current.scrollLeft = e.currentTarget.scrollLeft;
+          }
         }}
       >
         <div 
