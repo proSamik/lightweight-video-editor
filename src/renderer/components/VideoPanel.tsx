@@ -140,30 +140,24 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
 
       if (visibleWords.length === 0) return; // Skip frames with no visible words
 
-      // Convert frame times to virtual times using clips
+      // Keep frame times as original times (VideoPanel now works with original time)
       const frameStartMs = frame.startTime * 1000;
       const frameEndMs = frame.endTime * 1000;
-      
-      // Convert to virtual timing using clips
-      const virtualStartTime = clips.length > 0 ? originalToEffectiveTime(frameStartMs) : frameStartMs;
-      const virtualEndTime = clips.length > 0 ? originalToEffectiveTime(frameEndMs) : frameEndMs;
 
-      // Create virtual caption segment with proper timing
+      // Create caption segment with original timing
       const virtualCaption: DisplaySegment = {
         id: frame.id,
-        startTime: virtualStartTime,
-        endTime: virtualEndTime,
+        startTime: frameStartMs,
+        endTime: frameEndMs,
         text: visibleWords.map((w: any) => w.word).join(' '),
         words: visibleWords.map((word: any) => {
           const wordStartMs = word.start * 1000;
           const wordEndMs = word.end * 1000;
-          const virtualWordStart = clips.length > 0 ? originalToEffectiveTime(wordStartMs) : wordStartMs;
-          const virtualWordEnd = clips.length > 0 ? originalToEffectiveTime(wordEndMs) : wordEndMs;
           
           return {
             word: word.word,
-            start: virtualWordStart,
-            end: virtualWordEnd,
+            start: wordStartMs,
+            end: wordEndMs,
             editState: word.editState // Include edit state for rendering decisions
           };
         }),
@@ -174,7 +168,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     });
 
     return virtualCaptions.sort((a, b) => a.startTime - b.startTime);
-  }, [aiSubtitleData, clips, originalToEffectiveTime]);
+  }, [aiSubtitleData]);
 
   // Use AI-derived captions if available, otherwise use regular captions
   const effectiveCaptions = virtualCaptionsFromAI;
@@ -631,7 +625,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
       };
     }
     return undefined;
-  }, [onTimeUpdate, handleAutoSkip, originalToEffectiveTime, clips.length]);
+  }, [onTimeUpdate, handleAutoSkip, clips.length]);
 
   // Sync video time when currentTime prop changes (for seeking)
   useEffect(() => {
@@ -1021,7 +1015,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
         clearTimeout(syncTimeoutId);
       }
     };
-  }, [isAudioPreviewEnabled, replacementAudioPath, clips, originalToEffectiveTime]); // Include dependencies for current state access
+  }, [isAudioPreviewEnabled, replacementAudioPath, clips]); // Include dependencies for current state access
 
   // Ensure video audio is always at proper volume
   useEffect(() => {
