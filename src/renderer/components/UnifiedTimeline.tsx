@@ -29,6 +29,7 @@ interface UnifiedTimelineProps {
   onAudioPreviewToggle?: (enabled: boolean) => void;
   // AI Subtitle support - when available, use instead of captions
   aiSubtitleData?: AISubtitleData | null;
+  onAISubtitleUpdate?: (data: AISubtitleData) => void;
   selectedFrameId?: string | null;
   onFrameSelect?: (frameId: string) => void;
   // New: Clip editing support
@@ -65,6 +66,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   replacementAudioPath,
   onAudioPreviewToggle,
   aiSubtitleData,
+  onAISubtitleUpdate,
   selectedFrameId,
   onFrameSelect,
   clips = [],
@@ -189,6 +191,99 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   }, [localClips]);
 
   /**
+   * Handle subtitle frame splitting when clips are split
+   * Similar to AI Subtitle Editor's handleFrameSplit but triggered by clip splitting
+   */
+  const handleSubtitleFrameSplitting = useCallback((splitTimeMs: number) => {
+    if (!aiSubtitleData || !onAISubtitleUpdate) return;
+    
+    const splitTimeSeconds = splitTimeMs / 1000;
+    
+    // Find frames that span the split point
+    const framesToSplit = aiSubtitleData.frames.filter(frame => {
+      return frame.startTime < splitTimeSeconds && frame.endTime > splitTimeSeconds;
+    });
+    
+    if (framesToSplit.length === 0) return;
+    
+    const updatedFrames = [...aiSubtitleData.frames];
+    
+    for (const frameToSplit of framesToSplit) {
+      const frameIndex = updatedFrames.findIndex(f => f.id === frameToSplit.id);
+      if (frameIndex === -1) continue;
+      
+      // Find the word that corresponds to the split time
+      const wordsBeforeSplit = frameToSplit.words.filter(word => word.end <= splitTimeSeconds);
+      const wordsAfterSplit = frameToSplit.words.filter(word => word.start >= splitTimeSeconds);
+      
+      // Handle overlap: if no words clearly fall after split, find the word that spans the split
+      let wordsAfterSplitAdjusted = wordsAfterSplit;
+      if (wordsAfterSplit.length === 0) {
+        // Find the word that spans the split point
+        const spanningWord = frameToSplit.words.find(word => 
+          word.start < splitTimeSeconds && word.end > splitTimeSeconds
+        );
+        if (spanningWord) {
+          // Include the spanning word in both halves (overlap behavior)
+          wordsBeforeSplit.push(spanningWord);
+          wordsAfterSplitAdjusted = [spanningWord, ...frameToSplit.words.filter(word => word.start > splitTimeSeconds)];
+        }
+      } else {
+        // Check if there's a word that should be duplicated for natural flow
+        const lastWordBefore = wordsBeforeSplit[wordsBeforeSplit.length - 1];
+        const firstWordAfter = wordsAfterSplit[0];
+        
+        // If there's a gap, find a word to bridge it (like "not" in "application and not only")
+        const bridgeWord = frameToSplit.words.find(word =>
+          word.start >= (lastWordBefore?.end || 0) && word.end <= (firstWordAfter?.start || Infinity)
+        );
+        
+        if (bridgeWord && !wordsAfterSplit.includes(bridgeWord)) {
+          wordsAfterSplitAdjusted = [bridgeWord, ...wordsAfterSplit];
+        }
+      }
+      
+      if (wordsBeforeSplit.length === 0 || wordsAfterSplitAdjusted.length === 0) continue;
+      
+      // Create updated first frame
+      const updatedFirstFrame = {
+        ...frameToSplit,
+        endTime: wordsBeforeSplit[wordsBeforeSplit.length - 1].end,
+        words: wordsBeforeSplit,
+        isCustomBreak: true
+      };
+      
+      // Create new second frame
+      const generateUniqueId = (baseId: string): string => {
+        const timestamp = Date.now();
+        const random = Math.floor(Math.random() * 1000);
+        return `${baseId}-split-${timestamp}-${random}`;
+      };
+      
+      const newSecondFrame = {
+        ...frameToSplit,
+        id: generateUniqueId(frameToSplit.id),
+        startTime: wordsAfterSplitAdjusted[0].start,
+        endTime: wordsAfterSplitAdjusted[wordsAfterSplitAdjusted.length - 1].end,
+        words: wordsAfterSplitAdjusted,
+        isCustomBreak: true
+      };
+      
+      // Replace the original frame with the two new frames
+      updatedFrames.splice(frameIndex, 1, updatedFirstFrame, newSecondFrame);
+    }
+    
+    // Update the AI subtitle data
+    const newAIData = {
+      ...aiSubtitleData,
+      frames: updatedFrames.sort((a, b) => a.startTime - b.startTime),
+      lastModified: Date.now()
+    };
+    
+    onAISubtitleUpdate(newAIData);
+  }, [aiSubtitleData, onAISubtitleUpdate]);
+
+  /**
    * Split clip at current playhead position
    */
   const handleSplitClip = useCallback(() => {
@@ -229,7 +324,10 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
 
     setLocalClips(newClips);
     onClipsChange?.(newClips);
-  }, [localClips, currentTime, onClipsChange]);
+    
+    // Also split any subtitle frames that span the clip split point
+    handleSubtitleFrameSplitting(currentTimeMs);
+  }, [localClips, currentTime, onClipsChange, handleSubtitleFrameSplitting]);
 
   /**
    * Delete clip at current playhead position
@@ -371,7 +469,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   const effectiveSelectedId = selectedFrameId || null;
 
   /**
-   * Process subtitles to handle clipping: divide subtitles that span clip boundaries
+   * Process subtitles to handle clipping: show subtitles that overlap with active clips
    */
   const processSubtitlesForClips = useCallback((subtitles: DisplaySegment[], clips: VideoClip[]): DisplaySegment[] => {
     const activeClips = clips.filter(clip => !clip.isRemoved);
@@ -385,42 +483,13 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
       return subtitles;
     }
     
-    // Process subtitles to handle clipping: divide subtitles that span clip boundaries
-    const processedSubtitles: DisplaySegment[] = [];
-    
-    for (const segment of subtitles) {
-      // Check if subtitle overlaps with any active clips
-      const overlappingClips = activeClips.filter(clip => 
+    // Simply show subtitles that overlap with active clips
+    // The AI Subtitle Editor handles the actual frame splitting via custom breaks
+    return subtitles.filter(segment => {
+      return activeClips.some(clip => 
         segment.startTime < clip.endTime && segment.endTime > clip.startTime
       );
-      
-      if (overlappingClips.length === 0) {
-        // Subtitle doesn't overlap with any active clips, skip it
-        continue;
-      }
-      
-      // For each overlapping clip, create a subtitle segment that's clipped to the clip boundaries
-      for (const clip of overlappingClips) {
-        const clippedStartTime = Math.max(segment.startTime, clip.startTime);
-        const clippedEndTime = Math.min(segment.endTime, clip.endTime);
-        
-        // Only create segment if there's actual overlap
-        if (clippedStartTime < clippedEndTime) {
-          // Create a new subtitle segment clipped to this clip's boundaries
-          const clippedSegment = {
-            ...segment,
-            id: `${segment.id}-clip-${clip.id}`, // Create unique ID for clipped segment
-            startTime: clippedStartTime,
-            endTime: clippedEndTime,
-            text: segment.text // Keep original text (could be enhanced to filter words by timing)
-          };
-          
-          processedSubtitles.push(clippedSegment);
-        }
-      }
-    }
-    
-    return processedSubtitles;
+    });
   }, []);
 
   /**

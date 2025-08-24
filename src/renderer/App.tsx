@@ -1589,6 +1589,7 @@ const AppContent: React.FC = () => {
                   replacementAudioPath={replacementAudioPath}
                   onAudioPreviewToggle={setIsAudioPreviewEnabled}
                   aiSubtitleData={aiSubtitleData}
+                  onAISubtitleUpdate={setAiSubtitleData}
                   selectedFrameId={selectedFrameId}
                   onFrameSelect={setSelectedFrameId}
                   clips={clips}
