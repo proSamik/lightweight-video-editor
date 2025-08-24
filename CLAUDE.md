@@ -28,6 +28,7 @@ src/
 │   ├── videoEditor.ts     # Video editing operations (word deletions)
 │   ├── canvasRenderer.ts  # Canvas-based caption rendering
 │   ├── ffmpegOverlayRenderer.ts # FFmpeg-based overlay rendering with timing precision
+│   ├── ffmpegOverlayWithClips.ts # Advanced video rendering with clipping support
 │   ├── srtExporter.ts     # SRT subtitle export for YouTube
 │   ├── aiService.ts       # AI content generation (descriptions/titles)
 │   └── settingsManager.ts # Persistent settings storage
@@ -92,6 +93,14 @@ npm run dev-renderer  # Start webpack dev server for renderer
 - Precise millisecond-level timing conversion with `msToSeconds()` helper
 - Optimized filter chain building for multiple PNG overlays with exclusive timing
 - Enhanced caption word timing with gap enforcement to prevent visual conflicts
+
+#### FFmpegOverlayWithClips (`src/services/ffmpegOverlayWithClips.ts`)
+- Advanced video rendering with clipping support for non-destructive editing
+- Four-phase rendering pipeline: audio replacement → video clipping → caption timing adjustment → overlay rendering
+- Intelligent caption timing adjustment for removed video segments
+- Reuses FFmpegOverlayRenderer for optimized subtitle overlay processing
+- Temporary file management in assets directory with automatic cleanup
+- Full cancellation support with worker thread termination and FFmpeg process cleanup
 
 #### CanvasVideoRenderer (`src/services/canvasRenderer.ts`)
 - Web-compatible Canvas-based rendering system
@@ -225,6 +234,7 @@ npm run dev-renderer  # Start webpack dev server for renderer
 ### Video Rendering Architecture Improvements
 - **Streamlined rendering services**: Removed legacy CanvasVideoRenderer and GPUCanvasVideoRenderer classes to simplify architecture
 - **Enhanced FFmpegOverlayRenderer**: Intelligent overlap prevention with `ensureNoOverlaps()` method
+- **Advanced Clipping Support**: New FFmpegOverlayWithClips service for video segment processing with subtitle timing adjustment
 - **Precise timing control**: Millisecond-accurate overlay timing with exclusive `gte/lt` conditions
 - **Improved maintainability**: Comprehensive code comments and cleaner service dependencies
 - **Better performance**: Reduced complexity in video rendering pipeline
@@ -233,6 +243,12 @@ npm run dev-renderer  # Start webpack dev server for renderer
 - **Balanced workspace**: Updated to 60/40 split between video preview and styling panels
 - **Responsive design**: Improved panel sizing for better content visibility
 - **Streamlined controls**: Optimized for both video editing and caption styling workflows
+
+### Advanced Export Modes
+- **Complete Video**: Standard export with subtitles and optional audio replacement
+- **Complete Video (Clipped)**: Export with removed video segments and automatic subtitle timing adjustment
+- **Video with New Audio**: Replace original audio track without subtitles
+- **Video with Subtitles Only**: Add subtitles while preserving original audio
 
 ### Keyboard Shortcuts
 - **Cmd/Ctrl + ,**: Open AI Settings

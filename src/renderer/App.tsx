@@ -821,6 +821,27 @@ const AppContent: React.FC = () => {
           }
           break;
 
+        case 'completeWithClips':
+          // Export complete video with clipping support
+          if (aiSubtitleData && aiSubtitleData.frames.length > 0) {
+            setLoadingMessage('Rendering clipped video with subtitles...');
+            setLoadingProgress(0);
+            await window.electronAPI.renderVideoWithClipsAndSubtitles(
+              videoFile.path,
+              clips,
+              aiSubtitleData,
+              outputPath,
+              exportSettings,
+              replacementAudioPath || undefined
+            );
+          } else {
+            alert('No subtitles available for export.');
+            setIsLoading(false);
+            setLoadingProgress(undefined);
+            return;
+          }
+          break;
+
         default: // 'complete'
           // Export complete video (with AI subtitles and audio replacement if available)
           if (aiSubtitleData && aiSubtitleData.frames.length > 0) {
@@ -1731,6 +1752,7 @@ const AppContent: React.FC = () => {
         }}
         replacementAudioPath={replacementAudioPath}
         aiSubtitleData={aiSubtitleData}
+        clips={clips}
       />
 
       {/* Export Processing Modal (Liquid) */}

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
-import { ExportSettings, AISubtitleData } from '../../types';
+import { ExportSettings, AISubtitleData, VideoClip } from '../../types';
 import { LiquidModal } from './ui';
-import { FiSettings, FiZap, FiTarget, FiStar, FiMusic, FiFileText, FiVideo } from 'react-icons/fi';
+import { FiSettings, FiZap, FiTarget, FiStar, FiMusic, FiFileText, FiVideo, FiScissors } from 'react-icons/fi';
 
 interface ExportSettingsProps {
   isOpen: boolean;
@@ -10,6 +10,7 @@ interface ExportSettingsProps {
   onConfirm: (settings: ExportSettings) => void;
   replacementAudioPath?: string | null;
   aiSubtitleData?: AISubtitleData | null;
+  clips?: VideoClip[];
 }
 
 const ExportSettingsModal: React.FC<ExportSettingsProps> = ({
@@ -17,19 +18,19 @@ const ExportSettingsModal: React.FC<ExportSettingsProps> = ({
   onClose,
   onConfirm,
   replacementAudioPath,
-  aiSubtitleData
+  aiSubtitleData,
+  clips
 }) => {
   const { theme } = useTheme();
-  const [framerate, setFramerate] = useState<30 | 60>(30);
-  const [exportMode, setExportMode] = useState<'complete' | 'newAudio' | 'subtitlesOnly'>('complete');
+  const [exportMode, setExportMode] = useState<'complete' | 'newAudio' | 'subtitlesOnly' | 'completeWithClips'>('complete');
   const quality = 'high'; // Always use high quality
   
   const hasSubtitles = Boolean(aiSubtitleData?.frames?.length);
   const hasReplacementAudio = Boolean(replacementAudioPath);
+  const hasClips = Boolean(clips?.length && clips.some(clip => clip.isRemoved));
 
   const handleConfirm = () => {
     onConfirm({
-      framerate,
       quality,
       exportMode
     });
@@ -76,89 +77,11 @@ const ExportSettingsModal: React.FC<ExportSettingsProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Export Settings"
-      subtitle="Configure video export quality and framerate"
+      subtitle="Configure video export quality and settings"
       icon={<FiSettings size={24} color="white" />}
       maxWidth="500px"
     >
       <div style={{ padding: '20px' }}>
-
-        {/* Framerate Selection */}
-        <div style={{ marginBottom: '24px' }}>
-          <h3 style={{
-            margin: '0 0 16px 0',
-            fontSize: '18px',
-            fontWeight: '600',
-            color: theme.colors.text
-          }}>
-            Frame Rate
-          </h3>
-          <p style={{
-            margin: '0 0 16px 0',
-            fontSize: '14px',
-            color: theme.colors.textSecondary,
-            lineHeight: '1.5'
-          }}>
-            Choose the frame rate for your exported video. Higher frame rates produce smoother motion but take longer to render.
-          </p>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(2, 1fr)',
-            gap: '8px'
-          }}>
-            {[
-              { value: 30, label: '30 FPS', description: 'Standard quality, faster rendering', icon: FiTarget },
-              { value: 60, label: '60 FPS', description: 'Smooth motion, longer rendering', icon: FiStar }
-            ].map((option) => (
-              <button
-                key={option.value}
-                onClick={() => setFramerate(option.value as 30 | 60)}
-                style={{
-                  padding: '12px 16px',
-                  backgroundColor: framerate === option.value 
-                    ? theme.colors.primary 
-                    : theme.colors.surface,
-                  color: framerate === option.value 
-                    ? theme.colors.primaryForeground 
-                    : theme.colors.text,
-                  border: `1px solid ${framerate === option.value 
-                    ? theme.colors.primary 
-                    : theme.colors.border}`,
-                  borderRadius: theme.radius.md,
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  transition: 'all 0.2s ease',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
-                onMouseEnter={(e) => {
-                  if (framerate !== option.value) {
-                    e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (framerate !== option.value) {
-                    e.currentTarget.style.backgroundColor = theme.colors.surface;
-                  }
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <option.icon size={16} />
-                  <span style={{ fontWeight: '600' }}>{option.label}</span>
-                </div>
-                <span style={{ 
-                  fontSize: '12px', 
-                  opacity: 0.8,
-                  textAlign: 'center'
-                }}>
-                  {option.description}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
 
         {/* Export Mode Selection */}
         <div style={{ marginBottom: '24px' }}>
@@ -210,6 +133,23 @@ const ExportSettingsModal: React.FC<ExportSettingsProps> = ({
                 label: 'Export Video with Subtitles Only', 
                 description: 'Export video with original audio and subtitles', 
                 icon: FiFileText 
+              }] : []),
+              // Show Export Complete Video with Clips only if clips with removed sections exist
+              ...(hasClips ? [{ 
+                value: 'completeWithClips', 
+                label: 'Export Complete Video (Clipped)', 
+                description: (() => {
+                  if (hasReplacementAudio && hasSubtitles) {
+                    return 'Export clipped video with new audio and subtitles';
+                  } else if (hasReplacementAudio && !hasSubtitles) {
+                    return 'Export clipped video with new audio only';
+                  } else if (!hasReplacementAudio && hasSubtitles) {
+                    return 'Export clipped video with original audio and subtitles';
+                  } else {
+                    return 'Export clipped video with original audio only';
+                  }
+                })(), 
+                icon: FiScissors 
               }] : [])
             ].map(option => (
               <button

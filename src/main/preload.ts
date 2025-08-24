@@ -17,6 +17,8 @@ const electronAPI = {
     ipcRenderer.invoke('render-video-with-captions', videoPath, captionsData, outputPath, exportSettings, replacementAudioPath),
   renderVideoWithAISubtitles: (videoPath: string, aiSubtitleData: any, outputPath: string, exportSettings?: any, replacementAudioPath?: string) =>
     ipcRenderer.invoke('render-video-with-ai-subtitles', videoPath, aiSubtitleData, outputPath, exportSettings, replacementAudioPath),
+  renderVideoWithClipsAndSubtitles: (videoPath: string, clips: any[], aiSubtitleData: any, outputPath: string, exportSettings?: any, replacementAudioPath?: string) =>
+    ipcRenderer.invoke('render-video-with-clips-and-subtitles', videoPath, clips, aiSubtitleData, outputPath, exportSettings, replacementAudioPath),
   exportVideoWithNewAudio: (videoPath: string, newAudioPath: string, outputPath: string) =>
     ipcRenderer.invoke('export-video-with-new-audio', videoPath, newAudioPath, outputPath),
   handleFileDrop: (filePath: string) => ipcRenderer.invoke('handle-file-drop', filePath),

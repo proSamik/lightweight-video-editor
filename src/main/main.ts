@@ -569,6 +569,77 @@ ipcMain.handle('render-video-with-ai-subtitles', async (event, videoPath: string
   }
 });
 
+ipcMain.handle('render-video-with-clips-and-subtitles', async (event, videoPath: string, clips: any[], aiSubtitleData: any, outputPath: string, exportSettings?: any, replacementAudioPath?: string) => {
+  try {
+    // Import the clipping renderer
+    const { FFmpegOverlayWithClips } = await import('../services/ffmpegOverlayWithClips');
+    
+    // Convert AI subtitle data to captions format
+    const captionsData = aiSubtitleData.frames.map((frame: any) => {
+      const visibleWords = Array.isArray(frame.words)
+        ? frame.words.filter((w: any) => w && !w.isPause && w.editState !== 'removedCaption')
+        : [];
+
+      const mergedStyle = {
+        font: frame.style?.font || 'Arial',
+        fontSize: frame.style?.fontSize ?? 85,
+        textColor: frame.style?.textColor || '#ffffff',
+        highlighterColor: frame.style?.highlighterColor || '#ffff00',
+        backgroundColor: frame.style?.backgroundColor ?? 'transparent',
+        strokeColor: frame.style?.strokeColor,
+        strokeWidth: frame.style?.strokeWidth,
+        textTransform: frame.style?.textTransform,
+        position: {
+          x: frame.style?.position?.x ?? 50,
+          y: frame.style?.position?.y ?? 85,
+          z: frame.style?.position?.z ?? 0,
+        },
+        scale: frame.style?.scale ?? 1,
+        emphasizeMode: frame.style?.emphasizeMode ?? true,
+        renderMode: frame.style?.renderMode || 'horizontal',
+        textAlign: frame.style?.textAlign || 'center',
+        burnInSubtitles: frame.style?.burnInSubtitles !== false,
+      };
+
+      return {
+        id: frame.id,
+        startTime: Math.round(frame.startTime * 1000),
+        endTime: Math.round(frame.endTime * 1000),
+        text: visibleWords.map((w: any) => w.word).join(' '),
+        words: visibleWords.map((w: any) => ({
+          word: w.word,
+          start: Math.round(w.start * 1000),
+          end: Math.round(w.end * 1000),
+          editState: w.editState || 'normal',
+        })),
+        style: mergedStyle,
+      };
+    });
+
+    // Use the new clipping renderer
+    const clippingRenderer = FFmpegOverlayWithClips.getInstance();
+    
+    return await clippingRenderer.renderVideoWithClipsAndSubtitles(
+      videoPath,
+      clips,
+      captionsData,
+      outputPath,
+      replacementAudioPath,
+      (progress: number) => {
+        // Send progress updates to renderer
+        event.sender.send('rendering-progress', progress);
+      },
+      exportSettings
+    );
+  } catch (error) {
+    // Check if this is a cancellation (expected behavior)
+    if (error instanceof Error && error.message.includes('cancelled')) {
+      throw error; // Re-throw cancellation errors as-is
+    }
+    throw new Error(`Failed to render video with clips and subtitles: ${error}`);
+  }
+});
+
 ipcMain.handle('handle-file-drop', async (_event, filePath: string) => {
   // Send the dropped file path to the renderer
   mainWindow.webContents.send('file-dropped', filePath);
@@ -988,7 +1059,7 @@ ipcMain.handle('export-ai-subtitles-srt', async (_event, aiSubtitleData: any) =>
       aiSubtitleData,
       defaultStyle,
       result.filePath,
-      { exportMode: 'subtitlesOnly', framerate: 30, quality: 'balanced' },
+      { exportMode: 'subtitlesOnly', quality: 'balanced' },
       (progress, message) => {
         _event.sender.send('export-progress', progress, message);
       }
@@ -1035,7 +1106,6 @@ ipcMain.handle('export-modified-video', async (event, aiSubtitleData: any, video
     
     const exportSettings = { 
       exportMode: 'complete' as const, 
-      framerate: 30 as const, 
       quality: 'balanced' as const 
     };
 

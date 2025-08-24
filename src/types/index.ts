@@ -66,9 +66,8 @@ export enum ColorOption {
 }
 
 export interface ExportSettings {
-  framerate: 30 | 60;
   quality: 'fast' | 'balanced' | 'high';
-  exportMode: 'complete' | 'newAudio' | 'subtitlesOnly' | 'modifiedSegments';
+  exportMode: 'complete' | 'newAudio' | 'subtitlesOnly' | 'modifiedSegments' | 'completeWithClips';
 }
 
 export interface SearchResult {

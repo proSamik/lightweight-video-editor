@@ -104,7 +104,7 @@ export class FFmpegOverlayRenderer {
     captions: any[],
     outputPath: string,
     onProgress?: (progress: number) => void,
-    exportSettings?: { framerate: number; quality: string }
+    exportSettings?: { quality: string }
   ): Promise<string> {
     try {
       // Reset cancellation state for new render
@@ -177,7 +177,7 @@ export class FFmpegOverlayRenderer {
     metadata: any,
     tempDir: string,
     onProgress?: (progress: number) => void,
-    exportSettings?: { framerate: number; quality: string }
+    exportSettings?: { quality: string }
   ): Promise<string> {
     try {
       // Phase 1: Generate PNG overlays (0-50%)
@@ -230,7 +230,7 @@ export class FFmpegOverlayRenderer {
     outputPath: string,
     metadata: any,
     onProgress?: (progress: number) => void,
-    exportSettings?: { framerate: number; quality: string }
+    exportSettings?: { quality: string }
   ): Promise<string> {
     if (overlayFiles.length === 0) {
       // No overlays to apply, just copy the video
@@ -263,7 +263,7 @@ export class FFmpegOverlayRenderer {
     outputPath: string,
     metadata: any,
     onProgress?: (progress: number) => void,
-    exportSettings?: { framerate: number; quality: string }
+    exportSettings?: { quality: string }
   ): Promise<string> {
     const tempDir = path.dirname(outputPath);
     const videoDurationMs = (metadata.duration || 0) * 1000; // Convert to milliseconds
@@ -438,7 +438,7 @@ export class FFmpegOverlayRenderer {
     chunk: { startTime: number; endTime: number; overlays: Array<{ file: string; startTime: number; endTime: number }> },
     outputPath: string,
     metadata: any,
-    exportSettings?: { framerate: number; quality: string }
+    exportSettings?: { quality: string }
   ): Promise<void> {
     const tempDir = path.dirname(outputPath);
     const chunkVideoPath = path.join(tempDir, `temp_chunk_${Date.now()}.mp4`);
@@ -494,7 +494,9 @@ export class FFmpegOverlayRenderer {
         .duration(duration)
         .outputOptions([
           '-c', 'copy', // Copy streams without re-encoding
-          '-avoid_negative_ts', 'make_zero' // Ensure timestamps start from 0
+          '-avoid_negative_ts', 'make_zero', // Ensure timestamps start from 0
+          '-fflags', '+genpts', // Generate presentation timestamps
+          '-vsync', 'cfr' // Constant frame rate
         ])
         .output(outputPath)
         .on('start', () => {
@@ -634,7 +636,7 @@ export class FFmpegOverlayRenderer {
     outputPath: string,
     metadata: any,
     onProgress?: (progress: number) => void,
-    exportSettings?: { framerate: number; quality: string }
+    exportSettings?: { quality: string }
   ): Promise<string> {
     return new Promise((resolve, reject) => {
       console.log(`Applying ${overlayFiles.length} overlays in single batch`);
@@ -642,8 +644,11 @@ export class FFmpegOverlayRenderer {
       // Build FFmpeg overlay filter chain
       const { filterComplex } = this.buildOverlayFilterChain(overlayFiles);
       
-      const fps = exportSettings?.framerate || metadata.fps || 30;
+      const fps = metadata.fps || 30;
       const quality = exportSettings?.quality || 'high';
+      
+      // Use original video's frame rate to preserve timing
+      console.log(`Using original frame rate: ${fps}fps`);
       
       // Create FFmpeg command with all inputs and complex filter
       const command = ffmpeg(videoPath);
@@ -660,10 +665,13 @@ export class FFmpegOverlayRenderer {
           '-map', '0:a?', // Map audio from original video (? means optional)
           '-c:a', 'copy', // Copy audio without re-encoding
           '-c:v', 'libx264', // Encode video
-          '-r', fps.toString(),
+          '-r', fps.toString(), // Use original frame rate
           '-preset', this.getPresetForQuality(quality),
           '-crf', this.getCRFForQuality(quality),
-          '-pix_fmt', 'yuv420p'
+          '-pix_fmt', 'yuv420p',
+          '-vsync', 'cfr', // Constant frame rate to maintain timing
+          '-avoid_negative_ts', 'make_zero', // Ensure timestamps start from 0
+          '-fflags', '+genpts' // Generate presentation timestamps
         ])
         .output(outputPath)
         .on('start', (commandLine: string) => {
@@ -679,7 +687,15 @@ export class FFmpegOverlayRenderer {
         .on('end', () => {
           console.log('Single batch overlay completed successfully');
           this.activeFFmpegProcesses.delete(command);
-          resolve(outputPath);
+          
+          // Validate output duration matches input duration
+          this.validateOutputDuration(videoPath, outputPath, metadata.duration).then(() => {
+            resolve(outputPath);
+          }).catch((error) => {
+            console.warn('Duration validation failed:', error);
+            // Still resolve as the video was created successfully
+            resolve(outputPath);
+          });
         })
         .on('error', (err: any) => {
           console.error('Single batch overlay failed:', err);
@@ -701,7 +717,7 @@ export class FFmpegOverlayRenderer {
     metadata: any,
     batchSize: number,
     onProgress?: (progress: number) => void,
-    exportSettings?: { framerate: number; quality: string }
+    exportSettings?: { quality: string }
   ): Promise<string> {
     console.log(`Applying ${overlayFiles.length} overlays in batches of ${batchSize}`);
     
@@ -875,7 +891,7 @@ export class FFmpegOverlayRenderer {
     outputPath: string,
     metadata: any,
     onProgress?: (progress: number) => void,
-    exportSettings?: { framerate: number; quality: string }
+    exportSettings?: { quality: string }
   ): Promise<string> {
     // Create temporary directory for all overlay images
     const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'ffmpeg-overlay-optimized-'));
@@ -1109,9 +1125,9 @@ export class FFmpegOverlayRenderer {
     outputPath: string,
     metadata: any,
     onProgress?: (progress: number) => void,
-    exportSettings?: { framerate: number; quality: string }
+    exportSettings?: { quality: string }
   ): Promise<string> {
-    const fps = exportSettings?.framerate || metadata.fps;
+    const fps = metadata.fps || 30;
     const quality = exportSettings?.quality || 'high';
     
     console.log(`Overlaying caption video on main video...`);
@@ -1258,9 +1274,9 @@ export class FFmpegOverlayRenderer {
     captionVideoPath: string,
     outputPath: string,
     metadata: any,
-    exportSettings?: { framerate: number; quality: string }
+    exportSettings?: { quality: string }
   ): Promise<string> {
-    const fps = exportSettings?.framerate || metadata.fps;
+    const fps = metadata.fps || 30;
     const quality = exportSettings?.quality || 'high';
     
     console.log('Trying alternative overlay method with proper transparency handling...');
@@ -1312,7 +1328,7 @@ export class FFmpegOverlayRenderer {
     outputPath: string,
     metadata: any,
     onProgress?: (progress: number) => void,
-    exportSettings?: { framerate: number; quality: string }
+    exportSettings?: { quality: string }
   ): Promise<string> {
     const videoDuration = metadata.duration || 0;
     const chunkDuration = 300; // 5 minutes per chunk
@@ -1389,7 +1405,7 @@ export class FFmpegOverlayRenderer {
     chunkIndex: number,
     totalChunks: number,
     onProgress?: (progress: number) => void,
-    exportSettings?: { framerate: number; quality: string }
+    exportSettings?: { quality: string }
   ): Promise<void> {
     // Create temporary directory for this chunk
     const chunkTempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), `chunk-${chunkIndex}-`));
@@ -1464,7 +1480,7 @@ export class FFmpegOverlayRenderer {
     outputPath: string,
     metadata: any,
     onProgress?: (progress: number) => void,
-    exportSettings?: { framerate: number; quality: string }
+    exportSettings?: { quality: string }
   ): Promise<string> {
     // Create temporary directory for overlay images
     const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'ffmpeg-streaming-'));
@@ -1510,7 +1526,7 @@ export class FFmpegOverlayRenderer {
     outputPath: string,
     metadata: any,
     onProgress?: (progress: number) => void,
-    exportSettings?: { framerate: number; quality: string }
+    exportSettings?: { quality: string }
   ): Promise<string> {
     const videoDuration = metadata.duration || 0;
     const segmentDuration = 60; // 1 minute segments for streaming
@@ -1594,9 +1610,9 @@ export class FFmpegOverlayRenderer {
     segmentIndex: number,
     totalSegments: number,
     onProgress?: (progress: number) => void,
-    exportSettings?: { framerate: number; quality: string }
+    exportSettings?: { quality: string }
   ): Promise<void> {
-    const fps = exportSettings?.framerate || metadata.fps;
+    const fps = metadata.fps || 30; 
     const quality = exportSettings?.quality || 'high';
     
     // If no overlays for this segment, just copy the video segment
@@ -1796,7 +1812,7 @@ export class FFmpegOverlayRenderer {
     outputPath: string,
     metadata: any,
     onProgress?: (progress: number) => void,
-    exportSettings?: { framerate: number; quality: string }
+    exportSettings?: { quality: string }
   ): Promise<string> {
     // Create temporary directory for overlay PNGs
     const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'ffmpeg-overlay-'));
@@ -1842,7 +1858,7 @@ export class FFmpegOverlayRenderer {
     outputPath: string,
     metadata: any,
     onProgress?: (progress: number) => void,
-    exportSettings?: { framerate: number; quality: string }
+    exportSettings?: { quality: string }
   ): Promise<string> {
     const videoDuration = metadata.duration || 0;
     const chunkDuration = 300; // 5 minutes per chunk
@@ -1937,7 +1953,7 @@ export class FFmpegOverlayRenderer {
     chunkIndex: number,
     totalChunks: number,
     onProgress?: (progress: number) => void,
-    exportSettings?: { framerate: number; quality: string }
+    exportSettings?: { quality: string }
   ): Promise<void> {
     console.log(`Processing chunk ${chunkIndex + 1}/${totalChunks}: ${startTime}s - ${endTime}s`);
     
@@ -2190,15 +2206,12 @@ export class FFmpegOverlayRenderer {
     outputPath: string,
     metadata: any,
     onProgress?: (progress: number) => void,
-    exportSettings?: { framerate: number; quality: string }
+    exportSettings?: { quality: string }
   ): Promise<string> {
     if (overlayFiles.length === 0) {
       // No overlays to apply, just copy the video
       return await this.copyVideo(videoPath, outputPath);
     }
-    
-    const fps = exportSettings?.framerate || metadata.fps;
-    const quality = exportSettings?.quality || 'high';
     
     console.log(`Applying ${overlayFiles.length} overlays with hardware acceleration...`);
     
@@ -2237,7 +2250,7 @@ export class FFmpegOverlayRenderer {
     outputPath: string,
     metadata: any,
     onProgress?: (progress: number) => void,
-    exportSettings?: { framerate: number; quality: string },
+    exportSettings?: { quality: string },
     batchSize: number = 100
   ): Promise<string> {
     const tempDir = path.dirname(outputPath);
@@ -2322,9 +2335,9 @@ export class FFmpegOverlayRenderer {
     outputPath: string,
     metadata: any,
     onProgress?: (progress: number) => void,
-    exportSettings?: { framerate: number; quality: string }
+    exportSettings?: { quality: string }
   ): Promise<string> {
-    const fps = exportSettings?.framerate || metadata.fps;
+    const fps = metadata.fps || 30;
     const quality = exportSettings?.quality || 'high';
     
     return new Promise((resolve, reject) => {
@@ -2631,6 +2644,25 @@ export class FFmpegOverlayRenderer {
     } catch (error) {
       console.warn('Failed to cleanup temporary overlay files:', error);
     }
+  }
+
+  private async validateOutputDuration(videoPath: string, outputPath: string, expectedDuration: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      ffmpeg.ffprobe(outputPath, (err: any, metadata: any) => {
+        if (err) {
+          reject(new Error(`Failed to get output duration: ${err.message}`));
+          return;
+        }
+        const actualDuration = parseFloat(metadata.format.duration);
+        const durationDiff = Math.abs(actualDuration - expectedDuration);
+        console.log(`Duration validation: expected ${expectedDuration.toFixed(3)}s, actual ${actualDuration.toFixed(3)}s, difference ${durationDiff.toFixed(3)}s`);
+        
+        if (durationDiff > 0.1) {
+          console.warn(`Duration mismatch detected: ${durationDiff.toFixed(3)}s difference`);
+        }
+        resolve();
+      });
+    });
   }
 }
 

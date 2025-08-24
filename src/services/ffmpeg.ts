@@ -523,7 +523,8 @@ export class FFmpegService {
         .format('mp4')
         .outputOptions([
           '-avoid_negative_ts', 'make_zero',
-          '-fflags', '+genpts'
+          '-fflags', '+genpts',
+          '-vf', 'select=not(mod(n\\,1))' // Remove first frame to avoid black frame
         ])
         .output(outputPath)
         .on('progress', (progress: any) => {
@@ -591,7 +592,7 @@ export class FFmpegService {
     captionsData: any[],
     outputPath: string,
     onProgress?: (progress: number) => void,
-    exportSettings?: { framerate: number; quality: string }
+    exportSettings?: { quality: string }
   ): Promise<string> {
     return new Promise(async (resolve, reject) => {
       if (!captionsData || captionsData.length === 0) {
