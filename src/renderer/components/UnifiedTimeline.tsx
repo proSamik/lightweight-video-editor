@@ -426,11 +426,11 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
       
       // Type-safe style creation
       const defaultStyle = {
-        font: 'Segoe UI',
+        font: 'Poppins',
         fontSize: 85,
         textColor: '#ffffff',
-        highlighterColor: '#ffff00',
-        backgroundColor: 'transparent',
+        highlighterColor: '#00ff00',
+        backgroundColor: '#000000',
         strokeColor: '#000000',
         strokeWidth: 2,
         textTransform: 'none',
