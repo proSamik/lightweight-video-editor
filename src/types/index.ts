@@ -67,7 +67,7 @@ export enum ColorOption {
 
 export interface ExportSettings {
   quality: 'fast' | 'balanced' | 'high';
-  exportMode: 'complete' | 'newAudio' | 'subtitlesOnly' | 'modifiedSegments' | 'completeWithClips';
+  exportMode: 'newAudio' | 'subtitlesOnly' | 'completeWithClips';
 }
 
 export interface SearchResult {
