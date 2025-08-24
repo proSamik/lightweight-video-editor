@@ -3,7 +3,6 @@ import * as path from 'path';
 import * as os from 'os';
 import { Worker, isMainThread, parentPort, workerData } from 'worker_threads';
 import ffmpeg = require('fluent-ffmpeg');
-import { Canvas, CanvasRenderingContext2D } from 'canvas';
 
 /**
  * High-Performance FFmpeg Overlay-based video renderer
@@ -104,7 +103,7 @@ export class FFmpegOverlayRenderer {
     captions: any[],
     outputPath: string,
     onProgress?: (progress: number) => void,
-    exportSettings?: {  quality: string }
+    exportSettings?: {  quality: string, replacementAudioPath?: string }
   ): Promise<string> {
     try {
       // Reset cancellation state for new render
@@ -116,6 +115,11 @@ export class FFmpegOverlayRenderer {
       console.log('Captions count:', captions?.length || 0);
       console.log('Export settings:', exportSettings);
       console.log('Using worker threads:', this.maxWorkers);
+      
+      // Check for replacement audio
+      if (exportSettings?.replacementAudioPath) {
+        console.log('Replacement audio detected:', exportSettings.replacementAudioPath);
+      }
       
       // Check for captions with burn-in enabled
       const captionsWithBurnIn = captions.filter(caption => 
@@ -177,15 +181,39 @@ export class FFmpegOverlayRenderer {
     metadata: any,
     tempDir: string,
     onProgress?: (progress: number) => void,
-    exportSettings?: {  quality: string }
+    exportSettings?: {  quality: string, replacementAudioPath?: string }
   ): Promise<string> {
     try {
-      // Phase 1: Generate PNG overlays (0-50%)
+      // If there's replacement audio, handle it first
+      let processedVideoPath = videoPath;
+      let progressOffset = 0;
+      
+      if (exportSettings?.replacementAudioPath) {
+        console.log('=== PHASE 0: Replacing audio track ===');
+        const audioReplacedPath = path.join(tempDir, 'audio_replaced.mp4');
+        
+        await this.replaceAudioTrack(
+          videoPath,
+          exportSettings.replacementAudioPath,
+          audioReplacedPath,
+          (progress) => {
+            if (onProgress) {
+              // Audio replacement is 20% of total progress
+              onProgress(Math.round((progress / 100) * 20));
+            }
+          }
+        );
+        
+        processedVideoPath = audioReplacedPath;
+        progressOffset = 20; // Next phases start at 20%
+      }
+      
+      // Phase 1: Generate PNG overlays
       console.log('=== PHASE 1: Generating PNG overlays ===');
       const allOverlayFiles = await this.generateOverlayImagesParallel(captions, metadata, tempDir, (progress) => {
         if (onProgress) {
-          // Overlay generation is 50% of total progress
-          const overallProgress = Math.min(50, (progress / 100) * 50);
+          // Overlay generation is 40% of total progress (or 20-60% if audio replacement happened)
+          const overallProgress = Math.min(progressOffset + 40, progressOffset + (progress / 100) * 40);
           onProgress(Math.round(overallProgress));
         }
       });
@@ -197,17 +225,17 @@ export class FFmpegOverlayRenderer {
         throw new Error('Rendering cancelled before applying overlays');
       }
 
-      // Phase 2: Apply overlays directly to video (50-100%)
+      // Phase 2: Apply overlays directly to video
       console.log('=== PHASE 2: Applying overlays directly to video ===');
       const result = await this.applyDirectOverlaysToVideo(
-        videoPath,
+        processedVideoPath,
         allOverlayFiles,
         outputPath,
         metadata,
         (progress) => {
           if (onProgress) {
-            // Overlay application is 50% of total progress (50-100%)
-            const overallProgress = Math.min(100, Math.max(50, 50 + (progress / 100) * 50));
+            // Overlay application is remaining % of total progress
+            const overallProgress = Math.min(100, Math.max(progressOffset + 40, progressOffset + 40 + (progress / 100) * (60 - progressOffset)));
             onProgress(Math.round(overallProgress));
           }
         },
@@ -222,6 +250,53 @@ export class FFmpegOverlayRenderer {
   }
 
   /**
+   * Replace audio track in video
+   */
+  private async replaceAudioTrack(
+    videoPath: string,
+    audioPath: string,
+    outputPath: string,
+    onProgress?: (progress: number) => void
+  ): Promise<string> {
+    return new Promise((resolve, reject) => {
+      console.log(`Replacing audio track with: ${audioPath}`);
+      
+      const command = ffmpeg()
+        .input(videoPath)
+        .input(audioPath)
+        .outputOptions([
+          '-map', '0:v',  // Take video from first input
+          '-map', '1:a',  // Take audio from second input
+          '-c:v', 'copy', // Copy video without re-encoding
+          '-shortest'     // End when shortest input ends
+        ])
+        .output(outputPath)
+        .on('start', () => {
+          console.log('Audio replacement started');
+          this.activeFFmpegProcesses.add(command);
+        })
+        .on('progress', (progress: any) => {
+          if (onProgress) {
+            const percent = Math.min(100, Math.max(0, progress.percent || 0));
+            onProgress(Math.round(percent));
+          }
+        })
+        .on('end', () => {
+          console.log('Audio replacement completed successfully');
+          this.activeFFmpegProcesses.delete(command);
+          resolve(outputPath);
+        })
+        .on('error', (err: any) => {
+          console.error('Audio replacement failed:', err);
+          this.activeFFmpegProcesses.delete(command);
+          reject(new Error(`Audio replacement failed: ${err.message}`));
+        });
+      
+      command.run();
+    });
+  }
+
+  /**
    * Apply PNG overlays directly to video with smart batching and precise timing
    */
   private async applyDirectOverlaysToVideo(
@@ -230,7 +305,7 @@ export class FFmpegOverlayRenderer {
     outputPath: string,
     metadata: any,
     onProgress?: (progress: number) => void,
-    exportSettings?: {  quality: string }
+    exportSettings?: {  quality: string, replacementAudioPath?: string }
   ): Promise<string> {
     if (overlayFiles.length === 0) {
       // No overlays to apply, just copy the video
@@ -263,7 +338,7 @@ export class FFmpegOverlayRenderer {
     outputPath: string,
     metadata: any,
     onProgress?: (progress: number) => void,
-    exportSettings?: {  quality: string }
+    exportSettings?: {  quality: string, replacementAudioPath?: string }
   ): Promise<string> {
     const tempDir = path.dirname(outputPath);
     const videoDurationMs = (metadata.duration || 0) * 1000; // Convert to milliseconds
@@ -438,7 +513,7 @@ export class FFmpegOverlayRenderer {
     chunk: { startTime: number; endTime: number; overlays: Array<{ file: string; startTime: number; endTime: number }> },
     outputPath: string,
     metadata: any,
-    exportSettings?: {  quality: string }
+    exportSettings?: {  quality: string, replacementAudioPath?: string }
   ): Promise<void> {
     const tempDir = path.dirname(outputPath);
     const chunkVideoPath = path.join(tempDir, `temp_chunk_${Date.now()}.mp4`);
@@ -634,7 +709,7 @@ export class FFmpegOverlayRenderer {
     outputPath: string,
     metadata: any,
     onProgress?: (progress: number) => void,
-    exportSettings?: {  quality: string }
+    exportSettings?: {  quality: string, replacementAudioPath?: string }
   ): Promise<string> {
     return new Promise((resolve, reject) => {
       console.log(`Applying ${overlayFiles.length} overlays in single batch`);
