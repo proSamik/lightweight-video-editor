@@ -83,6 +83,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
   const [lastEnterTime, setLastEnterTime] = useState(0);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [showHelpTooltip, setShowHelpTooltip] = useState(false);
+  const [searchHighlight, setSearchHighlight] = useState<{frameId: string, wordIndex: number} | null>(null);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -477,8 +478,12 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
       // Don't handle shortcuts if user is typing in any input field
       const target = e.target as HTMLElement;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.contentEditable === 'true')) {
-        // Still allow Ctrl+F to work in input fields for search functionality
-        if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        // Check if we're in the search component - if so, don't handle Ctrl+F here
+        const searchContainer = document.querySelector('[data-search-container]');
+        const isWithinSearchComponent = searchContainer && searchContainer.contains(target);
+        
+        // Only handle Ctrl+F if not within search component
+        if ((e.metaKey || e.ctrlKey) && e.key === 'f' && !isWithinSearchComponent) {
           e.preventDefault();
           setIsSearchOpen(true);
         }
@@ -667,6 +672,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     setEditingWordId(wordId);
     setEditingValue(currentWord);
     setContextMenu(prev => ({ ...prev, show: false }));
+    setSearchHighlight(null); // Clear search highlight when editing
     // Focus input after state update
     setTimeout(() => inputRef.current?.focus(), 0);
   };
@@ -899,15 +905,19 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
   };
 
   // Get word style based on state
-  const getWordStyle = (word: WordSegment): React.CSSProperties => {
+  const getWordStyle = (word: WordSegment, frameId: string, wordIndex: number): React.CSSProperties => {
     const isHighlighted = currentlyHighlightedWords.has(word.id);
     const isSelected = selectedWordIds.has(word.id);
+    const isEditing = editingWordId === word.id;
+    const isSearchHighlighted = !isEditing && searchHighlight && 
+      searchHighlight.frameId === frameId && 
+      searchHighlight.wordIndex === wordIndex;
     
     const baseStyle: React.CSSProperties = {
       display: 'inline-block',
-      padding: '4px 6px', // Increased padding to compensate for removed border
-      margin: '2px 3px',
-      borderRadius: '3px',
+      padding: '2px 4px', // Reduced padding for more compact display
+      margin: '1px 2px', // Reduced margins
+      borderRadius: '2px', // Smaller border radius
       cursor: 'pointer',
       transition: 'all 0.2s ease',
       userSelect: 'none',
@@ -915,7 +925,8 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
       outline: 'none',
       boxShadow: isSelected ? `0 0 0 2px ${theme.colors.primary}` : 'none', // Use box-shadow for selection
       position: 'relative',
-      zIndex: isSelected ? 10 : 1
+      zIndex: isSelected ? 10 : 1,
+      fontSize: '12px' // Smaller font size for words
     };
 
     // Apply edit state styling
@@ -923,7 +934,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
       case 'censored':
         return {
           ...baseStyle,
-          backgroundColor: isHighlighted ? theme.colors.warning + '60' : theme.colors.warning + '20',
+          backgroundColor: isSearchHighlighted ? '#ffeb3b' : (isHighlighted ? theme.colors.warning + '60' : theme.colors.warning + '20'),
           color: theme.colors.text
         };
       case 'removedCaption':
@@ -932,7 +943,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
           textDecoration: 'line-through',
           color: theme.colors.textSecondary,
           opacity: 0.6,
-          backgroundColor: isHighlighted ? theme.colors.textSecondary + '40' : 'transparent'
+          backgroundColor: isSearchHighlighted ? '#ffeb3b' : (isHighlighted ? theme.colors.textSecondary + '40' : 'transparent')
         };
       case 'editing':
         return {
@@ -953,7 +964,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
         if (word.isKeyword) {
           return {
             ...baseStyle,
-            backgroundColor: isHighlighted ? theme.colors.accent + '80' : theme.colors.accent + '40',
+            backgroundColor: isSearchHighlighted ? '#ffeb3b' : (isHighlighted ? theme.colors.accent + '80' : theme.colors.accent + '40'),
             color: theme.colors.text,
             fontWeight: 'bold'
           };
@@ -961,7 +972,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
         
         return {
           ...baseStyle,
-          backgroundColor: isHighlighted ? theme.colors.primary + '60' : 'transparent',
+          backgroundColor: isSearchHighlighted ? '#ffeb3b' : (isHighlighted ? theme.colors.primary + '60' : 'transparent'),
           color: theme.colors.text
         };
     }
@@ -1063,12 +1074,12 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     >
       {/* Header */}
       <div style={{
-        padding: '16px',
+        padding: '12px',
         borderBottom: `1px solid ${theme.colors.border}`,
         backgroundColor: theme.colors.surface
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600' }}>
+          <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '600' }}>
             AI Subtitles Editor
           </h3>
           <div style={{ position: 'relative' }}>
@@ -1117,8 +1128,8 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
           </div>
         </div>
         <p style={{ 
-          margin: '4px 0 8px 0', 
-          fontSize: '12px', 
+          margin: '3px 0 6px 0', 
+          fontSize: '11px', 
           color: theme.colors.textSecondary 
         }}>
           {renderFrames.length} frames • Max {maxWordsPerFrame} words, {maxCharsPerFrame} chars per frame
@@ -1133,6 +1144,11 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
           onOpen={() => setIsSearchOpen(true)}
           onFrameSelect={onFrameSelect}
           onTimeSeek={onTimeSeek}
+          onSearchHighlight={(frameId, wordIndex) => 
+            frameId && wordIndex !== null 
+              ? setSearchHighlight({frameId, wordIndex})
+              : setSearchHighlight(null)
+          }
         />
       </div>
 
@@ -1142,7 +1158,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
         style={{
           flex: 1,
           overflow: 'auto',
-          padding: '8px'
+          padding: '6px'
         }}
       >
         {renderFrames.map((frame, frameIndex) => (
@@ -1151,21 +1167,21 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
             data-frame-id={frame.id}
             onClick={() => handleFrameClick(frame.id)}
             style={{
-              marginBottom: '8px',
-              padding: '10px',
+              marginBottom: '4px',
+              padding: '6px 8px',
               backgroundColor: theme.colors.surface,
-              borderRadius: '6px',
+              borderRadius: '4px',
               border: `1px solid ${selectedFrameId === frame.id ? theme.colors.primary : theme.colors.border}`,
               cursor: 'pointer',
               transition: 'all 0.15s ease',
-              lineHeight: 1.4
+              lineHeight: 1.3
             }}
           >
             {/* Frame timing and controls */}
             <div style={{
-              fontSize: '12px',
+              fontSize: '10px',
               color: theme.colors.textSecondary,
-              marginBottom: '8px',
+              marginBottom: '4px',
               fontFamily: 'monospace',
               display: 'flex',
               alignItems: 'center',
@@ -1275,10 +1291,10 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
 
             {/* Words */}
             <div style={{
-              lineHeight: '1.6',
-              fontSize: '16px'
+              lineHeight: '1.4',
+              fontSize: '13px'
             }}>
-              {frame.words.map((word) => (
+              {frame.words.map((word, wordIndex) => (
                 editingWordId === word.id ? (
                   <input
                     key={word.id}
@@ -1303,18 +1319,18 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
                       display: 'inline-block',
                       padding: '2px 4px',
                       margin: '1px',
-                      border: `2px solid ${theme.colors.primary}`,
-                      borderRadius: '3px',
+                      border: `1px solid ${theme.colors.primary}`,
+                      borderRadius: '2px',
                       backgroundColor: theme.colors.background,
                       color: theme.colors.text,
-                      fontSize: 'inherit',
-                      minWidth: '60px'
+                      fontSize: '12px',
+                      minWidth: '40px'
                     }}
                   />
                 ) : (
                   <span
                     key={word.id}
-                    style={getWordStyle(word)}
+                    style={getWordStyle(word, frame.id, wordIndex)}
                     onClick={(e) => handleWordClick(e, word.id, frame.id)}
                     onDoubleClick={() => handleWordDoubleClick(word.id, word.word)}
                     title={getWordTooltip(word)}
