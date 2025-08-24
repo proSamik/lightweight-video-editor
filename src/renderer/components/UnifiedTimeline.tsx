@@ -98,6 +98,26 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
     setLocalClips(clips);
   }, [clips]);
 
+  // Reset timeline when video file path changes (new video loaded)
+  useEffect(() => {
+    if (videoFile?.path && localClips.length > 0) {
+      // Check if this is a different video by comparing the current clips 
+      // with what they should be for this video duration
+      const expectedDuration = videoFile.duration ? videoFile.duration * 1000 : 0;
+      const currentMaxTime = Math.max(...localClips.map(clip => clip.endTime));
+      
+      // If the timeline duration doesn't match the video duration, reset
+      if (expectedDuration > 0 && Math.abs(currentMaxTime - expectedDuration) > 1000) {
+        console.log('Resetting UnifiedTimeline for new video:', {
+          videoPath: videoFile.path,
+          expectedDuration,
+          currentMaxTime
+        });
+        setLocalClips([]);
+      }
+    }
+  }, [videoFile?.path, videoFile?.duration]);
+
 
 
   /**
