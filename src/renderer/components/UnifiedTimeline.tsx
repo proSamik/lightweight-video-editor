@@ -371,6 +371,59 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   const effectiveSelectedId = selectedFrameId || null;
 
   /**
+   * Process subtitles to handle clipping: divide subtitles that span clip boundaries
+   */
+  const processSubtitlesForClips = useCallback((subtitles: DisplaySegment[], clips: VideoClip[]): DisplaySegment[] => {
+    const activeClips = clips.filter(clip => !clip.isRemoved);
+    
+    if (subtitles.length === 0) {
+      return [];
+    }
+    
+    if (activeClips.length === 0) {
+      // No active clips - show all subtitles
+      return subtitles;
+    }
+    
+    // Process subtitles to handle clipping: divide subtitles that span clip boundaries
+    const processedSubtitles: DisplaySegment[] = [];
+    
+    for (const segment of subtitles) {
+      // Check if subtitle overlaps with any active clips
+      const overlappingClips = activeClips.filter(clip => 
+        segment.startTime < clip.endTime && segment.endTime > clip.startTime
+      );
+      
+      if (overlappingClips.length === 0) {
+        // Subtitle doesn't overlap with any active clips, skip it
+        continue;
+      }
+      
+      // For each overlapping clip, create a subtitle segment that's clipped to the clip boundaries
+      for (const clip of overlappingClips) {
+        const clippedStartTime = Math.max(segment.startTime, clip.startTime);
+        const clippedEndTime = Math.min(segment.endTime, clip.endTime);
+        
+        // Only create segment if there's actual overlap
+        if (clippedStartTime < clippedEndTime) {
+          // Create a new subtitle segment clipped to this clip's boundaries
+          const clippedSegment = {
+            ...segment,
+            id: `${segment.id}-clip-${clip.id}`, // Create unique ID for clipped segment
+            startTime: clippedStartTime,
+            endTime: clippedEndTime,
+            text: segment.text // Keep original text (could be enhanced to filter words by timing)
+          };
+          
+          processedSubtitles.push(clippedSegment);
+        }
+      }
+    }
+    
+    return processedSubtitles;
+  }, []);
+
+  /**
    * Assign tracks to segments to avoid overlaps and utilize vertical space
    */
   const assignTracks = useCallback((segments: Array<{startTime: number, endTime: number, id: string}>): Array<{segment: any, track: number}> => {
@@ -417,34 +470,18 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   
   // Calculate timeline height for unified layout
   const TIMELINE_HEIGHT = useMemo(() => {
-    // Calculate tracks needed for subtitles
-    let subtitleTracks = 0;
+    // Process subtitles using the helper function
+    const processedSubtitles = processSubtitlesForClips(effectiveCaptions, localClips);
     
-    // Always show subtitles that overlap with active clips (or all subtitles if no clips)
-    const activeClips = localClips.filter(clip => !clip.isRemoved);
-    let overlappingSubtitles;
-    
-    if (activeClips.length === 0) {
-      // No active clips - show all subtitles
-      overlappingSubtitles = effectiveCaptions;
-    } else {
-      // Show subtitles that overlap with active clips
-      overlappingSubtitles = effectiveCaptions.filter(segment => {
-        return activeClips.some(clip => 
-          segment.startTime < clip.endTime && segment.endTime > clip.startTime
-        );
-      });
-    }
-    
-    const segmentsWithTracks = assignTracks(overlappingSubtitles);
-    subtitleTracks = Math.max(...segmentsWithTracks.map(s => s.track), 0) + 1;
+    const segmentsWithTracks = assignTracks(processedSubtitles);
+    const subtitleTracks = Math.max(...segmentsWithTracks.map(s => s.track), 0) + 1;
     
     // Clips always use 1 track, subtitles use their calculated tracks
     const totalTracks = subtitleTracks + 1; // Always reserve space for clips
     const totalHeight = totalTracks * (CAPTION_TRACK_HEIGHT + 1); // Minimal spacing
     
     return Math.min(Math.max(totalHeight, MIN_TIMELINE_HEIGHT), MAX_TIMELINE_HEIGHT);
-  }, [localClips, effectiveCaptions, assignTracks]);
+  }, [localClips, effectiveCaptions, processSubtitlesForClips, assignTracks]);
   
   const TIMELINE_CONTENT_HEIGHT = TIMELINE_HEIGHT - CONTROL_HEIGHT - RULER_HEIGHT;
 
@@ -819,6 +856,9 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
    * Handle segment double click to select and seek to middle
    */
   const handleSegmentDoubleClick = (segment: { id: string; startTime: number; endTime: number }) => {
+    const now = Date.now();
+    setIsManualSelection(true); // Mark as manual selection
+    setManualSelectionTime(now); // Track when manual selection occurred
     onFrameSelect?.(segment.id);
     const middleTime = segment.startTime + ((segment.endTime - segment.startTime) / 2);
     onTimeSeek(middleTime);
@@ -828,35 +868,38 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
    * Handle segment click to select
    */
   const handleSegmentClick = (segment: { id: string }) => {
+    const now = Date.now();
+    setIsManualSelection(true); // Mark as manual selection
+    setManualSelectionTime(now); // Track when manual selection occurred
     onFrameSelect?.(segment.id);
   };
 
-  // Keep selected frame in view
+  // Track manual selection vs automatic selection from playhead movement
+  const [isManualSelection, setIsManualSelection] = React.useState(false);
+  const [manualSelectionTime, setManualSelectionTime] = React.useState(0);
+  
+  // Keep selected frame in view (only for manual selections)
   useEffect(() => {
-    if (!timelineContainerRef.current || !timelineRef.current) return;
-    const container = timelineContainerRef.current;
-    const timeline = timelineRef.current;
-    const selectedId = selectedFrameId;
-    if (!selectedId) return;
-
-    // Find the element for the selected segment by data attribute
-    const el = timeline.querySelector(`[data-segment-id="${selectedId}"]`) as HTMLElement | null;
-    if (!el) return;
-
-    const elLeft = el.offsetLeft;
-    const elRight = elLeft + el.offsetWidth;
-    const viewLeft = container.scrollLeft;
-    const viewRight = viewLeft + container.clientWidth;
-
-    if (elLeft < viewLeft || elRight > viewRight) {
-      container.scrollTo({ left: Math.max(0, elLeft - container.clientWidth * 0.2), behavior: 'smooth' });
+    // DISABLED: Don't auto-scroll on manual selections to prevent UI jumping
+    // The user can see what they clicked on without the timeline moving
+    // This prevents the jarring experience of timeline jumping to clip start
+    
+    // Reset manual selection flag
+    if (isManualSelection) {
+      setIsManualSelection(false);
     }
-  }, [selectedFrameId]);
+  }, [selectedFrameId, isManualSelection]);
 
   // Update selected frame when playhead enters a new segment (debounced to prevent race conditions)
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (!onFrameSelect) return;
+      
+      // Don't auto-select if there was a recent manual selection (within 500ms)
+      const timeSinceManualSelection = Date.now() - manualSelectionTime;
+      if (timeSinceManualSelection < 500) {
+        return; // Skip automatic selection to preserve manual selection
+      }
       
       const currentTimeMs = currentTime;
       let targetSelection: string | null = null;
@@ -900,7 +943,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
     }, 100); // 100ms debounce to prevent rapid-fire selection changes
 
     return () => clearTimeout(timeoutId);
-  }, [currentTime, aiSubtitleData?.frames, onFrameSelect, localClips, selectedFrameId, virtualCaptionsFromAI]);
+  }, [currentTime, aiSubtitleData?.frames, onFrameSelect, localClips, selectedFrameId, virtualCaptionsFromAI, manualSelectionTime]);
 
   return (
     <div style={{ 
@@ -1428,7 +1471,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
         >
           {(() => {
             // Calculate time intervals based on zoom level and prevent overlapping
-            const getTimeInterval = (zoom: number, containerWidth: number, timelineWidth: number): number => {
+            const getTimeInterval = (containerWidth: number, timelineWidth: number): number => {
               // Adjust minimum width based on duration format
               const minLabelWidth = actualDuration < 60000 ? 40 : // "30s" format
                                    actualDuration < 3600000 ? 60 : // "5:30" format  
@@ -1473,7 +1516,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
               ? localClips.filter(clip => !clip.isRemoved).reduce((total, clip) => total + (clip.endTime - clip.startTime), 0)
               : actualDuration;
               
-            const interval = getTimeInterval(zoomLevel, containerWidth, timelineWidth);
+            const interval = getTimeInterval(containerWidth, timelineWidth);
             
             // Use the calculated interval directly - no artificial limits
             const effectiveInterval = interval;
@@ -1662,37 +1705,22 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
               
               // Add only active clips as segments (always on track 0)
               const activeClipsForDisplay = localClips.filter(clip => !clip.isRemoved);
-              activeClipsForDisplay.forEach((clip, displayIndex) => {
+              activeClipsForDisplay.forEach((clip) => {
                 // Find original index in full clips array for display purposes
                 const originalIndex = localClips.findIndex(c => c.id === clip.id);
                 allSegments.push({ type: 'clip', data: clip, index: originalIndex });
               });
               
                              // Add subtitle segments with proper track assignment
-               // Always show subtitles that overlap with active clips (or all subtitles if no clips)
-               const activeClips = localClips.filter(clip => !clip.isRemoved);
-               let overlappingSubtitles;
-               
-               if (effectiveCaptions.length > 0) {
-                 if (activeClips.length === 0) {
-                   // No active clips - show all subtitles
-                   overlappingSubtitles = effectiveCaptions;
-                 } else {
-                   // Show only subtitles that are fully contained within active clips (not clipped)
-                   overlappingSubtitles = effectiveCaptions.filter(segment => {
-                     return activeClips.some(clip => 
-                       segment.startTime >= clip.startTime && segment.endTime <= clip.endTime
-                     );
-                   });
-                 }
-                 
-                 const segmentsWithTracks = assignTracks(overlappingSubtitles);
-                 segmentsWithTracks.forEach(({ segment, track }) => {
-                   allSegments.push({ type: 'subtitle', data: segment, track: track + 1 }); // Offset by 1 to leave space for clips
-                 });
-               }
+              // Process subtitles to handle clipping using the helper function
+              const processedSubtitles = processSubtitlesForClips(effectiveCaptions, localClips);
               
-              return allSegments.map((segment, globalIndex) => {
+              const segmentsWithTracks = assignTracks(processedSubtitles);
+              segmentsWithTracks.forEach(({ segment, track }) => {
+                allSegments.push({ type: 'subtitle', data: segment, track: track + 1 }); // Offset by 1 to leave space for clips
+              });
+              
+              return allSegments.map((segment) => {
                 if (segment.type === 'clip') {
                   const clip = segment.data;
                   const index = segment.index;
