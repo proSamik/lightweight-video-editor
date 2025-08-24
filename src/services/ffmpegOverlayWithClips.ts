@@ -535,7 +535,7 @@ export class FFmpegOverlayWithClips {
             const wordStartMs = word.start;
             const wordEndMs = word.end;
             
-            // Calculate time to subtract for this word
+            // Calculate time to subtract for this word (same logic as caption)
             let wordTimeToSubtractMs = 0;
             for (const clip of removedClips) {
               if (clip.endTime <= wordStartMs) {

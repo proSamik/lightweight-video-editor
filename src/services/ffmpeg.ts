@@ -524,7 +524,7 @@ export class FFmpegService {
         .outputOptions([
           '-avoid_negative_ts', 'make_zero',
           '-fflags', '+genpts',
-          '-vf', 'select=not(mod(n\\,1))' // Remove first frame to avoid black frame
+          '-vf', 'select=gt(n\\,0)' // Remove first frame (n=0) to avoid black frame
         ])
         .output(outputPath)
         .on('progress', (progress: any) => {

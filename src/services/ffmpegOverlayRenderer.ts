@@ -3114,6 +3114,9 @@ if (!isMainThread && workerData?.isWorker) {
     canvasWidth: number,
     canvasHeight: number
   ): Promise<void> => {
+    // Calculate frameTime based on the highlighted word's timing (matching AI Subtitle Panel logic)
+    const highlightedWord = words[highlightedWordIndex];
+    const frameTime = highlightedWord ? (highlightedWord.start + highlightedWord.end) / 2 : 0;
     const baseFontSize = caption.style?.fontSize || 32;
     const scale = caption.style?.scale || 1;
     const fontSize = baseFontSize * scale;
@@ -3130,16 +3133,30 @@ if (!isMainThread && workerData?.isWorker) {
     const x = (canvasWidth * caption.style.position.x) / 100;
     const y = (canvasHeight * caption.style.position.y) / 100;
     
-    // Show words progressively up to the highlighted word
-    const visibleWords = words.slice(0, highlightedWordIndex + 1);
+    // Find words that should be visible up to current time (matching AI Subtitle Panel logic)
+    const visibleWords: any[] = [];
+    for (const word of words) {
+      if (frameTime >= word.start) {
+        visibleWords.push(word);
+      }
+    }
+    
+    // Find the currently highlighted word (matching AI Subtitle Panel logic)
+    const currentWord = words.find(word => frameTime >= word.start && frameTime <= word.end);
+    const currentWordIndex = currentWord ? words.indexOf(currentWord) : visibleWords.length - 1;
+    
+    // Show only the line that corresponds to the currently highlighted word
+    const displayLineIndex = Math.min(currentWordIndex, visibleWords.length - 1);
+    const displayWords = visibleWords.slice(0, displayLineIndex + 1);
+    
     const lineHeight = fontSize + 8;
     const firstWordY = y;
     
     // Draw each word vertically
-    for (let wordIndex = 0; wordIndex < visibleWords.length; wordIndex++) {
-      const word = visibleWords[wordIndex];
+    for (let wordIndex = 0; wordIndex < displayWords.length; wordIndex++) {
+      const word = displayWords[wordIndex];
       const wordY = firstWordY + (wordIndex * lineHeight);
-      const isHighlighted = wordIndex === highlightedWordIndex;
+      const isHighlighted = wordIndex === displayLineIndex;
       
       const displayWord = applyTextTransformInWorker(word.word, caption.style?.textTransform || 'none');
       
