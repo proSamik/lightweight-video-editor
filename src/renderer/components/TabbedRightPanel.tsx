@@ -3,6 +3,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { AISubtitleData, VideoClip } from '../../types';
 import StylingPanel from './StylingPanel';
 import AISubtitlesPanel from './AISubtitlesPanel';
+import TranscriptionModal from './TranscriptionModal';
 import { Palette, Brain } from 'lucide-react';
 
 interface TabbedRightPanelProps {
@@ -49,7 +50,7 @@ const TabbedRightPanel: React.FC<TabbedRightPanelProps> = ({
     color: isActive ? theme.colors.text : theme.colors.textSecondary,
     border: 'none',
     borderBottom: isActive ? `2px solid ${theme.colors.primary}` : `2px solid transparent`,
-    cursor: 'pointer',
+    cursor: transcriptionStatus.isTranscribing ? 'not-allowed' : 'pointer',
     fontSize: '14px',
     fontWeight: isActive ? '500' : '400',
     transition: 'all 0.15s ease',
@@ -57,7 +58,8 @@ const TabbedRightPanel: React.FC<TabbedRightPanelProps> = ({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '8px'
+    gap: '8px',
+    opacity: transcriptionStatus.isTranscribing && !isActive ? 0.5 : 1
   });
 
   return (
@@ -74,14 +76,14 @@ const TabbedRightPanel: React.FC<TabbedRightPanelProps> = ({
         backgroundColor: theme.colors.background
       }}>
         <button
-          onClick={() => setActiveTab('styling')}
+          onClick={() => !transcriptionStatus.isTranscribing && setActiveTab('styling')}
           style={tabStyle(activeTab === 'styling')}
         >
           <Palette size={14} />
           Styling
         </button>
         <button
-          onClick={() => setActiveTab('aiSubtitles')}
+          onClick={() => !transcriptionStatus.isTranscribing && setActiveTab('aiSubtitles')}
           style={tabStyle(activeTab === 'aiSubtitles')}
         >
           <Brain size={14} />
@@ -92,9 +94,12 @@ const TabbedRightPanel: React.FC<TabbedRightPanelProps> = ({
       {/* Tab Content */}
       <div style={{
         flex: 1,
-        overflow: 'hidden'
+        overflow: 'hidden',
+        position: 'relative'
       }}>
-        {activeTab === 'styling' ? (
+        {transcriptionStatus.isTranscribing ? (
+          <TranscriptionModal transcriptionStatus={transcriptionStatus} />
+        ) : activeTab === 'styling' ? (
           <StylingPanel
             onTimeSeek={onTimeSeek}
             transcriptionStatus={transcriptionStatus}
