@@ -120,7 +120,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
       // Find the original caption segment for style reference
       // Provide a safe fallback style
       const baseStyle = frame.style || {
-        font: 'Segoe UI',
+        font: 'Poppins',
         fontSize: 85,
         textColor: '#ffffff',
         highlighterColor: '#ffff00',
@@ -1671,7 +1671,7 @@ function renderSimpleTextOnCanvas(
   const strokeWidth = caption.style?.strokeWidth || 0;
   
   // Set font with actual font from caption style (matching export system exactly)
-  const fontFamily = mapFontName(caption.style?.font || 'Segoe UI');
+  const fontFamily = mapFontName(caption.style?.font || 'Poppins');
   ctx.font = `bold ${fontSize}px ${fontFamily}, Arial, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -1780,7 +1780,7 @@ function renderKaraokeTextOnCanvas(
   const strokeWidth = caption.style?.strokeWidth || 0;
   
   // Set font with actual font from caption style (matching VideoPanel exactly)
-  const fontFamily = mapFontName(caption.style?.font || 'Segoe UI');
+  const fontFamily = mapFontName(caption.style?.font || 'Poppins');
   ctx.font = `bold ${fontSize}px ${fontFamily}, Arial, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle'; // Changed to middle for better centering
@@ -1955,7 +1955,7 @@ function renderProgressiveTextOnCanvas(
   const strokeWidth = caption.style?.strokeWidth || 0;
   
   // Set font with actual font from caption style
-  const fontFamily = mapFontName(caption.style?.font || 'Segoe UI');
+  const fontFamily = mapFontName(caption.style?.font || 'Poppins');
   const textAlign = caption.style?.textAlign || 'center';
   ctx.font = `bold ${fontSize}px ${fontFamily}, Arial, sans-serif`;
   ctx.textAlign = textAlign;
