@@ -781,6 +781,14 @@ const AppContent: React.FC = () => {
         const videoMetadata = await window.electronAPI.getVideoMetadata(pendingVideoPath);
         setVideoFile(videoMetadata);
         
+        // Reset state for new video - this will cause UnifiedTimeline to reinitialize
+        setClips([]);
+        setCurrentTime(0);
+        setSelectedFrameId(null);
+        
+        // Clear any persisted clips from previous video
+        localStorage.removeItem('tempClips');
+        
         // Generate captions in background (UI remains responsive)
         await generateCaptions(pendingVideoPath, settings);
         setPendingVideoPath(null);
