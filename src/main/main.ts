@@ -485,60 +485,33 @@ ipcMain.handle('export-video-with-new-audio', async (event, videoPath: string, n
 
 ipcMain.handle('render-video-with-ai-subtitles', async (event, videoPath: string, aiSubtitleData: any, outputPath: string, exportSettings?: any, replacementAudioPath?: string) => {
   try {
-    // Convert AI subtitle data to captions format for now
-    // TODO: Update FFmpeg services to work directly with AI subtitles
-    const captionsData = aiSubtitleData.frames.map((frame: any) => {
-      const visibleWords = Array.isArray(frame.words)
+    // Use FFmpegOverlayRenderer directly with AI subtitle data (no conversion needed)
+    const { FFmpegOverlayRenderer } = await import('../services/ffmpegOverlayRenderer');
+    const overlayRenderer = FFmpegOverlayRenderer.getInstance();
+    
+    // Filter out removed words and pauses from AI subtitle data
+    const filteredFrames = aiSubtitleData.frames.map((frame: any) => ({
+      ...frame,
+      words: Array.isArray(frame.words) 
         ? frame.words.filter((w: any) => w && !w.isPause && w.editState !== 'removedCaption')
-        : [];
-
-      const mergedStyle = {
-        font: frame.style?.font || 'Arial',
-        fontSize: frame.style?.fontSize ?? 85,
-        textColor: frame.style?.textColor || '#ffffff',
-        highlighterColor: frame.style?.highlighterColor || '#ffff00',
-        backgroundColor: frame.style?.backgroundColor ?? 'transparent',
-        strokeColor: frame.style?.strokeColor,
-        strokeWidth: frame.style?.strokeWidth,
-        textTransform: frame.style?.textTransform,
-        position: {
-          x: frame.style?.position?.x ?? 50,
-          y: frame.style?.position?.y ?? 85,
-          z: frame.style?.position?.z ?? 0,
-        },
-        scale: frame.style?.scale ?? 1,
-        emphasizeMode: frame.style?.emphasizeMode ?? true,
-        renderMode: frame.style?.renderMode || 'horizontal',
-        textAlign: frame.style?.textAlign || 'center',
-        burnInSubtitles: frame.style?.burnInSubtitles !== false,
-      };
-
-      return {
-        id: frame.id,
-        startTime: Math.round(frame.startTime * 1000),
-        endTime: Math.round(frame.endTime * 1000),
-        text: visibleWords.map((w: any) => w.word).join(' '),
-        words: visibleWords.map((w: any) => ({
-          word: w.word,
-          start: Math.round(w.start * 1000),
-          end: Math.round(w.end * 1000),
-          editState: w.editState || 'normal',
-        })),
-        style: mergedStyle,
-      };
-    });
-
-    const ffmpegService = FFmpegService.getInstance();
+        : frame.words || []
+    }));
+    
+    const filteredAiSubtitleData = {
+      ...aiSubtitleData,
+      frames: filteredFrames
+    };
     
     if (replacementAudioPath) {
       // First render video with captions to a temp file
       const tempVideoPath = outputPath.replace('.mp4', '_temp_with_subtitles.mp4');
-      await ffmpegService.renderVideoWithBurnedCaptions(videoPath, captionsData, tempVideoPath, (progress: number) => {
+      await overlayRenderer.renderVideoWithCaptions(videoPath, filteredFrames, tempVideoPath, (progress: number) => {
         // Send progress updates to renderer (first 80% for subtitle rendering)
         event.sender.send('rendering-progress', progress * 0.8);
       }, exportSettings);
       
       // Then replace the audio track
+      const ffmpegService = FFmpegService.getInstance();
       await ffmpegService.replaceAudioTrack(tempVideoPath, replacementAudioPath, outputPath);
       
       // Send final progress
@@ -555,7 +528,7 @@ ipcMain.handle('render-video-with-ai-subtitles', async (event, videoPath: string
       return outputPath;
     } else {
       // Normal rendering without audio replacement
-      return await ffmpegService.renderVideoWithBurnedCaptions(videoPath, captionsData, outputPath, (progress: number) => {
+      return await overlayRenderer.renderVideoWithCaptions(videoPath, filteredFrames, outputPath, (progress: number) => {
         // Send progress updates to renderer
         event.sender.send('rendering-progress', progress);
       }, exportSettings);
@@ -603,11 +576,13 @@ ipcMain.handle('render-video-with-clips-and-subtitles', async (event, videoPath:
 
       return {
         id: frame.id,
+        // Convert from seconds (UI) to milliseconds (service) for consistent timing
         startTime: Math.round(frame.startTime * 1000),
         endTime: Math.round(frame.endTime * 1000),
         text: visibleWords.map((w: any) => w.word).join(' '),
         words: visibleWords.map((w: any) => ({
           word: w.word,
+          // Convert word timing from seconds to milliseconds
           start: Math.round(w.start * 1000),
           end: Math.round(w.end * 1000),
           editState: w.editState || 'normal',

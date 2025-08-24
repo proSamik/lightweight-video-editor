@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { Worker, isMainThread, parentPort, workerData } from 'worker_threads';
+import { Worker, isMainThread, workerData } from 'worker_threads';
 import ffmpeg = require('fluent-ffmpeg');
 
 /**

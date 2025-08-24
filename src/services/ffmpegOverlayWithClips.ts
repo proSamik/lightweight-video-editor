@@ -6,6 +6,109 @@ import { FFmpegOverlayRenderer } from './ffmpegOverlayRenderer';
 import FFmpegService from './ffmpeg';
 
 /**
+ * Timeline segment representing an active video clip with original and effective timing
+ */
+interface TimelineSegment {
+  originalStart: number;
+  originalEnd: number;
+  effectiveStart: number;
+  effectiveEnd: number;
+  segmentIndex: number;
+}
+
+/**
+ * TimelineMapper class for accurate subtitle timing adjustments
+ * Provides consistent timeline mapping to eliminate timing drift
+ */
+class TimelineMapper {
+  private segments: TimelineSegment[] = [];
+  
+  constructor(clips: VideoClip[]) {
+    this.buildTimelineSegments(clips);
+  }
+  
+  /**
+   * Build ordered timeline segments from active clips
+   */
+  private buildTimelineSegments(clips: VideoClip[]): void {
+    // Get active clips sorted by start time
+    const activeClips = clips
+      .filter(clip => !clip.isRemoved)
+      .sort((a, b) => a.startTime - b.startTime);
+    
+    console.log('TimelineMapper: Building segments from', activeClips.length, 'active clips');
+    
+    let effectiveOffset = 0;
+    
+    this.segments = activeClips.map((clip, index) => {
+      const segment: TimelineSegment = {
+        originalStart: clip.startTime,
+        originalEnd: clip.endTime,
+        effectiveStart: effectiveOffset,
+        effectiveEnd: effectiveOffset + (clip.endTime - clip.startTime),
+        segmentIndex: index
+      };
+      
+      // Next segment starts after this one ends
+      effectiveOffset = segment.effectiveEnd;
+      
+      console.log(`Segment ${index}: Original ${(segment.originalStart/1000).toFixed(3)}s-${(segment.originalEnd/1000).toFixed(3)}s → Effective ${(segment.effectiveStart/1000).toFixed(3)}s-${(segment.effectiveEnd/1000).toFixed(3)}s`);
+      
+      return segment;
+    });
+    
+    console.log('TimelineMapper: Built', this.segments.length, 'timeline segments');
+  }
+  
+  /**
+   * Find the timeline segment containing the given original time
+   */
+  private findSegmentContaining(originalTime: number): TimelineSegment | null {
+    return this.segments.find(segment => 
+      originalTime >= segment.originalStart && originalTime <= segment.originalEnd
+    ) || null;
+  }
+  
+  /**
+   * Map an original timestamp to effective timeline timestamp
+   */
+  public mapSubtitleTime(originalTime: number): number {
+    const segment = this.findSegmentContaining(originalTime);
+    if (!segment) {
+      // Time falls outside any active segment - should be filtered
+      return -1;
+    }
+    
+    // Calculate offset within the segment
+    const offsetWithinSegment = originalTime - segment.originalStart;
+    const effectiveTime = segment.effectiveStart + offsetWithinSegment;
+    
+    return effectiveTime;
+  }
+  
+  /**
+   * Check if a subtitle should be filtered out (doesn't overlap with any active segment)
+   */
+  public shouldFilterSubtitle(startTime: number, endTime: number): boolean {
+    // Subtitle should be filtered if it doesn't overlap with any active segment
+    const hasOverlap = this.segments.some(segment => 
+      startTime < segment.originalEnd && endTime > segment.originalStart
+    );
+    
+    return !hasOverlap;
+  }
+  
+  /**
+   * Get total effective duration of all active segments
+   */
+  public getTotalEffectiveDuration(): number {
+    return this.segments.reduce((total, segment) => {
+      return Math.max(total, segment.effectiveEnd);
+    }, 0);
+  }
+}
+
+/**
  * Advanced FFmpeg Overlay-based video renderer with clipping support
  * Features: Audio replacement, video clipping, subtitle overlay, and chunked processing
  */
@@ -14,6 +117,7 @@ export class FFmpegOverlayWithClips {
   private isCancelled: boolean = false;
   private activeFFmpegProcesses: Set<any> = new Set();
   private currentTempDir: string | null = null;
+  private debugMode: boolean = false;
 
   private constructor() {
     console.log('FFmpeg Overlay With Clips Renderer initialized');
@@ -142,129 +246,116 @@ export class FFmpegOverlayWithClips {
         throw new Error('Rendering cancelled after video clipping');
       }
       
-      // Phase 3: Adjust captions timing for clipped video (50-60%)
-      console.log('=== PHASE 3: Adjusting Caption Timing ===');
+      // Phase 3: Direct segment processing with overlays (50-100%)
+      console.log('=== PHASE 3: Direct Segment Processing with Overlays ===');
+      
+      // Adjust caption timing for the clipped timeline
       const adjustedCaptions = this.adjustCaptionsForClips(captions, clips);
-      console.log('Caption timing adjusted, adjusted count:', adjustedCaptions.length);
-      if (onProgress) onProgress(60);
+      console.log('Adjusted caption count:', adjustedCaptions.length);
+      
+      if (adjustedCaptions.length === 0) {
+        console.log('No captions to process, copying clipped video to output');
+        return await this.copyVideo(clippedVideoPath, outputPath);
+      }
       
       // Check if cancelled after caption adjustment
       if (this.isCancelled) {
         throw new Error('Rendering cancelled after caption timing adjustment');
       }
       
-      // Phase 4: Use FFmpegOverlayRenderer for subtitle overlay rendering (60-100%)
-      console.log('=== PHASE 4: Subtitle Overlay Rendering ===');
-      console.log(`Passing ${adjustedCaptions.length} adjusted captions to FFmpegOverlayRenderer`);
+      // Get the list of segment files created in Phase 2
+      const activeClips = clips.filter(clip => !clip.isRemoved).sort((a, b) => a.startTime - b.startTime);
+      const segmentPaths: string[] = [];
       
-      if (adjustedCaptions.length === 0) {
-        console.log('No captions to render, copying clipped video to output');
-        return await this.copyVideo(clippedVideoPath, outputPath);
+      for (let i = 0; i < activeClips.length; i++) {
+        segmentPaths.push(path.join(tempDir, `segment_${i}.mp4`));
       }
       
-      // Validate that we have at least some captions with burn-in enabled
-      const captionsWithBurnIn = adjustedCaptions.filter(caption => 
-        caption.style?.burnInSubtitles !== false
-      );
+      console.log(`Processing ${segmentPaths.length} video segments with overlays`);
+      if (onProgress) onProgress(60);
       
-      if (captionsWithBurnIn.length === 0) {
-        console.log('No captions with burn-in enabled, copying clipped video to output');
-        return await this.copyVideo(clippedVideoPath, outputPath);
-      }
+      const processedSegmentPaths: string[] = [];
       
-      console.log(`Found ${captionsWithBurnIn.length} captions with burn-in enabled`);
-      
-      // Debug: Log first few captions to verify timing
-      if (captionsWithBurnIn.length > 0) {
-        console.log('=== DEBUG: First 3 adjusted captions ===');
-        captionsWithBurnIn.slice(0, 3).forEach((caption, index) => {
-          console.log(`Caption ${index + 1}: ${(caption.startTime/1000).toFixed(3)}s - ${(caption.endTime/1000).toFixed(3)}s (duration: ${((caption.endTime - caption.startTime)/1000).toFixed(3)}s)`);
-          if (caption.words && caption.words.length > 0) {
-            console.log(`  Words: ${caption.words.length}, First word: ${(caption.words[0].start/1000).toFixed(3)}s - ${(caption.words[0].end/1000).toFixed(3)}s`);
-          }
-        });
-        console.log('=== END DEBUG ===');
-      }
-      
-      // Final validation: Ensure all captions have proper timing
-      const finalValidCaptions = captionsWithBurnIn.filter(caption => {
-        const isValid = caption.startTime !== undefined && 
-                       caption.endTime !== undefined && 
-                       caption.startTime < caption.endTime &&
-                       (caption.endTime - caption.startTime) >= 1; // At least 1ms duration
+      // Process each segment individually
+      for (let i = 0; i < segmentPaths.length; i++) {
+        const segmentPath = segmentPaths[i];
+        const clip = activeClips[i];
         
-        if (!isValid) {
-          console.warn(`Final validation: Removing invalid caption with timing: start=${caption.startTime}, end=${caption.endTime}, duration=${caption.endTime - caption.startTime}ms`);
-          return false;
+        if (!fs.existsSync(segmentPath)) {
+          throw new Error(`Segment file not found: ${segmentPath}`);
         }
         
-        // Also validate word timing if present
-        if (caption.words && Array.isArray(caption.words)) {
-          const validWords = caption.words.filter((word: any) => {
-            const wordValid = word.start !== undefined && 
-                            word.end !== undefined && 
-                            word.start < word.end &&
-                            (word.end - word.start) >= 1; // At least 1ms duration
-            
-            if (!wordValid) {
-              console.warn(`Final validation: Removing invalid word with timing: start=${word.start}, end=${word.end}, duration=${word.end - word.start}ms`);
-            }
-            
-            return wordValid;
-          });
-          
-          // Update caption with only valid words
-          caption.words = validWords;
-          
-          // If no valid words remain, the caption might still be valid for static rendering
-          if (validWords.length === 0 && caption.words && caption.words.length > 0) {
-            console.log(`Caption has no valid words after final validation, will render as static text`);
-          }
+        console.log(`Processing segment ${i + 1}/${segmentPaths.length}: ${path.basename(segmentPath)}`);
+        
+        if (this.isCancelled) {
+          throw new Error('Rendering cancelled during segment processing');
         }
         
-        return true;
-      });
-      
-      if (finalValidCaptions.length === 0) {
-        console.log('No valid captions after final validation, copying clipped video to output');
-        return await this.copyVideo(clippedVideoPath, outputPath);
-      }
-      
-      console.log(`Final validation complete: ${finalValidCaptions.length} captions ready for rendering`);
-      
-      // Additional validation: Check for any remaining timing issues
-      let totalWords = 0;
-      let validWords = 0;
-      finalValidCaptions.forEach(caption => {
-        if (caption.words && Array.isArray(caption.words)) {
-          totalWords += caption.words.length;
-          validWords += caption.words.filter((word: any) => 
-            word.start !== undefined && 
-            word.end !== undefined && 
-            word.start < word.end &&
-            (word.end - word.start) >= 1
-          ).length;
+        // Create segment descriptor for caption filtering
+        // IMPORTANT: Use effective times that correspond to the adjustedCaptions timeline
+        // The TimelineMapper mapped captions to effective times (0-based timeline)
+        // So segment 0 starts at effective time 0, segment 1 starts where segment 0 ends, etc.
+        
+        // Calculate effective start/end for this segment
+        let effectiveStartMs = 0;
+        for (let j = 0; j < i; j++) {
+          const prevClip = activeClips[j];
+          effectiveStartMs += (prevClip.endTime - prevClip.startTime);
         }
-      });
-      
-      console.log(`Word validation summary: ${validWords}/${totalWords} words have valid timing`);
-      
-      if (validWords < totalWords) {
-        console.warn(`Warning: ${totalWords - validWords} words have invalid timing and will be skipped`);
+        const effectiveEndMs = effectiveStartMs + (clip.endTime - clip.startTime);
+        
+        const segmentDescriptor = {
+          startTime: effectiveStartMs, // Use effective timeline times
+          endTime: effectiveEndMs,
+          segmentIndex: i
+        };
+        
+        // Get captions for this segment (adjusted to segment-relative timing)
+        const segmentCaptions = this.getSegmentCaptions(segmentDescriptor, adjustedCaptions);
+        
+        // Generate overlay images for this segment
+        const overlayFiles = await this.generateOverlayImagesForSegment(
+          segmentCaptions,
+          i,
+          tempDir,
+          metadata
+        );
+        
+        // Determine processing approach based on segment duration
+        const segmentMetadata = await this.getVideoMetadata(segmentPath);
+        const segmentDuration = segmentMetadata.duration;
+        
+        const processedSegmentPath = path.join(tempDir, `processed_segment_${i}.mp4`);
+        
+        if (segmentDuration <= 90) {
+          // Process as single batch (most common case)
+          console.log(`Processing segment ${i + 1} as single batch (${segmentDuration.toFixed(1)}s)`);
+          await this.processSingleSegment(segmentPath, overlayFiles, processedSegmentPath, segmentMetadata, exportSettings);
+        } else {
+          // Process with internal chunking for large segments
+          console.log(`Processing segment ${i + 1} with chunking (${segmentDuration.toFixed(1)}s)`);
+          await this.processLargeSegmentWithChunking(segmentPath, overlayFiles, processedSegmentPath, segmentMetadata, exportSettings);
+        }
+        
+        processedSegmentPaths.push(processedSegmentPath);
+        
+        // Progress update
+        if (onProgress) {
+          const segmentProgress = 60 + ((i + 1) / segmentPaths.length) * 35; // 60-95%
+          onProgress(Math.round(segmentProgress));
+        }
+        
+        console.log(`Segment ${i + 1} processing completed`);
       }
       
-      // Use the existing FFmpegOverlayRenderer for the overlay rendering
-      const overlayRenderer = FFmpegOverlayRenderer.getInstance();
+      console.log(`All ${processedSegmentPaths.length} segments processed, concatenating final video`);
       
-      const finalVideoPath = await overlayRenderer.renderVideoWithCaptions(
-        clippedVideoPath,
-        finalValidCaptions,
-        outputPath,
-        (progress) => {
-          if (onProgress) onProgress(60 + Math.min(40, (progress / 100) * 40));
-        },
-        exportSettings
-      );
+      // Concatenate all processed segments into final output
+      await this.concatenateVideoFiles(processedSegmentPaths, outputPath);
+      
+      if (onProgress) onProgress(100);
+      
+      console.log('Direct segment processing completed successfully');
       
       // Check if cancelled before cleanup
       if (this.isCancelled) {
@@ -277,7 +368,7 @@ export class FFmpegOverlayWithClips {
       this.currentTempDir = null;
       
       console.log('=== FFMPEG OVERLAY WITH CLIPS RENDERER COMPLETED ===');
-      return finalVideoPath;
+      return outputPath;
       
     } catch (error) {
       // Check if this is a cancellation (expected behavior)
@@ -470,12 +561,12 @@ export class FFmpegOverlayWithClips {
   }
 
   /**
-   * Adjust caption timing based on clips using the same logic as AISubtitlesPanel
-   * This ensures captions are properly mapped to the new clipped video timeline
+   * Adjust caption timing based on clips using TimelineMapper for accurate segment-based processing
+   * Eliminates timing drift by using precise timeline mapping instead of cumulative time subtraction
    * Note: FFmpegOverlayRenderer expects times in milliseconds
    */
   private adjustCaptionsForClips(captions: any[], clips: VideoClip[]): any[] {
-    console.log('Adjusting caption timing for', captions.length, 'captions');
+    console.log('=== TIMELINE MAPPER: Adjusting caption timing for', captions.length, 'captions ===');
     
     // Check if there are any removed clips
     const hasRemovedClips = clips.some(clip => clip.isRemoved);
@@ -484,155 +575,598 @@ export class FFmpegOverlayWithClips {
       return captions;
     }
     
-    const removedClips = clips.filter(clip => clip.isRemoved).sort((a, b) => a.startTime - b.startTime);
-    console.log('Removed clips:', removedClips.map(c => `${(c.startTime/1000).toFixed(3)}s-${(c.endTime/1000).toFixed(3)}s`));
+    // Initialize TimelineMapper with clip data
+    const timelineMapper = new TimelineMapper(clips);
     
-    // First, filter out captions that overlap with removed clips (same logic as UI)
-    const filteredCaptions = captions.filter(caption => {
-      // Caption times are in milliseconds, convert to same unit as clip times
-      const captionStartMs = caption.startTime;
-      const captionEndMs = caption.endTime;
-      
-      // Check if this caption overlaps with any removed clip
-      const isInRemovedClip = removedClips.some(clip => 
-        captionStartMs < clip.endTime && 
-        captionEndMs > clip.startTime
-      );
-      
-      if (isInRemovedClip) {
-        console.log(`Filtering out caption ${(captionStartMs/1000).toFixed(3)}s-${(captionEndMs/1000).toFixed(3)}s: overlaps with removed clip`);
-      }
-      
-      return !isInRemovedClip;
-    });
+    console.log('=== CAPTION FILTERING AND MAPPING PHASE ===');
     
-    console.log(`Filtered ${filteredCaptions.length}/${captions.length} captions (removed overlapping with deleted clips)`);
+    // Debug: Show first few caption times for comparison
+    if (captions.length > 0) {
+      console.log('=== DEBUG: First 3 original caption timings ===');
+      captions.slice(0, 3).forEach((caption, index) => {
+        console.log(`Caption ${index + 1}: ${(caption.startTime/1000).toFixed(3)}s - ${(caption.endTime/1000).toFixed(3)}s`);
+      });
+      console.log('=== END DEBUG ===');
+    }
     
-    // Then, adjust timing by subtracting removed clip durations (same logic as UI)
-    const adjustedCaptions = filteredCaptions.map(caption => {
-      const captionStartMs = caption.startTime;
-      const captionEndMs = caption.endTime;
-      
-      // Calculate how much time to subtract from removed clips that come before this caption
-      let timeToSubtractMs = 0;
-      for (const clip of removedClips) {
-        if (clip.endTime <= captionStartMs) {
-          // Entire clip is before this caption
-          timeToSubtractMs += (clip.endTime - clip.startTime);
-        }
-      }
-      
-      // Keep times in milliseconds for FFmpegOverlayRenderer
-      const newStartMs = Math.max(0, captionStartMs - timeToSubtractMs);
-      const newEndMs = Math.max(newStartMs + 1, captionEndMs - timeToSubtractMs); // Ensure minimum 1ms duration
-      
-      // Adjust word timing if present
-      let adjustedWords = caption.words;
-      if (Array.isArray(caption.words)) {
-        adjustedWords = caption.words.map((word: any) => {
-          if (word.start !== undefined && word.end !== undefined) {
-            // Word times are in milliseconds
-            const wordStartMs = word.start;
-            const wordEndMs = word.end;
-            
-            // Calculate time to subtract for this word (same logic as caption)
-            let wordTimeToSubtractMs = 0;
-            for (const clip of removedClips) {
-              if (clip.endTime <= wordStartMs) {
-                wordTimeToSubtractMs += (clip.endTime - clip.startTime);
-              }
-            }
-            
-            // Keep word times in milliseconds for FFmpegOverlayRenderer
-            const newWordStartMs = Math.max(0, wordStartMs - wordTimeToSubtractMs);
-            const newWordEndMs = Math.max(newWordStartMs + 1, wordEndMs - wordTimeToSubtractMs); // Ensure minimum 1ms duration
-            
-            // Additional validation: ensure the word has a valid duration
-            if (newWordEndMs <= newWordStartMs) {
-              console.warn(`Invalid word duration after adjustment: start=${newWordStartMs}ms, end=${newWordEndMs}ms, original: start=${wordStartMs}ms, end=${wordEndMs}ms, subtracted=${wordTimeToSubtractMs}ms`);
-              // Skip this word by returning null - it will be filtered out
-              return null;
-            }
-            
-            // Ensure word timing is constrained within caption timing (like AISubtitlesPanel does)
-            const constrainedStartMs = Math.max(newWordStartMs, newStartMs);
-            const constrainedEndMs = Math.min(newWordEndMs, newEndMs);
-            
-            // Final validation: ensure constrained timing is valid
-            if (constrainedEndMs <= constrainedStartMs) {
-              console.warn(`Word timing constrained to invalid duration: start=${constrainedStartMs}ms, end=${constrainedEndMs}ms, caption: start=${newStartMs}ms, end=${newEndMs}ms`);
-              return null;
-            }
-            
-            return {
-              ...word,
-              start: constrainedStartMs,
-              end: constrainedEndMs
-            };
-          }
-          return word;
-        }).filter((word: any) => word !== null); // Remove null words (invalid durations)
+    // Filter and adjust captions using TimelineMapper
+    const processedCaptions = captions
+      .filter(caption => {
+        // Filter out captions that fall entirely outside active segments
+        const shouldFilter = timelineMapper.shouldFilterSubtitle(caption.startTime, caption.endTime);
         
-        // If no valid words remain, log it but keep the caption for static rendering
-        if (adjustedWords.length === 0 && caption.words && caption.words.length > 0) {
-          console.log(`Caption at ${(newStartMs/1000).toFixed(3)}s has no valid words after adjustment, will render as static text`);
+        if (shouldFilter) {
+          console.log(`Filtering out caption ${(caption.startTime/1000).toFixed(3)}s-${(caption.endTime/1000).toFixed(3)}s: falls outside active segments`);
         }
-      }
-      
-      const adjustedCaption = {
-        ...caption,
-        startTime: newStartMs,  // Keep in milliseconds for FFmpegOverlayRenderer
-        endTime: newEndMs,      // Keep in milliseconds for FFmpegOverlayRenderer
-        words: adjustedWords || []
-      };
-      
-      // Debug first few captions
-      if (filteredCaptions.indexOf(caption) < 3) {
-        console.log(`Adjusted caption: ${(captionStartMs/1000).toFixed(3)}s -> ${(newStartMs/1000).toFixed(3)}s (subtracted ${(timeToSubtractMs/1000).toFixed(3)}s)`);
-        console.log(`  Words: ${adjustedWords?.length || 0}, First word timing: ${adjustedWords?.[0]?.start ? (adjustedWords[0].start/1000).toFixed(3) : 'N/A'}s-${adjustedWords?.[0]?.end ? (adjustedWords[0].end/1000).toFixed(3) : 'N/A'}s`);
         
-        // Debug word timing adjustment for first caption
-        if (filteredCaptions.indexOf(caption) === 0 && caption.words && caption.words.length > 0) {
-          console.log(`  === WORD TIMING DEBUG ===`);
-          caption.words.slice(0, 3).forEach((word: any, wordIndex: number) => {
-            const wordStartMs = word.start;
-            const wordEndMs = word.end;
-            let wordTimeToSubtractMs = 0;
-            for (const clip of removedClips) {
-              if (clip.endTime <= wordStartMs) {
-                wordTimeToSubtractMs += (clip.endTime - clip.startTime);
-              }
-            }
-            const newWordStartMs = Math.max(0, wordStartMs - wordTimeToSubtractMs);
-            const newWordEndMs = Math.max(newWordStartMs + 1, wordEndMs - wordTimeToSubtractMs);
-            const constrainedStartMs = Math.max(newWordStartMs, newStartMs);
-            const constrainedEndMs = Math.min(newWordEndMs, newEndMs);
-            
-            console.log(`  Word ${wordIndex}: ${(wordStartMs/1000).toFixed(3)}s-${(wordEndMs/1000).toFixed(3)}s -> ${(constrainedStartMs/1000).toFixed(3)}s-${(constrainedEndMs/1000).toFixed(3)}s (subtracted: ${(wordTimeToSubtractMs/1000).toFixed(3)}s)`);
-          });
-          console.log(`  === END WORD TIMING DEBUG ===`);
+        return !shouldFilter;
+      })
+      .map((caption, index) => {
+        // Map original times to effective timeline times
+        const originalStartMs = caption.startTime;
+        const originalEndMs = caption.endTime;
+        
+        const effectiveStartMs = timelineMapper.mapSubtitleTime(originalStartMs);
+        const effectiveEndMs = timelineMapper.mapSubtitleTime(originalEndMs);
+        
+        // Validate mapped times
+        if (effectiveStartMs < 0 || effectiveEndMs < 0) {
+          console.warn(`Caption ${index} has invalid mapped times: ${effectiveStartMs}ms - ${effectiveEndMs}ms`);
+          return null;
         }
-      }
-      
-      return adjustedCaption;
-    });
+        
+        // Ensure minimum duration
+        const finalStartMs = effectiveStartMs;
+        const finalEndMs = Math.max(finalStartMs + 100, effectiveEndMs); // Minimum 100ms duration
+        
+        // Process word timing if present
+        let adjustedWords = caption.words;
+        if (Array.isArray(caption.words) && caption.words.length > 0) {
+          adjustedWords = caption.words
+            .map((word: any) => {
+              if (word.start !== undefined && word.end !== undefined) {
+                const wordEffectiveStart = timelineMapper.mapSubtitleTime(word.start);
+                const wordEffectiveEnd = timelineMapper.mapSubtitleTime(word.end);
+                
+                // Skip words that couldn't be mapped to any active segment
+                if (wordEffectiveStart < 0 || wordEffectiveEnd < 0) {
+                  console.log(`Filtering out word "${word.word}" - falls outside active segments`);
+                  return null;
+                }
+                
+                // Ensure word times are valid and have minimum duration
+                const validStart = Math.max(wordEffectiveStart, finalStartMs);
+                const validEnd = Math.max(wordEffectiveEnd, validStart + 50); // Minimum 50ms duration
+                
+                // Constrain within caption bounds
+                const constrainedStart = validStart;
+                const constrainedEnd = Math.min(validEnd, finalEndMs);
+                
+                // Final validation: ensure we have a valid duration after constraints (minimum 10ms)
+                if (constrainedEnd <= constrainedStart || (constrainedEnd - constrainedStart) < 10) {
+                  if (this.debugMode) {
+                    console.log(`Filtering out word "${word.word}" - invalid duration: ${constrainedStart}ms - ${constrainedEnd}ms (duration: ${constrainedEnd - constrainedStart}ms)`);
+                  }
+                  return null;
+                }
+                
+                return {
+                  ...word,
+                  start: constrainedStart,
+                  end: constrainedEnd
+                };
+              }
+              return word;
+            })
+            .filter((word: any) => word !== null);
+        }
+        
+        // Debug timing for first few captions
+        if (index < 3) {
+          console.log(`Caption ${index + 1} timing adjustment:`);
+          console.log(`  Original: ${(originalStartMs/1000).toFixed(3)}s - ${(originalEndMs/1000).toFixed(3)}s`);
+          console.log(`  Effective: ${(finalStartMs/1000).toFixed(3)}s - ${(finalEndMs/1000).toFixed(3)}s`);
+          console.log(`  Words: ${adjustedWords?.length || 0} (${caption.words?.length || 0} original)`);
+        }
+        
+        return {
+          ...caption,
+          startTime: finalStartMs,
+          endTime: finalEndMs,
+          words: adjustedWords || []
+        };
+      })
+      .filter((caption: any) => caption !== null); // Remove null captions
     
-    // Validate and filter out any captions with invalid timing after adjustment
-    const validCaptions = adjustedCaptions.filter(caption => {
+    // Final validation
+    const validCaptions = processedCaptions.filter((caption: any) => {
       const isValid = caption.startTime !== undefined && 
                      caption.endTime !== undefined && 
                      caption.startTime < caption.endTime &&
-                     caption.endTime > caption.startTime;
+                     (caption.endTime - caption.startTime) >= 100; // Minimum 100ms duration
       
       if (!isValid) {
-        console.warn(`Filtering out invalid caption after adjustment: start=${caption.startTime}, end=${caption.endTime}`);
+        console.warn(`Final validation failed for caption: start=${caption.startTime}ms, end=${caption.endTime}ms, duration=${caption.endTime - caption.startTime}ms`);
       }
       
       return isValid;
     });
     
-    console.log(`Caption timing adjustment complete: ${validCaptions.length} valid captions in final video (filtered out ${adjustedCaptions.length - validCaptions.length} invalid captions)`);
+    const totalEffectiveDuration = timelineMapper.getTotalEffectiveDuration();
+    
+    console.log('=== TIMELINE MAPPER RESULTS ===');
+    console.log(`Original captions: ${captions.length}`);
+    console.log(`Filtered captions: ${processedCaptions.length}`);
+    console.log(`Valid final captions: ${validCaptions.length}`);
+    console.log(`Total effective timeline duration: ${(totalEffectiveDuration/1000).toFixed(3)}s`);
+    console.log('=== END TIMELINE MAPPER ===');
+    
     return validCaptions;
+  }
+
+  /**
+   * Extract captions that fall within a specific segment's timeline
+   * and adjust their timing relative to segment start
+   */
+  private getSegmentCaptions(
+    segment: { startTime: number; endTime: number; segmentIndex: number },
+    adjustedCaptions: any[]
+  ): any[] {
+    // Convert segment times from milliseconds to seconds for comparison
+    const segmentStartSec = segment.startTime / 1000;
+    const segmentEndSec = segment.endTime / 1000;
+    const segmentDurationSec = segmentEndSec - segmentStartSec;
+
+    console.log(`\n=== CAPTION DEBUGGING FOR SEGMENT ${segment.segmentIndex} ===`);
+    console.log(`Segment: ${segmentStartSec.toFixed(3)}s - ${segmentEndSec.toFixed(3)}s (duration: ${segmentDurationSec.toFixed(3)}s)`);
+    console.log(`Total adjusted captions available: ${adjustedCaptions.length}`);
+    
+    // Debug first few captions to see their timing
+    console.log('First 5 adjusted captions:');
+    adjustedCaptions.slice(0, 5).forEach((caption, index) => {
+      const captionStartSec = caption.startTime / 1000;
+      const captionEndSec = caption.endTime / 1000;
+      console.log(`  Caption ${index}: ${captionStartSec.toFixed(3)}s - ${captionEndSec.toFixed(3)}s`);
+    });
+
+    const segmentCaptions = adjustedCaptions
+      .filter(caption => {
+        // Convert caption times from milliseconds to seconds
+        const captionStartSec = caption.startTime / 1000;
+        const captionEndSec = caption.endTime / 1000;
+        
+        // Caption overlaps with segment if it starts before segment ends AND ends after segment starts
+        const overlaps = captionStartSec < segmentEndSec && captionEndSec > segmentStartSec;
+        
+        if (segment.segmentIndex === 1) { // Debug segment 2 specifically
+          console.log(`    Caption ${captionStartSec.toFixed(3)}s-${captionEndSec.toFixed(3)}s overlaps with segment? ${overlaps}`);
+        }
+        
+        return overlaps;
+      })
+      .map(caption => {
+        // Convert caption times from milliseconds to seconds for calculation
+        const captionStartSec = caption.startTime / 1000;
+        const captionEndSec = caption.endTime / 1000;
+        
+        // Adjust timing relative to segment start (convert back to milliseconds for consistency)
+        const relativeStartSec = Math.max(0, captionStartSec - segmentStartSec);
+        const relativeEndSec = Math.min(segmentDurationSec, captionEndSec - segmentStartSec);
+        
+        return {
+          ...caption,
+          startTime: relativeStartSec * 1000, // Convert back to milliseconds
+          endTime: relativeEndSec * 1000,     // Convert back to milliseconds
+          words: caption.words?.map((word: any) => {
+            const wordStartSec = word.start / 1000;
+            const wordEndSec = word.end / 1000;
+            
+            return {
+              ...word,
+              start: Math.max(0, (wordStartSec - segmentStartSec)) * 1000,
+              end: Math.min(segmentDurationSec * 1000, (wordEndSec - segmentStartSec) * 1000)
+            };
+          }) || []
+        };
+      })
+      .filter(caption => {
+        // Final validation: ensure caption has valid duration within segment
+        return caption.startTime < caption.endTime && caption.endTime > 0;
+      });
+
+    console.log(`Found ${segmentCaptions.length} captions for segment ${segment.segmentIndex}`);
+    
+    // Debug the first few segment captions
+    if (segmentCaptions.length > 0) {
+      console.log('First 3 segment captions (relative timing):');
+      segmentCaptions.slice(0, 3).forEach((caption, index) => {
+        const captionStartSec = caption.startTime / 1000;
+        const captionEndSec = caption.endTime / 1000;
+        console.log(`  Segment caption ${index}: ${captionStartSec.toFixed(3)}s - ${captionEndSec.toFixed(3)}s`);
+      });
+    }
+    console.log(`=== END CAPTION DEBUGGING FOR SEGMENT ${segment.segmentIndex} ===\n`);
+    
+    return segmentCaptions;
+  }
+
+  /**
+   * Generate overlay images for a specific segment's captions using FFmpegOverlayRenderer system
+   */
+  private async generateOverlayImagesForSegment(
+    segmentCaptions: any[],
+    segmentIndex: number,
+    tempDir: string,
+    metadata: any
+  ): Promise<Array<{ file: string; startTime: number; endTime: number }>> {
+    if (segmentCaptions.length === 0) {
+      console.log(`No captions for segment ${segmentIndex}, skipping overlay generation`);
+      return [];
+    }
+
+    console.log(`Generating overlay images for segment ${segmentIndex} with ${segmentCaptions.length} captions`);
+    
+    // Create segment-specific overlay directory
+    const segmentOverlayDir = path.join(tempDir, `segment_${segmentIndex}_overlays`);
+    if (!fs.existsSync(segmentOverlayDir)) {
+      fs.mkdirSync(segmentOverlayDir, { recursive: true });
+    }
+
+    // Use FFmpegOverlayRenderer's proper image generation system
+    const overlayRenderer = FFmpegOverlayRenderer.getInstance();
+    
+    // Generate overlay images using the same parallel processing as FFmpegOverlayRenderer
+    const overlayFiles = await overlayRenderer.generateOverlayImagesParallel(
+      segmentCaptions,
+      metadata,
+      segmentOverlayDir,
+      (progress) => {
+        console.log(`Segment ${segmentIndex} overlay generation: ${progress}%`);
+      }
+    );
+
+    console.log(`Generated ${overlayFiles.length} overlay images for segment ${segmentIndex}`);
+    return overlayFiles;
+  }
+
+  /**
+   * Process a single segment (≤90s) with its overlays in one batch
+   */
+  private async processSingleSegment(
+    segmentPath: string,
+    overlayFiles: Array<{ file: string; startTime: number; endTime: number }>,
+    outputPath: string,
+    _metadata: any,
+    exportSettings?: { quality: string }
+  ): Promise<void> {
+    console.log(`Processing single segment: ${path.basename(segmentPath)} with ${overlayFiles.length} overlays`);
+    
+    if (overlayFiles.length === 0) {
+      // No overlays, just copy the segment
+      console.log('No overlays for segment, copying directly');
+      return await this.copyVideoFile(segmentPath, outputPath);
+    }
+    
+    return new Promise((resolve, reject) => {
+      if (this.isCancelled) {
+        reject(new Error('Segment processing cancelled'));
+        return;
+      }
+      
+      // Build overlay filter chain
+      const filterChain = this.buildSegmentOverlayFilter(overlayFiles);
+      
+      // Create FFmpeg command
+      let command = ffmpeg(segmentPath);
+      
+      // Add overlay inputs
+      overlayFiles.forEach(overlay => {
+        command = command.input(overlay.file);
+      });
+      
+      // Apply filter chain and output options
+      command = command
+        .complexFilter(filterChain.filterComplex, filterChain.outputs)
+        .outputOptions([
+          '-c:v', this.getVideoCodecForMac(),
+          '-c:a', 'copy', // PRESERVE AUDIO - copy without re-encoding
+          '-map', '[final]', // Map the final video output
+          '-map', '0:a?', // Map audio stream if available (? makes it optional)
+          '-preset', this.getPresetForQuality(exportSettings?.quality || 'medium'),
+          '-crf', this.getCRFForQuality(exportSettings?.quality || 'medium'),
+          '-pix_fmt', 'yuv420p',
+          '-movflags', '+faststart'
+        ])
+        .output(outputPath);
+        
+      // Add this command to active processes for cancellation support
+      this.activeFFmpegProcesses.add(command);
+      
+      command
+        .on('start', () => {
+          const codec = this.getVideoCodecForMac();
+          const encodingType = codec === 'h264_videotoolbox' ? 'hardware' : 'software';
+          console.log(`Using ${encodingType} encoding (${codec}) for segment processing`);
+        })
+        .on('stderr', (stderrLine) => {
+          console.error(`FFmpeg stderr: ${stderrLine}`);
+        })
+        .on('end', () => {
+          console.log(`Segment processed successfully: ${path.basename(outputPath)}`);
+          this.activeFFmpegProcesses.delete(command);
+          resolve();
+        })
+        .on('error', (err) => {
+          console.error(`Segment processing failed: ${err.message}`);
+          console.error(`FFmpeg error details:`, err);
+          this.activeFFmpegProcesses.delete(command);
+          reject(new Error(`Segment processing failed: ${err.message}`));
+        });
+        
+      command.run();
+    });
+  }
+
+  /**
+   * Process a large segment (>90s) by chunking it internally
+   */
+  private async processLargeSegmentWithChunking(
+    segmentPath: string,
+    overlayFiles: Array<{ file: string; startTime: number; endTime: number }>,
+    outputPath: string,
+    metadata: any,
+    exportSettings?: { quality: string }
+  ): Promise<void> {
+    console.log(`Processing large segment with chunking: ${path.basename(segmentPath)}`);
+    
+    // Get segment duration
+    const segmentMetadata = await this.getVideoMetadata(segmentPath);
+    const segmentDuration = segmentMetadata.duration;
+    
+    if (segmentDuration <= 90) {
+      // Not actually a large segment, process normally
+      return await this.processSingleSegment(segmentPath, overlayFiles, outputPath, metadata, exportSettings);
+    }
+    
+    // Create chunks within this segment
+    const chunkDuration = 90; // 90 seconds per chunk
+    const numChunks = Math.ceil(segmentDuration / chunkDuration);
+    
+    console.log(`Splitting large segment (${segmentDuration}s) into ${numChunks} chunks`);
+    
+    const tempDir = path.dirname(outputPath);
+    const chunkPaths: string[] = [];
+    
+    try {
+      for (let i = 0; i < numChunks; i++) {
+        const chunkStart = i * chunkDuration;
+        const chunkEnd = Math.min((i + 1) * chunkDuration, segmentDuration);
+        const chunkPath = path.join(tempDir, `segment_chunk_${i}.mp4`);
+        
+        // Extract chunk from segment
+        await this.extractVideoChunk(segmentPath, chunkPath, chunkStart, chunkEnd);
+        
+        // Filter overlays for this chunk and adjust timing
+        const chunkOverlays = overlayFiles
+          .filter(overlay => {
+            const overlayStartSec = overlay.startTime / 1000;
+            const overlayEndSec = overlay.endTime / 1000;
+            return overlayStartSec < chunkEnd && overlayEndSec > chunkStart;
+          })
+          .map(overlay => ({
+            ...overlay,
+            startTime: Math.max(0, (overlay.startTime / 1000 - chunkStart)) * 1000,
+            endTime: Math.min((chunkEnd - chunkStart) * 1000, (overlay.endTime / 1000 - chunkStart) * 1000)
+          }));
+        
+        // Process chunk with its overlays
+        const processedChunkPath = path.join(tempDir, `processed_chunk_${i}.mp4`);
+        await this.processSingleSegment(chunkPath, chunkOverlays, processedChunkPath, metadata, exportSettings);
+        
+        chunkPaths.push(processedChunkPath);
+        
+        // Clean up intermediate chunk
+        fs.unlinkSync(chunkPath);
+      }
+      
+      // Merge all processed chunks
+      await this.concatenateVideoFiles(chunkPaths, outputPath);
+      
+    } finally {
+      // Clean up all chunk files
+      for (const chunkPath of chunkPaths) {
+        try {
+          if (fs.existsSync(chunkPath)) {
+            fs.unlinkSync(chunkPath);
+          }
+        } catch (error) {
+          console.warn(`Failed to cleanup chunk file: ${chunkPath}`, error);
+        }
+      }
+    }
+  }
+
+  /**
+   * Build overlay filter chain for a single segment
+   */
+  private buildSegmentOverlayFilter(overlayFiles: Array<{ file: string; startTime: number; endTime: number }>) {
+    if (overlayFiles.length === 0) {
+      return { filterComplex: '', outputs: ['[final]'] };
+    }
+    
+    const filters: string[] = [];
+    let currentInput = '[0:v]'; // Main video input
+    
+    // Sort overlays by start time to prevent timing conflicts
+    const sortedOverlays = [...overlayFiles].sort((a, b) => a.startTime - b.startTime);
+    
+    sortedOverlays.forEach((overlay, index) => {
+      const inputIndex = index + 1; // Overlay inputs start from 1
+      const outputLabel = index === sortedOverlays.length - 1 ? '[final]' : `[v${index + 1}]`;
+      
+      // Convert times to seconds with proper precision
+      const startSeconds = (overlay.startTime / 1000).toFixed(3);
+      const endSeconds = (overlay.endTime / 1000).toFixed(3);
+      
+      // Create overlay filter with timing
+      const overlayFilter = `${currentInput}[${inputIndex}:v]overlay=enable='gte(t,${startSeconds})*lt(t,${endSeconds})'${outputLabel}`;
+      filters.push(overlayFilter);
+      currentInput = outputLabel;
+    });
+    
+    return {
+      filterComplex: filters.join(';'),
+      outputs: ['[final]']
+    };
+  }
+
+  /**
+   * Extract a chunk from a video file
+   */
+  private async extractVideoChunk(
+    inputPath: string,
+    outputPath: string,
+    startTimeSeconds: number,
+    endTimeSeconds: number
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const duration = endTimeSeconds - startTimeSeconds;
+      
+      const command = ffmpeg(inputPath)
+        .seekInput(startTimeSeconds)
+        .duration(duration)
+        .outputOptions([
+          '-c', 'copy',
+          '-avoid_negative_ts', 'make_zero'
+        ])
+        .output(outputPath);
+        
+      this.activeFFmpegProcesses.add(command);
+      
+      command
+        .on('end', () => {
+          this.activeFFmpegProcesses.delete(command);
+          resolve();
+        })
+        .on('error', (err) => {
+          this.activeFFmpegProcesses.delete(command);
+          reject(err);
+        });
+        
+      command.run();
+    });
+  }
+
+  /**
+   * Concatenate multiple video files into one
+   */
+  private async concatenateVideoFiles(filePaths: string[], outputPath: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const concatFile = path.join(path.dirname(outputPath), `concat_${Date.now()}.txt`);
+      const concatContent = filePaths.map(file => `file '${path.resolve(file)}'`).join('\n');
+      
+      fs.writeFileSync(concatFile, concatContent);
+      
+      const command = ffmpeg()
+        .input(concatFile)
+        .inputOptions(['-f', 'concat', '-safe', '0'])
+        .outputOptions([
+          '-c', 'copy', // Copy both video and audio streams
+          '-map', '0:v', // Map video stream
+          '-map', '0:a?', // Map audio stream if available (? makes it optional)
+        ])
+        .output(outputPath);
+        
+      this.activeFFmpegProcesses.add(command);
+      
+      command
+        .on('end', () => {
+          this.activeFFmpegProcesses.delete(command);
+          try {
+            fs.unlinkSync(concatFile);
+          } catch (error) {
+            console.warn('Failed to cleanup concat file:', error);
+          }
+          resolve();
+        })
+        .on('error', (err) => {
+          this.activeFFmpegProcesses.delete(command);
+          try {
+            fs.unlinkSync(concatFile);
+          } catch (error) {
+            console.warn('Failed to cleanup concat file:', error);
+          }
+          reject(err);
+        });
+        
+      command.run();
+    });
+  }
+
+  /**
+   * Copy a video file (utility method)
+   */
+  private async copyVideoFile(inputPath: string, outputPath: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const command = ffmpeg(inputPath)
+        .outputOptions([
+          '-c', 'copy', // Copy both streams
+          '-map', '0:v', // Map video stream
+          '-map', '0:a?' // Map audio stream if available
+        ])
+        .output(outputPath);
+        
+      this.activeFFmpegProcesses.add(command);
+      
+      command
+        .on('end', () => {
+          this.activeFFmpegProcesses.delete(command);
+          resolve();
+        })
+        .on('error', (err) => {
+          this.activeFFmpegProcesses.delete(command);
+          reject(err);
+        });
+        
+      command.run();
+    });
+  }
+
+  /**
+   * Get video codec for macOS with hardware acceleration preference
+   */
+  private getVideoCodecForMac(): string {
+    // On macOS, try to use hardware acceleration
+    if (process.platform === 'darwin') {
+      console.log('Using hardware encoding (h264_videotoolbox) for macOS');
+      return 'h264_videotoolbox';
+    }
+    console.log('Using software encoding (libx264)');
+    return 'libx264';
+  }
+
+  /**
+   * Get FFmpeg preset for quality setting
+   */
+  private getPresetForQuality(quality: string): string {
+    switch (quality) {
+      case 'low': return 'fast';
+      case 'medium': return 'medium';
+      case 'high': return 'slow';
+      default: return 'medium';
+    }
+  }
+
+  /**
+   * Get CRF value for quality setting
+   */
+  private getCRFForQuality(quality: string): string {
+    switch (quality) {
+      case 'low': return '28';
+      case 'medium': return '23';
+      case 'high': return '18';
+      default: return '23';
+    }
   }
 
   /**
