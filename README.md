@@ -45,7 +45,7 @@ pip install openai-whisper
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone git@github.com:proSamik/lightweight-video-editor.git
 cd lightweight-video-editor
 ```
 
