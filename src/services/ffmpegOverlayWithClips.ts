@@ -847,7 +847,8 @@ export class FFmpegOverlayWithClips {
       }
       
       // Build overlay filter chain
-      const filterChain = this.buildSegmentOverlayFilter(overlayFiles);
+      const tempDir = path.dirname(outputPath);
+      const filterChain = this.buildSegmentOverlayFilter(overlayFiles, tempDir);
       
       // Create FFmpeg command
       let command = ffmpeg(segmentPath);
@@ -861,9 +862,9 @@ export class FFmpegOverlayWithClips {
       const codec = this.getVideoCodecForMac();
       const quality = exportSettings?.quality || 'high';
       
-      if (filterChain.filterComplex) {
+      if (filterChain.filterComplex && filterChain.filterScriptPath) {
         const outputOptions = [
-          '-filter_complex', filterChain.filterComplex,
+          '-filter_complex_script', filterChain.filterScriptPath,
           '-map', '[final]', // Map the final video output
           '-map', '0:a?', // Map audio stream if available (? makes it optional)
           '-c:v', codec,
@@ -903,44 +904,14 @@ export class FFmpegOverlayWithClips {
         
         command = command.outputOptions(outputOptions);
       } else {
-        // No overlays, just copy the video
+        // No filter chain or script path, just copy the video without re-encoding
         const outputOptions = [
-          '-c:v', codec,
-          '-c:a', 'copy', // PRESERVE AUDIO - copy without re-encoding
+          '-c:v', 'copy', // COPY VIDEO - preserve original quality
+          '-c:a', 'copy', // COPY AUDIO - preserve original quality
           '-map', '0:v', // Map video stream directly
           '-map', '0:a?', // Map audio stream if available
-          '-pix_fmt', 'yuv420p',
           '-movflags', '+faststart'
         ];
-        
-        // Add quality settings based on encoder type
-        if (codec === 'h264_videotoolbox') {
-          // Hardware encoder quality settings
-          switch (quality) {
-            case 'high':
-              outputOptions.push('-b:v', '8000k', '-maxrate', '8000k', '-bufsize', '16000k');
-              break;
-            case 'medium':
-              outputOptions.push('-b:v', '4000k', '-maxrate', '4000k', '-bufsize', '8000k');
-              break;
-            case 'low':
-              outputOptions.push('-b:v', '1500k', '-maxrate', '1500k', '-bufsize', '3000k');
-              break;
-            default:
-              outputOptions.push('-b:v', '4000k', '-maxrate', '4000k', '-bufsize', '8000k');
-          }
-        } else {
-          // Software encoder quality settings
-          const preset = this.getPresetForQuality(quality);
-          const crf = this.getCRFForQuality(quality);
-          if (preset) outputOptions.push('-preset', preset);
-          if (crf) outputOptions.push('-crf', crf);
-          outputOptions.push(
-            '-b:v', this.getBitrateForQuality(quality),
-            '-maxrate', this.getMaxBitrateForQuality(quality),
-            '-bufsize', this.getBufferSizeForQuality(quality)
-          );
-        }
         
         command = command.outputOptions(outputOptions);
       }
@@ -963,12 +934,30 @@ export class FFmpegOverlayWithClips {
         .on('end', () => {
           console.log(`Segment processed successfully: ${path.basename(outputPath)}`);
           this.activeFFmpegProcesses.delete(command);
+          // Clean up filter script file
+          if (filterChain.filterScriptPath && fs.existsSync(filterChain.filterScriptPath)) {
+            try {
+              fs.unlinkSync(filterChain.filterScriptPath);
+              console.log(`[DEBUG] Filter script file cleaned up: ${filterChain.filterScriptPath}`);
+            } catch (error) {
+              console.warn(`Failed to clean up filter script file: ${error}`);
+            }
+          }
           resolve();
         })
         .on('error', (err) => {
           console.error(`Segment processing failed: ${err.message}`);
           console.error(`FFmpeg error details:`, err);
           this.activeFFmpegProcesses.delete(command);
+          // Clean up filter script file on error
+          if (filterChain.filterScriptPath && fs.existsSync(filterChain.filterScriptPath)) {
+            try {
+              fs.unlinkSync(filterChain.filterScriptPath);
+              console.log(`[DEBUG] Filter script file cleaned up on error: ${filterChain.filterScriptPath}`);
+            } catch (error) {
+              console.warn(`Failed to clean up filter script file on error: ${error}`);
+            }
+          }
           reject(new Error(`Segment processing failed: ${err.message}`));
         });
         
@@ -1057,10 +1046,11 @@ export class FFmpegOverlayWithClips {
 
   /**
    * Build overlay filter chain for a single segment
+   * Uses filter script file to avoid command line length limits
    */
-  private buildSegmentOverlayFilter(overlayFiles: Array<{ file: string; startTime: number; endTime: number }>) {
+  private buildSegmentOverlayFilter(overlayFiles: Array<{ file: string; startTime: number; endTime: number }>, tempDir: string) {
     if (overlayFiles.length === 0) {
-      return { filterComplex: '', outputs: [] };
+      return { filterComplex: '', outputs: [], filterScriptPath: null };
     }
     
     const filters: string[] = [];
@@ -1084,12 +1074,19 @@ export class FFmpegOverlayWithClips {
     });
     
     const filterComplex = filters.join(';');
-    console.log(`[DEBUG] Generated filter complex: ${filterComplex}`);
+    console.log(`[DEBUG] Generated filter complex with ${overlayFiles.length} overlays`);
+    console.log(`[DEBUG] Filter complex length: ${filterComplex.length} characters`);
     console.log(`[DEBUG] Expected output label: [final]`);
+    
+    // Write filter complex to file to avoid command line length limits
+    const filterScriptPath = path.join(tempDir, `filter_complex_${Date.now()}.txt`);
+    fs.writeFileSync(filterScriptPath, filterComplex);
+    console.log(`[DEBUG] Filter complex written to: ${filterScriptPath}`);
     
     return {
       filterComplex,
-      outputs: ['[final]']
+      outputs: ['[final]'],
+      filterScriptPath
     };
   }
 
