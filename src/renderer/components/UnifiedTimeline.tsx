@@ -861,19 +861,8 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
       const currentTimeMs = currentTime;
       let targetSelection: string | null = null;
       
-      if (localClips.length > 0) {
-        // Priority 1: Find active clip at current time
-        const clipAtTime = localClips.find(clip => 
-          currentTimeMs >= clip.startTime && currentTimeMs <= clip.endTime && !clip.isRemoved
-        );
-        if (clipAtTime) {
-          targetSelection = clipAtTime.id;
-        }
-      }
-      
-      // Priority 2: If no clip selected, or if we want both clip and subtitle selection,
-      // find subtitle segment at current time that's within active clips
-      if (!targetSelection && aiSubtitleData?.frames?.length) {
+      // Priority 1: Always try to find subtitle segment first (for styling control)
+      if (aiSubtitleData?.frames?.length) {
         const subtitleAtTime = virtualCaptionsFromAI.find(seg => {
           // Check if subtitle is at current time
           if (currentTimeMs < seg.startTime || currentTimeMs > seg.endTime) return false;
@@ -891,6 +880,16 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
         
         if (subtitleAtTime) {
           targetSelection = subtitleAtTime.id;
+        }
+      }
+      
+      // Priority 2: If no subtitle found, fall back to clip selection
+      if (!targetSelection && localClips.length > 0) {
+        const clipAtTime = localClips.find(clip => 
+          currentTimeMs >= clip.startTime && currentTimeMs <= clip.endTime && !clip.isRemoved
+        );
+        if (clipAtTime) {
+          targetSelection = clipAtTime.id;
         }
       }
       
@@ -1703,7 +1702,20 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                   const effectiveEndTime = originalToEffectiveTime(clip.endTime);
                   const left = (effectiveStartTime / actualDuration) * 100;
                   const width = ((effectiveEndTime - effectiveStartTime) / actualDuration) * 100;
-                  const isSelected = clip.id === selectedFrameId;
+                  // Clip is selected if:
+                  // 1. Its own ID is selected, OR  
+                  // 2. A subtitle segment within this clip is selected
+                  let isSelected = clip.id === selectedFrameId;
+                  
+                  // Check if selected item is a subtitle within this clip
+                  if (!isSelected && selectedFrameId && effectiveCaptions.length > 0) {
+                    const selectedSubtitle = effectiveCaptions.find(seg => seg.id === selectedFrameId);
+                    if (selectedSubtitle) {
+                      // Check if this subtitle is fully within this clip
+                      isSelected = selectedSubtitle.startTime >= clip.startTime && 
+                                  selectedSubtitle.endTime <= clip.endTime;
+                    }
+                  }
                   
                   // Use consistent blue border color for all segments (removed clips not shown)
                   const segmentBorderColor = isSelected 
