@@ -51,18 +51,6 @@ export class AISubtitleExporter {
       
       // Process based on export mode - simplified to overlay-based only
       switch (exportSettings.exportMode) {
-        case 'modifiedSegments':
-        case 'complete':
-          return await this.exportCompleteVideo(
-            originalVideoPath,
-            aiSubtitleData,
-            baseStyle,
-            outputPath,
-            exportSettings,
-            tempDir,
-            onProgress
-          );
-        
         case 'subtitlesOnly':
           return await this.exportSubtitlesOnly(
             aiSubtitleData,
