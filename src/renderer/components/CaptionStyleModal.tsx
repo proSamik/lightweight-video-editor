@@ -20,11 +20,11 @@ const CaptionStyleModal: React.FC<CaptionStyleModalProps> = ({
 }) => {
   const { theme } = useTheme();
   const [localStyle, setLocalStyle] = useState<SubtitleStyle>({
-    font: 'Segoe UI',
+    font: 'Poppins',
     fontSize: 85,
     textColor: '#ffffff',
-    highlighterColor: '#ffff00',
-    backgroundColor: '#80000000',
+    highlighterColor: '#00ff00',
+    backgroundColor: '#000000',
     strokeColor: '#000000',
     strokeWidth: 0,
     textTransform: 'none',
@@ -424,7 +424,7 @@ const CaptionStyleModal: React.FC<CaptionStyleModalProps> = ({
                 Font Family
               </label>
                               <select
-                  value={localStyle.font || 'Segoe UI'}
+                  value={localStyle.font || 'Poppins'}
                   onChange={(e) => updateStyle({ font: e.target.value })}
                   style={{
                     width: '100%',
