@@ -450,25 +450,114 @@ export class FFmpegService {
     startTime: number,
     endTime: number,
     outputPath: string,
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number) => void,
+    quality?: string
   ): Promise<string> {
     return new Promise((resolve, reject) => {
       const duration = endTime - startTime;
       
-      console.log(`[FFmpeg] Extracting video segment: ${startTime}s to ${endTime}s (duration: ${duration}s)`);
+      console.log(`[FFmpeg] Extracting video segment: ${startTime}s to ${endTime}s (duration: ${duration}s) with quality: ${quality || 'default'}`);
       
-      ffmpeg(videoPath)
+      const command = ffmpeg(videoPath)
         .setFfmpegPath(this.ffmpegPath)
         .setFfprobePath(this.ffprobePath)
         .seekInput(startTime)
         .duration(duration)
         .videoCodec(this.getVideoCodecForMac()) // Use hardware acceleration on macOS
         .audioCodec('aac')
-        .format('mp4')
-        .outputOptions([
+        .format('mp4');
+      
+      // Apply quality settings if specified
+      if (quality) {
+        const codec = this.getVideoCodecForMac();
+        if (codec === 'h264_videotoolbox') {
+          // Hardware encoder quality settings with proper bitrate control
+          switch (quality) {
+            case 'high':
+              command.outputOptions([
+                '-avoid_negative_ts', 'make_zero',
+                '-fflags', '+genpts',
+                '-profile:v', 'high',
+                '-level', '4.1',
+                '-b:v', '8000k',
+                '-maxrate', '8000k',
+                '-bufsize', '16000k'
+              ]);
+              break;
+            case 'medium':
+              command.outputOptions([
+                '-avoid_negative_ts', 'make_zero',
+                '-fflags', '+genpts',
+                '-profile:v', 'main',
+                '-level', '4.0',
+                '-b:v', '4000k',
+                '-maxrate', '4000k',
+                '-bufsize', '8000k'
+              ]);
+              break;
+            case 'low':
+              command.outputOptions([
+                '-avoid_negative_ts', 'make_zero',
+                '-fflags', '+genpts',
+                '-profile:v', 'baseline',
+                '-level', '3.1',
+                '-b:v', '1500k',
+                '-maxrate', '1500k',
+                '-bufsize', '3000k'
+              ]);
+              break;
+            default:
+              command.outputOptions([
+                '-avoid_negative_ts', 'make_zero',
+                '-fflags', '+genpts',
+                '-b:v', '4000k',
+                '-maxrate', '4000k',
+                '-bufsize', '8000k'
+              ]);
+          }
+        } else {
+          // Software encoder quality settings
+          switch (quality) {
+            case 'high':
+              command.outputOptions([
+                '-avoid_negative_ts', 'make_zero',
+                '-fflags', '+genpts',
+                '-preset', 'slow',
+                '-crf', '18'
+              ]);
+              break;
+            case 'medium':
+              command.outputOptions([
+                '-avoid_negative_ts', 'make_zero',
+                '-fflags', '+genpts',
+                '-preset', 'fast',
+                '-crf', '23'
+              ]);
+              break;
+            case 'low':
+              command.outputOptions([
+                '-avoid_negative_ts', 'make_zero',
+                '-fflags', '+genpts',
+                '-preset', 'ultrafast',
+                '-crf', '28'
+              ]);
+              break;
+            default:
+              command.outputOptions([
+                '-avoid_negative_ts', 'make_zero',
+                '-fflags', '+genpts'
+              ]);
+          }
+        }
+      } else {
+        // Default output options
+        command.outputOptions([
           '-avoid_negative_ts', 'make_zero',
           '-fflags', '+genpts'
-        ])
+        ]);
+      }
+      
+      command
         .output(outputPath)
         .on('progress', (progress: any) => {
           if (onProgress && progress.percent) {
@@ -493,7 +582,8 @@ export class FFmpegService {
   public async concatenateVideoSegments(
     segmentPaths: string[],
     outputPath: string,
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number) => void,
+    quality?: string
   ): Promise<string> {
     return new Promise((resolve, reject) => {
       if (segmentPaths.length === 0) {
@@ -520,24 +610,120 @@ export class FFmpegService {
       const concatListPath = path.join(path.dirname(outputPath), 'video_concat_list.txt');
       const fileList = segmentPaths.map(p => `file '${path.resolve(p)}'`).join('\n');
       
-      console.log(`[FFmpeg] Concatenating ${segmentPaths.length} video segments`);
+      console.log(`[FFmpeg] Concatenating ${segmentPaths.length} video segments with quality: ${quality || 'default'}`);
       console.log(`[FFmpeg] Concat list:\n${fileList}`);
       
       fs.writeFileSync(concatListPath, fileList);
       
-      ffmpeg()
+      const command = ffmpeg()
         .setFfmpegPath(this.ffmpegPath)
         .setFfprobePath(this.ffprobePath)
         .input(concatListPath)
         .inputOptions(['-f', 'concat', '-safe', '0'])
         .videoCodec(this.getVideoCodecForMac()) // Use hardware acceleration on macOS
         .audioCodec('aac')
-        .format('mp4')
-        .outputOptions([
+        .format('mp4');
+      
+      // Apply quality settings if specified
+      if (quality) {
+        const codec = this.getVideoCodecForMac();
+        if (codec === 'h264_videotoolbox') {
+          // Hardware encoder quality settings with proper bitrate control
+          switch (quality) {
+            case 'high':
+              command.outputOptions([
+                '-avoid_negative_ts', 'make_zero',
+                '-fflags', '+genpts',
+                '-vf', 'select=gt(n\\,0)', // Remove first frame (n=0) to avoid black frame
+                '-profile:v', 'high',
+                '-level', '4.1',
+                '-b:v', '8000k',
+                '-maxrate', '8000k',
+                '-bufsize', '16000k'
+              ]);
+              break;
+            case 'medium':
+              command.outputOptions([
+                '-avoid_negative_ts', 'make_zero',
+                '-fflags', '+genpts',
+                '-vf', 'select=gt(n\\,0)', // Remove first frame (n=0) to avoid black frame
+                '-profile:v', 'main',
+                '-level', '4.0',
+                '-b:v', '4000k',
+                '-maxrate', '4000k',
+                '-bufsize', '8000k'
+              ]);
+              break;
+            case 'low':
+              command.outputOptions([
+                '-avoid_negative_ts', 'make_zero',
+                '-fflags', '+genpts',
+                '-vf', 'select=gt(n\\,0)', // Remove first frame (n=0) to avoid black frame
+                '-profile:v', 'baseline',
+                '-level', '3.1',
+                '-b:v', '1500k',
+                '-maxrate', '1500k',
+                '-bufsize', '3000k'
+              ]);
+              break;
+            default:
+              command.outputOptions([
+                '-avoid_negative_ts', 'make_zero',
+                '-fflags', '+genpts',
+                '-vf', 'select=gt(n\\,0)', // Remove first frame (n=0) to avoid black frame
+                '-b:v', '4000k',
+                '-maxrate', '4000k',
+                '-bufsize', '8000k'
+              ]);
+          }
+        } else {
+          // Software encoder quality settings
+          switch (quality) {
+            case 'high':
+              command.outputOptions([
+                '-avoid_negative_ts', 'make_zero',
+                '-fflags', '+genpts',
+                '-vf', 'select=gt(n\\,0)', // Remove first frame (n=0) to avoid black frame
+                '-preset', 'slow',
+                '-crf', '18'
+              ]);
+              break;
+            case 'medium':
+              command.outputOptions([
+                '-avoid_negative_ts', 'make_zero',
+                '-fflags', '+genpts',
+                '-vf', 'select=gt(n\\,0)', // Remove first frame (n=0) to avoid black frame
+                '-preset', 'fast',
+                '-crf', '23'
+              ]);
+              break;
+            case 'low':
+              command.outputOptions([
+                '-avoid_negative_ts', 'make_zero',
+                '-fflags', '+genpts',
+                '-vf', 'select=gt(n\\,0)', // Remove first frame (n=0) to avoid black frame
+                '-preset', 'ultrafast',
+                '-crf', '28'
+              ]);
+              break;
+            default:
+              command.outputOptions([
+                '-avoid_negative_ts', 'make_zero',
+                '-fflags', '+genpts',
+                '-vf', 'select=gt(n\\,0)' // Remove first frame (n=0) to avoid black frame
+              ]);
+          }
+        }
+      } else {
+        // Default output options
+        command.outputOptions([
           '-avoid_negative_ts', 'make_zero',
           '-fflags', '+genpts',
           '-vf', 'select=gt(n\\,0)' // Remove first frame (n=0) to avoid black frame
-        ])
+        ]);
+      }
+      
+      command
         .output(outputPath)
         .on('progress', (progress: any) => {
           if (onProgress && progress.percent) {

@@ -237,7 +237,8 @@ export class FFmpegOverlayWithClips {
         metadata,
         (progress) => {
           if (onProgress) onProgress(15 + Math.min(35, (progress / 100) * 35));
-        }
+        },
+        exportSettings?.quality // Pass quality setting (will be overridden to 'high' in Phase 2)
       );
       console.log('Video clipping completed:', clippedVideoPath);
       
@@ -460,7 +461,8 @@ export class FFmpegOverlayWithClips {
     clips: VideoClip[],
     tempDir: string,
     metadata: any,
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number) => void,
+    quality?: string
   ): Promise<string> {
     // Filter out removed clips and sort by start time
     const activeClips = clips
@@ -473,23 +475,12 @@ export class FFmpegOverlayWithClips {
       throw new Error('No active clips found for processing');
     }
     
-    // If only one clip that spans the entire video, just copy the original
-    if (activeClips.length === 1) {
-      const clip = activeClips[0];
-      const clipDurationMs = clip.endTime - clip.startTime;
-      const videoDurationMs = metadata.duration * 1000;
-      
-      // Check if this is essentially the full video (allow 1s tolerance)
-      if (clip.startTime === 0 && Math.abs(clipDurationMs - videoDurationMs) <= 1000) {
-        console.log('Single full-duration clip detected, copying original video');
-        console.log(`Clip duration: ${clipDurationMs}ms, Video duration: ${videoDurationMs}ms`);
-        const outputPath = path.join(tempDir, 'clipped_video.mp4');
-        return await this.copyVideo(videoPath, outputPath);
-      }
-    }
+    // Note: We always create segment files for Phase 3 processing, even for single clips
+    // This ensures consistent processing pipeline regardless of clip count
     
     // Extract individual video segments
     console.log('Extracting video segments...');
+    console.log('PHASE 2: Using HIGH quality extraction regardless of user quality setting for optimal segment quality');
     const segmentPaths: string[] = [];
     const ffmpegService = FFmpegService.getInstance();
     let totalExpectedDuration = 0;
@@ -515,7 +506,8 @@ export class FFmpegOverlayWithClips {
             const overallProgress = ((i / activeClips.length) + (segmentProgress / 100 / activeClips.length)) * 80; // 80% for extraction
             onProgress(overallProgress);
           }
-        }
+        },
+        'high' // Always use high quality for Phase 2 extraction regardless of user quality setting
       );
       
       segmentPaths.push(segmentPath);
@@ -539,7 +531,8 @@ export class FFmpegOverlayWithClips {
           const overallProgress = 80 + (concatProgress / 100) * 20; // 20% for concatenation
           onProgress(overallProgress);
         }
-      }
+      },
+      'high' // Always use high quality for Phase 2 concatenation regardless of user quality setting
     );
     
     // Verify final concatenated video duration
@@ -865,35 +858,91 @@ export class FFmpegOverlayWithClips {
       });
       
       // Apply filter chain and output options
+      const codec = this.getVideoCodecForMac();
+      const quality = exportSettings?.quality || 'high';
+      
       if (filterChain.filterComplex) {
-        command = command
-          .outputOptions([
-            '-filter_complex', filterChain.filterComplex,
-            '-map', '[final]', // Map the final video output
-            '-map', '0:a?', // Map audio stream if available (? makes it optional)
-            '-c:v', this.getVideoCodecForMac(),
-            '-c:a', 'copy', // PRESERVE AUDIO - copy without re-encoding
-            '-preset', this.getPresetForQuality(exportSettings?.quality || 'high'),
-            '-crf', this.getCRFForQuality(exportSettings?.quality || 'high'),
-            '-b:v', this.getBitrateForQuality(exportSettings?.quality || 'high'),
-            '-maxrate', this.getMaxBitrateForQuality(exportSettings?.quality || 'high'),
-            '-bufsize', this.getBufferSizeForQuality(exportSettings?.quality || 'high'),
-            '-pix_fmt', 'yuv420p',
-            '-movflags', '+faststart'
-          ]);
+        const outputOptions = [
+          '-filter_complex', filterChain.filterComplex,
+          '-map', '[final]', // Map the final video output
+          '-map', '0:a?', // Map audio stream if available (? makes it optional)
+          '-c:v', codec,
+          '-c:a', 'copy', // PRESERVE AUDIO - copy without re-encoding
+          '-pix_fmt', 'yuv420p',
+          '-movflags', '+faststart'
+        ];
+        
+        // Add quality settings based on encoder type
+        if (codec === 'h264_videotoolbox') {
+          // Hardware encoder quality settings
+          switch (quality) {
+            case 'high':
+              outputOptions.push('-b:v', '8000k', '-maxrate', '8000k', '-bufsize', '16000k');
+              break;
+            case 'medium':
+              outputOptions.push('-b:v', '4000k', '-maxrate', '4000k', '-bufsize', '8000k');
+              break;
+            case 'low':
+              outputOptions.push('-b:v', '1500k', '-maxrate', '1500k', '-bufsize', '3000k');
+              break;
+            default:
+              outputOptions.push('-b:v', '4000k', '-maxrate', '4000k', '-bufsize', '8000k');
+          }
+        } else {
+          // Software encoder quality settings
+          const preset = this.getPresetForQuality(quality);
+          const crf = this.getCRFForQuality(quality);
+          if (preset) outputOptions.push('-preset', preset);
+          if (crf) outputOptions.push('-crf', crf);
+          outputOptions.push(
+            '-b:v', this.getBitrateForQuality(quality),
+            '-maxrate', this.getMaxBitrateForQuality(quality),
+            '-bufsize', this.getBufferSizeForQuality(quality)
+          );
+        }
+        
+        command = command.outputOptions(outputOptions);
       } else {
         // No overlays, just copy the video
-        command = command
-          .outputOptions([
-            '-c:v', this.getVideoCodecForMac(),
-            '-c:a', 'copy', // PRESERVE AUDIO - copy without re-encoding
-            '-map', '0:v', // Map video stream directly
-            '-map', '0:a?', // Map audio stream if available
-            '-preset', this.getPresetForQuality(exportSettings?.quality || 'high'),
-            '-crf', this.getCRFForQuality(exportSettings?.quality || 'high'),
-            '-pix_fmt', 'yuv420p',
-            '-movflags', '+faststart'
-          ]);
+        const outputOptions = [
+          '-c:v', codec,
+          '-c:a', 'copy', // PRESERVE AUDIO - copy without re-encoding
+          '-map', '0:v', // Map video stream directly
+          '-map', '0:a?', // Map audio stream if available
+          '-pix_fmt', 'yuv420p',
+          '-movflags', '+faststart'
+        ];
+        
+        // Add quality settings based on encoder type
+        if (codec === 'h264_videotoolbox') {
+          // Hardware encoder quality settings
+          switch (quality) {
+            case 'high':
+              outputOptions.push('-b:v', '8000k', '-maxrate', '8000k', '-bufsize', '16000k');
+              break;
+            case 'medium':
+              outputOptions.push('-b:v', '4000k', '-maxrate', '4000k', '-bufsize', '8000k');
+              break;
+            case 'low':
+              outputOptions.push('-b:v', '1500k', '-maxrate', '1500k', '-bufsize', '3000k');
+              break;
+            default:
+              outputOptions.push('-b:v', '4000k', '-maxrate', '4000k', '-bufsize', '8000k');
+          }
+        } else {
+          // Software encoder quality settings
+          const preset = this.getPresetForQuality(quality);
+          const crf = this.getCRFForQuality(quality);
+          if (preset) outputOptions.push('-preset', preset);
+          if (crf) outputOptions.push('-crf', crf);
+          outputOptions.push(
+            '-b:v', this.getBitrateForQuality(quality),
+            '-maxrate', this.getMaxBitrateForQuality(quality),
+            '-bufsize', this.getBufferSizeForQuality(quality)
+          );
+        }
+        
+        command = command.outputOptions(outputOptions);
       }
       
       command = command.output(outputPath);
@@ -1185,13 +1234,8 @@ export class FFmpegOverlayWithClips {
     const codec = this.getVideoCodecForMac();
     
     if (codec === 'h264_videotoolbox') {
-      // Hardware encoder presets
-      switch (quality) {
-        case 'low': return 'fast';
-        case 'medium': return 'medium';
-        case 'high': return 'slow';
-        default: return 'medium';
-      }
+      // Hardware encoder doesn't use presets, return empty string
+      return '';
     } else {
       // Software encoder presets
       switch (quality) {
@@ -1210,13 +1254,8 @@ export class FFmpegOverlayWithClips {
     const codec = this.getVideoCodecForMac();
     
     if (codec === 'h264_videotoolbox') {
-      // Hardware encoder uses different quality scale
-      switch (quality) {
-        case 'low': return '35';
-        case 'medium': return '25';
-        case 'high': return '20';
-        default: return '25';
-      }
+      // Hardware encoder doesn't use CRF, return empty string
+      return '';
     } else {
       // Software encoder CRF values
       switch (quality) {

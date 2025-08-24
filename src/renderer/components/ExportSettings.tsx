@@ -27,7 +27,7 @@ const ExportSettingsModal: React.FC<ExportSettingsProps> = ({
   
   const hasSubtitles = Boolean(aiSubtitleData?.frames?.length);
   const hasReplacementAudio = Boolean(replacementAudioPath);
-  const hasClips = Boolean(clips?.length && clips.some(clip => clip.isRemoved));
+  const hasClips = Boolean(clips?.length); // Show clip export option for any clips, even single clips
 
   const handleConfirm = () => {
     onConfirm({
@@ -134,7 +134,7 @@ const ExportSettingsModal: React.FC<ExportSettingsProps> = ({
                 description: 'Export video with original audio and subtitles', 
                 icon: FiFileText 
               }] : []),
-              // Show Export Complete Video with Clips only if clips with removed sections exist
+              // Show Export Complete Video with Clips if any clips exist (single or multiple)
               ...(hasClips ? [{ 
                 value: 'completeWithClips', 
                 label: 'Export Complete Video (Clipped)', 

@@ -823,23 +823,16 @@ const AppContent: React.FC = () => {
 
         case 'completeWithClips':
           // Export complete video with clipping support
-          if (aiSubtitleData && aiSubtitleData.frames.length > 0) {
-            setLoadingMessage('Rendering clipped video with subtitles...');
-            setLoadingProgress(0);
-            await window.electronAPI.renderVideoWithClipsAndSubtitles(
-              videoFile.path,
-              clips,
-              aiSubtitleData,
-              outputPath,
-              exportSettings,
-              replacementAudioPath || undefined
-            );
-          } else {
-            alert('No subtitles available for export.');
-            setIsLoading(false);
-            setLoadingProgress(undefined);
-            return;
-          }
+          setLoadingMessage('Rendering clipped video...');
+          setLoadingProgress(0);
+          await window.electronAPI.renderVideoWithClipsAndSubtitles(
+            videoFile.path,
+            clips,
+            aiSubtitleData || { frames: [] }, // Pass empty frames array if no subtitles
+            outputPath,
+            exportSettings,
+            replacementAudioPath || undefined
+          );
           break;
 
         default: // 'complete'
