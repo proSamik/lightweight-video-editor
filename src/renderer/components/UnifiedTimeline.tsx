@@ -752,6 +752,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
         }
       }
 
+
       // Clip editing shortcuts - only active in clip mode
       if (localClips.length > 0) {
         if ((e.metaKey || e.ctrlKey) && e.key === 's') {
@@ -1305,6 +1306,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
             backgroundColor: theme.colors.border,
             margin: '0 4px'
           }} />
+
 
           {/* Undo/Redo Controls */}
           <button

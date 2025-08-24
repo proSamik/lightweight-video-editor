@@ -7,7 +7,8 @@ import {
   WordEditState,
   VideoClip,
 } from '../../types';
-import { Copy, Edit3, Hash, FileX, ChevronUp, ChevronDown } from 'lucide-react';
+import { Copy, Edit3, Hash, FileX, ChevronUp, ChevronDown, HelpCircle } from 'lucide-react';
+import CompactSearchReplace from './CompactSearchReplace';
 import { formatTimeHHMMSS } from '../../utils/timeFormatting';
 
 interface AISubtitlesPanelProps {
@@ -80,6 +81,8 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
   const [isShiftPressed, setIsShiftPressed] = useState(false);
   const [enterPressCount, setEnterPressCount] = useState(0);
   const [lastEnterTime, setLastEnterTime] = useState(0);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [showHelpTooltip, setShowHelpTooltip] = useState(false);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -474,6 +477,11 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
       // Don't handle shortcuts if user is typing in any input field
       const target = e.target as HTMLElement;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.contentEditable === 'true')) {
+        // Still allow Ctrl+F to work in input fields for search functionality
+        if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+          e.preventDefault();
+          setIsSearchOpen(true);
+        }
         return;
       }
 
@@ -483,6 +491,11 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
       if (e.key === 'Escape') {
         setContextMenu(prev => ({ ...prev, show: false }));
         setEditingWordId(null);
+      }
+      // Search and replace shortcut
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        e.preventDefault();
+        setIsSearchOpen(true);
       }
       if (e.key === 'Enter' && !editingWordId && selectedWordIds.size === 1) {
         const currentTime = Date.now();
@@ -531,7 +544,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [editingWordId, selectedWordIds, aiSubtitleData, enterPressCount, lastEnterTime]);
+  }, [editingWordId, selectedWordIds, aiSubtitleData, enterPressCount, lastEnterTime, isSearchOpen]);
 
   // Close context menu when clicking outside
   useEffect(() => {
@@ -1054,9 +1067,55 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
         borderBottom: `1px solid ${theme.colors.border}`,
         backgroundColor: theme.colors.surface
       }}>
-        <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600' }}>
-          AI Subtitles Editor
-        </h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600' }}>
+            AI Subtitles Editor
+          </h3>
+          <div style={{ position: 'relative' }}>
+            <button
+              onMouseEnter={() => setShowHelpTooltip(true)}
+              onMouseLeave={() => setShowHelpTooltip(false)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: theme.colors.textSecondary,
+                cursor: 'pointer',
+                padding: '2px',
+                display: 'flex',
+                alignItems: 'center'
+              }}
+            >
+              <HelpCircle size={14} />
+            </button>
+            {showHelpTooltip && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '24px',
+                  left: '-120px',
+                  width: '280px',
+                  backgroundColor: theme.colors.surface,
+                  border: `1px solid ${theme.colors.border}`,
+                  borderRadius: '4px',
+                  padding: '8px',
+                  fontSize: '11px',
+                  color: theme.colors.text,
+                  zIndex: 1000,
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                }}
+              >
+                <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Keyboard Shortcuts:</div>
+                <div>• <strong>Ctrl/Cmd + F:</strong> Search & Replace</div>
+                <div>• <strong>Single click:</strong> Select word & show context menu</div>
+                <div>• <strong>Double click:</strong> Edit word</div>
+                <div>• <strong>Shift + click:</strong> Multi-select words</div>
+                <div>• <strong>Double Enter:</strong> Split frame at selected word</div>
+                <div>• <strong>↑↓:</strong> Combine frames</div>
+                <div>• <strong>Ctrl/Cmd + Z:</strong> Undo all changes</div>
+              </div>
+            )}
+          </div>
+        </div>
         <p style={{ 
           margin: '4px 0 8px 0', 
           fontSize: '12px', 
@@ -1064,6 +1123,17 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
         }}>
           {renderFrames.length} frames • Max {maxWordsPerFrame} words, {maxCharsPerFrame} chars per frame
         </p>
+        
+        {/* Compact Search & Replace */}
+        <CompactSearchReplace
+          aiSubtitleData={aiSubtitleData}
+          onAISubtitleUpdate={updateAISubtitleData}
+          isOpen={isSearchOpen}
+          onClose={() => setIsSearchOpen(false)}
+          onOpen={() => setIsSearchOpen(true)}
+          onFrameSelect={onFrameSelect}
+          onTimeSeek={onTimeSeek}
+        />
       </div>
 
       {/* Subtitle Frames */}
@@ -1258,26 +1328,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
         ))}
       </div>
 
-      {/* Help Text */}
-      <div style={{
-        padding: '12px 16px',
-        backgroundColor: theme.colors.surface,
-        borderTop: `1px solid ${theme.colors.border}`,
-        fontSize: '12px',
-        color: theme.colors.textSecondary,
-        lineHeight: '1.4'
-      }}>
-        <div><strong>Controls:</strong></div>
-        <div>• Single click: Select word & show context menu</div>
-        <div>• Double click: Edit word</div>
-        <div>• Shift + click: Multi-select words</div>
-        <div>• Double Enter: Split frame at selected word</div>
-        <div>• Use merge buttons (↑↓) to combine frames</div>
-        <div>• Cmd/Ctrl + Z: Undo all changes</div>
-      </div>
 
-      {/* Context Menu */}
-      {renderContextMenu()}
     </div>
   );
 };
