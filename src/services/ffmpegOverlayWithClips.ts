@@ -351,7 +351,7 @@ export class FFmpegOverlayWithClips {
       console.log(`All ${processedSegmentPaths.length} segments processed, concatenating final video`);
       
       // Concatenate all processed segments into final output
-      await this.concatenateVideoFiles(processedSegmentPaths, outputPath);
+      await this.concatenateVideoFiles(processedSegmentPaths, outputPath, exportSettings?.quality || 'high');
       
       if (onProgress) onProgress(100);
       
@@ -865,28 +865,48 @@ export class FFmpegOverlayWithClips {
       });
       
       // Apply filter chain and output options
-      command = command
-        .complexFilter(filterChain.filterComplex, filterChain.outputs)
-        .outputOptions([
-          '-c:v', this.getVideoCodecForMac(),
-          '-c:a', 'copy', // PRESERVE AUDIO - copy without re-encoding
-          '-map', '[final]', // Map the final video output
-          '-map', '0:a?', // Map audio stream if available (? makes it optional)
-          '-preset', this.getPresetForQuality(exportSettings?.quality || 'medium'),
-          '-crf', this.getCRFForQuality(exportSettings?.quality || 'medium'),
-          '-pix_fmt', 'yuv420p',
-          '-movflags', '+faststart'
-        ])
-        .output(outputPath);
+      if (filterChain.filterComplex) {
+        command = command
+          .outputOptions([
+            '-filter_complex', filterChain.filterComplex,
+            '-map', '[final]', // Map the final video output
+            '-map', '0:a?', // Map audio stream if available (? makes it optional)
+            '-c:v', this.getVideoCodecForMac(),
+            '-c:a', 'copy', // PRESERVE AUDIO - copy without re-encoding
+            '-preset', this.getPresetForQuality(exportSettings?.quality || 'high'),
+            '-crf', this.getCRFForQuality(exportSettings?.quality || 'high'),
+            '-b:v', this.getBitrateForQuality(exportSettings?.quality || 'high'),
+            '-maxrate', this.getMaxBitrateForQuality(exportSettings?.quality || 'high'),
+            '-bufsize', this.getBufferSizeForQuality(exportSettings?.quality || 'high'),
+            '-pix_fmt', 'yuv420p',
+            '-movflags', '+faststart'
+          ]);
+      } else {
+        // No overlays, just copy the video
+        command = command
+          .outputOptions([
+            '-c:v', this.getVideoCodecForMac(),
+            '-c:a', 'copy', // PRESERVE AUDIO - copy without re-encoding
+            '-map', '0:v', // Map video stream directly
+            '-map', '0:a?', // Map audio stream if available
+            '-preset', this.getPresetForQuality(exportSettings?.quality || 'high'),
+            '-crf', this.getCRFForQuality(exportSettings?.quality || 'high'),
+            '-pix_fmt', 'yuv420p',
+            '-movflags', '+faststart'
+          ]);
+      }
+      
+      command = command.output(outputPath);
         
       // Add this command to active processes for cancellation support
       this.activeFFmpegProcesses.add(command);
       
       command
-        .on('start', () => {
+        .on('start', (commandLine) => {
           const codec = this.getVideoCodecForMac();
           const encodingType = codec === 'h264_videotoolbox' ? 'hardware' : 'software';
           console.log(`Using ${encodingType} encoding (${codec}) for segment processing`);
+          console.log(`[DEBUG] Full FFmpeg command: ${commandLine}`);
         })
         .on('stderr', (stderrLine) => {
           console.error(`FFmpeg stderr: ${stderrLine}`);
@@ -944,7 +964,7 @@ export class FFmpegOverlayWithClips {
         const chunkPath = path.join(tempDir, `segment_chunk_${i}.mp4`);
         
         // Extract chunk from segment
-        await this.extractVideoChunk(segmentPath, chunkPath, chunkStart, chunkEnd);
+        await this.extractVideoChunk(segmentPath, chunkPath, chunkStart, chunkEnd, exportSettings?.quality || 'high');
         
         // Filter overlays for this chunk and adjust timing
         const chunkOverlays = overlayFiles
@@ -970,7 +990,7 @@ export class FFmpegOverlayWithClips {
       }
       
       // Merge all processed chunks
-      await this.concatenateVideoFiles(chunkPaths, outputPath);
+      await this.concatenateVideoFiles(chunkPaths, outputPath, exportSettings?.quality || 'high');
       
     } finally {
       // Clean up all chunk files
@@ -991,7 +1011,7 @@ export class FFmpegOverlayWithClips {
    */
   private buildSegmentOverlayFilter(overlayFiles: Array<{ file: string; startTime: number; endTime: number }>) {
     if (overlayFiles.length === 0) {
-      return { filterComplex: '', outputs: ['[final]'] };
+      return { filterComplex: '', outputs: [] };
     }
     
     const filters: string[] = [];
@@ -1008,14 +1028,18 @@ export class FFmpegOverlayWithClips {
       const startSeconds = (overlay.startTime / 1000).toFixed(3);
       const endSeconds = (overlay.endTime / 1000).toFixed(3);
       
-      // Create overlay filter with timing
-      const overlayFilter = `${currentInput}[${inputIndex}:v]overlay=enable='gte(t,${startSeconds})*lt(t,${endSeconds})'${outputLabel}`;
+      // Create overlay filter with timing  
+      const overlayFilter = `${currentInput}[${inputIndex}:v]overlay=enable='gte(t,${startSeconds})*lt(t,${endSeconds})' ${outputLabel}`;
       filters.push(overlayFilter);
       currentInput = outputLabel;
     });
     
+    const filterComplex = filters.join(';');
+    console.log(`[DEBUG] Generated filter complex: ${filterComplex}`);
+    console.log(`[DEBUG] Expected output label: [final]`);
+    
     return {
-      filterComplex: filters.join(';'),
+      filterComplex,
       outputs: ['[final]']
     };
   }
@@ -1027,7 +1051,8 @@ export class FFmpegOverlayWithClips {
     inputPath: string,
     outputPath: string,
     startTimeSeconds: number,
-    endTimeSeconds: number
+    endTimeSeconds: number,
+    quality: string = 'high'
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       const duration = endTimeSeconds - startTimeSeconds;
@@ -1035,9 +1060,13 @@ export class FFmpegOverlayWithClips {
       const command = ffmpeg(inputPath)
         .seekInput(startTimeSeconds)
         .duration(duration)
+        .videoCodec(this.getVideoCodecForMac())
+        .audioCodec('aac')
         .outputOptions([
-          '-c', 'copy',
-          '-avoid_negative_ts', 'make_zero'
+          '-avoid_negative_ts', 'make_zero',
+          '-fflags', '+genpts',
+          '-preset', this.getPresetForQuality(quality),
+          '-crf', this.getCRFForQuality(quality)
         ])
         .output(outputPath);
         
@@ -1060,7 +1089,7 @@ export class FFmpegOverlayWithClips {
   /**
    * Concatenate multiple video files into one
    */
-  private async concatenateVideoFiles(filePaths: string[], outputPath: string): Promise<void> {
+  private async concatenateVideoFiles(filePaths: string[], outputPath: string, quality: string = 'high'): Promise<void> {
     return new Promise((resolve, reject) => {
       const concatFile = path.join(path.dirname(outputPath), `concat_${Date.now()}.txt`);
       const concatContent = filePaths.map(file => `file '${path.resolve(file)}'`).join('\n');
@@ -1071,9 +1100,13 @@ export class FFmpegOverlayWithClips {
         .input(concatFile)
         .inputOptions(['-f', 'concat', '-safe', '0'])
         .outputOptions([
-          '-c', 'copy', // Copy both video and audio streams
+          '-c:v', this.getVideoCodecForMac(), // Use quality encoding for video
+          '-c:a', 'aac', // Re-encode audio with AAC for compatibility
+          '-preset', this.getPresetForQuality(quality),
+          '-crf', this.getCRFForQuality(quality),
           '-map', '0:v', // Map video stream
           '-map', '0:a?', // Map audio stream if available (? makes it optional)
+          '-fflags', '+genpts'
         ])
         .output(outputPath);
         
@@ -1149,11 +1182,24 @@ export class FFmpegOverlayWithClips {
    * Get FFmpeg preset for quality setting
    */
   private getPresetForQuality(quality: string): string {
-    switch (quality) {
-      case 'low': return 'fast';
-      case 'medium': return 'medium';
-      case 'high': return 'slow';
-      default: return 'medium';
+    const codec = this.getVideoCodecForMac();
+    
+    if (codec === 'h264_videotoolbox') {
+      // Hardware encoder presets
+      switch (quality) {
+        case 'low': return 'fast';
+        case 'medium': return 'medium';
+        case 'high': return 'slow';
+        default: return 'medium';
+      }
+    } else {
+      // Software encoder presets
+      switch (quality) {
+        case 'low': return 'ultrafast';
+        case 'medium': return 'fast';
+        case 'high': return 'slow';
+        default: return 'fast';
+      }
     }
   }
 
@@ -1161,11 +1207,60 @@ export class FFmpegOverlayWithClips {
    * Get CRF value for quality setting
    */
   private getCRFForQuality(quality: string): string {
+    const codec = this.getVideoCodecForMac();
+    
+    if (codec === 'h264_videotoolbox') {
+      // Hardware encoder uses different quality scale
+      switch (quality) {
+        case 'low': return '35';
+        case 'medium': return '25';
+        case 'high': return '20';
+        default: return '25';
+      }
+    } else {
+      // Software encoder CRF values
+      switch (quality) {
+        case 'low': return '28';
+        case 'medium': return '23';
+        case 'high': return '18';
+        default: return '23';
+      }
+    }
+  }
+
+  /**
+   * Get bitrate for quality setting
+   */
+  private getBitrateForQuality(quality: string): string {
     switch (quality) {
-      case 'low': return '28';
-      case 'medium': return '23';
-      case 'high': return '18';
-      default: return '23';
+      case 'low': return '2M';
+      case 'medium': return '5M';
+      case 'high': return '10M';
+      default: return '5M';
+    }
+  }
+
+  /**
+   * Get max bitrate for quality setting
+   */
+  private getMaxBitrateForQuality(quality: string): string {
+    switch (quality) {
+      case 'low': return '3M';
+      case 'medium': return '7M';
+      case 'high': return '15M';
+      default: return '7M';
+    }
+  }
+
+  /**
+   * Get buffer size for quality setting
+   */
+  private getBufferSizeForQuality(quality: string): string {
+    switch (quality) {
+      case 'low': return '4M';
+      case 'medium': return '10M';
+      case 'high': return '20M';
+      default: return '10M';
     }
   }
 

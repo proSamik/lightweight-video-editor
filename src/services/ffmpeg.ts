@@ -29,6 +29,18 @@ export class FFmpegService {
     this.detectFFmpegPaths();
   }
 
+  /**
+   * Get video codec for macOS with hardware acceleration preference
+   */
+  private getVideoCodecForMac(): string {
+    if (process.platform === 'darwin') {
+      console.log('Using hardware encoding (h264_videotoolbox) for macOS video processing');
+      return 'h264_videotoolbox';
+    }
+    console.log('Using software encoding (libx264) for video processing');
+    return 'libx264';
+  }
+
   public static getInstance(): FFmpegService {
     if (!FFmpegService.instance) {
       FFmpegService.instance = new FFmpegService();
@@ -450,7 +462,7 @@ export class FFmpegService {
         .setFfprobePath(this.ffprobePath)
         .seekInput(startTime)
         .duration(duration)
-        .videoCodec('libx264') // Re-encode to ensure compatibility
+        .videoCodec(this.getVideoCodecForMac()) // Use hardware acceleration on macOS
         .audioCodec('aac')
         .format('mp4')
         .outputOptions([
@@ -518,7 +530,7 @@ export class FFmpegService {
         .setFfprobePath(this.ffprobePath)
         .input(concatListPath)
         .inputOptions(['-f', 'concat', '-safe', '0'])
-        .videoCodec('libx264') // Re-encode to ensure compatibility
+        .videoCodec(this.getVideoCodecForMac()) // Use hardware acceleration on macOS
         .audioCodec('aac')
         .format('mp4')
         .outputOptions([
