@@ -14,6 +14,8 @@ interface VideoPanelProps {
   isPlaying?: boolean;
   replacementAudioPath?: string | null;
   isAudioPreviewEnabled?: boolean;
+  dependenciesReady?: boolean;
+  isCheckingDependencies?: boolean;
   // AI Subtitle support - when available, use instead of captions
   aiSubtitleData?: AISubtitleData | null;
   selectedFrameId?: string | null;
@@ -33,6 +35,8 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   isPlaying,
   replacementAudioPath,
   isAudioPreviewEnabled = true,
+  dependenciesReady = true,
+  isCheckingDependencies = false,
   aiSubtitleData,
   selectedFrameId,
   onFrameSelect,
@@ -1125,13 +1129,14 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
           margin: '20px',
           borderRadius: theme.radius.lg,
           border: isDragOver ? `2px dashed ${theme.colors.primary}` : `2px dashed ${theme.colors.primary}40`,
-          cursor: 'pointer',
+          cursor: dependenciesReady ? 'pointer' : 'not-allowed',
+          opacity: dependenciesReady ? 1 : 0.6,
           transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           boxShadow: isDragOver ? theme.shadows.lg : theme.shadows.sm,
           position: 'relative',
           overflow: 'hidden'
         }} 
-        onClick={onVideoSelect}
+        onClick={dependenciesReady ? onVideoSelect : undefined}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
       >
@@ -1181,7 +1186,11 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
             fontWeight: '600',
             fontFamily: theme.typography.fontFamily
           }}>
-            Drop a video file here or click to select
+{isCheckingDependencies 
+              ? 'Checking dependencies...' 
+              : dependenciesReady 
+                ? 'Drop a video file here or click to select'
+                : 'Dependencies not ready'}
           </div>
           
           <div style={{ 
@@ -1189,7 +1198,11 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
             color: theme.colors.textSecondary,
             marginBottom: '20px'
           }}>
-            Supports MP4, MOV, AVI
+{isCheckingDependencies 
+              ? 'Please wait while we initialize...'
+              : dependenciesReady 
+                ? 'Supports MP4, MOV, AVI'
+                : 'Please install missing dependencies'}
           </div>
           
           {/* Blue accent button for visual appeal */}

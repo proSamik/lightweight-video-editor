@@ -71,6 +71,8 @@ const AppContent: React.FC = () => {
   const [showVideoLoadingModal, setShowVideoLoadingModal] = useState(false);
   const [videoLoadingMessage, setVideoLoadingMessage] = useState('Loading video...');
   const [missingDependencies, setMissingDependencies] = useState({ ffmpeg: false, whisper: false });
+  const [dependenciesReady, setDependenciesReady] = useState(false);
+  const [isCheckingDependencies, setIsCheckingDependencies] = useState(true);
 
   // Update-related state
   const [showUpdateModal, setShowUpdateModal] = useState(false);
@@ -295,26 +297,40 @@ const AppContent: React.FC = () => {
 
   // Initialize history and load project info
   useEffect(() => {
-    // Initialize history with current state
-    const initialState = { aiSubtitleData: null, selectedFrameId: null, clips: [] };
-    setHistory([initialState]);
-    setHistoryIndex(0);
-
-    // Load clips from localStorage if available
-    try {
-      const savedClips = localStorage.getItem('tempClips');
+    // Initialize app on startup
+    const initializeApp = async () => {
+      console.log('Initializing app and checking dependencies...');
       
-      if (savedClips) {
-        const parsedClips = JSON.parse(savedClips);
-        setClips(parsedClips);
+      // Initialize history with current state
+      const initialState = { aiSubtitleData: null, selectedFrameId: null, clips: [] };
+      setHistory([initialState]);
+      setHistoryIndex(0);
+
+      // Load clips from localStorage if available
+      try {
+        const savedClips = localStorage.getItem('tempClips');
+        
+        if (savedClips) {
+          const parsedClips = JSON.parse(savedClips);
+          setClips(parsedClips);
+        }
+      } catch (error) {
+        console.error('Failed to load clips from localStorage:', error);
       }
-      
-      
-    } catch (error) {
-      console.error('Failed to load clips from localStorage:', error);
-    }
 
-    loadCurrentProjectInfo();
+      // Load project info
+      await loadCurrentProjectInfo();
+      
+      // Check dependencies at startup
+      console.log('Checking dependencies at app startup...');
+      const dependenciesOk = await checkDependencies();
+      setDependenciesReady(dependenciesOk);
+      setIsCheckingDependencies(false);
+      
+      console.log('App initialization complete. Dependencies ready:', dependenciesOk);
+    };
+
+    initializeApp();
   }, []);
 
   // Load current project info
@@ -491,11 +507,14 @@ const AppContent: React.FC = () => {
   };
 
   const handleVideoSelect = async () => {
-    if (!(await checkDependencies())) return;
+    if (!dependenciesReady) {
+      console.log('Dependencies not ready yet');
+      return;
+    }
     
     try {
       setShowVideoLoadingModal(true);
-      setVideoLoadingMessage('Selecting video file...');
+      setVideoLoadingMessage('Opening file selector...');
       
       const filePath = await window.electronAPI.selectVideoFile();
       if (filePath) {
@@ -520,13 +539,16 @@ const AppContent: React.FC = () => {
 
   const handleVideoDropped = async (filePath: string) => {
     console.log('handleVideoDropped called with:', filePath);
-    if (!(await checkDependencies())) return;
+    if (!dependenciesReady) {
+      console.log('Dependencies not ready yet');
+      return;
+    }
     
-    console.log('Dependencies checked, opening transcription settings');
+    console.log('Dependencies ready, processing dropped video');
     
     try {
       setShowVideoLoadingModal(true);
-      setVideoLoadingMessage('Loading dropped video...');
+      setVideoLoadingMessage('Processing dropped video...');
       
       // Load video metadata to get duration for time estimation
       const metadata = await window.electronAPI.getVideoMetadata(filePath);
@@ -1612,6 +1634,8 @@ const AppContent: React.FC = () => {
                   isPlaying={isPlaying}
                   replacementAudioPath={replacementAudioPath}
                   isAudioPreviewEnabled={isAudioPreviewEnabled}
+                  dependenciesReady={dependenciesReady}
+                  isCheckingDependencies={isCheckingDependencies}
                   aiSubtitleData={aiSubtitleData}
                   selectedFrameId={selectedFrameId}
                   onFrameSelect={setSelectedFrameId}
@@ -1692,6 +1716,8 @@ const AppContent: React.FC = () => {
                 isPlaying={isPlaying}
                 replacementAudioPath={replacementAudioPath}
                 isAudioPreviewEnabled={isAudioPreviewEnabled}
+                dependenciesReady={dependenciesReady}
+                isCheckingDependencies={isCheckingDependencies}
                 clips={clips}
               />
             </div>
