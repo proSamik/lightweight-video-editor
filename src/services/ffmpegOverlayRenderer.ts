@@ -2128,7 +2128,7 @@ export class FFmpegOverlayRenderer {
   /**
    * Generate overlay images using true parallel processing with worker threads
    */
-  private async generateOverlayImagesParallel(
+  public async generateOverlayImagesParallel(
     captions: any[],
     metadata: any,
     tempDir: string,
