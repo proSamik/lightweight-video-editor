@@ -19,6 +19,7 @@ interface CompactSearchReplaceProps {
   onOpen?: () => void;
   onFrameSelect?: (frameId: string) => void;
   onTimeSeek?: (time: number) => void;
+  onSearchHighlight?: (frameId: string | null, wordIndex: number | null) => void;
 }
 
 interface SearchResult {
@@ -36,7 +37,8 @@ const CompactSearchReplace: React.FC<CompactSearchReplaceProps> = ({
   onClose,
   onOpen,
   onFrameSelect,
-  onTimeSeek
+  onTimeSeek,
+  onSearchHighlight
 }) => {
   const { theme } = useTheme();
   const [searchTerm, setSearchTerm] = useState('');
@@ -48,20 +50,30 @@ const CompactSearchReplace: React.FC<CompactSearchReplaceProps> = ({
   const [showReplace, setShowReplace] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const replaceInputRef = useRef<HTMLInputElement>(null);
+  const isNavigatingRef = useRef(false);
 
-  // Focus search input when opening
+  // Focus search input only when opening
   useEffect(() => {
     if (isOpen && searchInputRef.current) {
-      searchInputRef.current.focus();
-      searchInputRef.current.select();
+      // Use setTimeout to ensure focus happens after render
+      setTimeout(() => {
+        if (searchInputRef.current) {
+          searchInputRef.current.focus();
+          searchInputRef.current.select();
+        }
+      }, 0);
+    } else if (!isOpen) {
+      // Clear highlight when search is closed
+      onSearchHighlight?.(null, null);
     }
-  }, [isOpen]);
+  }, [isOpen]); // Remove onSearchHighlight dependency - this was causing the refocus!
 
   // Search functionality
   const performSearch = useCallback((term: string) => {
     if (!term.trim() || !aiSubtitleData?.frames) {
       setSearchResults([]);
       setCurrentResultIndex(0);
+      onSearchHighlight?.(null, null); // Clear highlight when no search results
       return;
     }
 
@@ -106,17 +118,36 @@ const CompactSearchReplace: React.FC<CompactSearchReplaceProps> = ({
     });
 
     setSearchResults(results);
-    setCurrentResultIndex(0);
+    
+    // Only reset to first result if we're not currently navigating
+    // Don't auto-navigate or highlight - let user manually navigate
+    if (results.length > 0 && !isNavigatingRef.current) {
+      setCurrentResultIndex(0);
+    }
+    
+    // Reset navigation flag
+    isNavigatingRef.current = false;
   }, [aiSubtitleData?.frames, caseSensitive, wholeWord]);
 
+  // Debounced search to prevent too many re-renders
   useEffect(() => {
-    performSearch(searchTerm);
+    const timeoutId = setTimeout(() => {
+      performSearch(searchTerm);
+    }, 500); // 500ms debounce - longer delay for better UX
+
+    return () => clearTimeout(timeoutId);
   }, [searchTerm, performSearch]);
+
+  // Note: Removed aggressive focus maintenance that was interfering with word editing
+  // Users can click back into search input if they need to continue searching
 
   // Navigate to search result
   const navigateToResult = useCallback((index: number) => {
     if (searchResults.length === 0) return;
 
+    // Set flag to prevent search from resetting to first result
+    isNavigatingRef.current = true;
+    
     const validIndex = Math.max(0, Math.min(index, searchResults.length - 1));
     setCurrentResultIndex(validIndex);
 
@@ -124,8 +155,9 @@ const CompactSearchReplace: React.FC<CompactSearchReplaceProps> = ({
     if (result) {
       onFrameSelect?.(result.frameId);
       onTimeSeek?.(result.frameStartTime);
+      onSearchHighlight?.(result.frameId, result.wordIndex);
     }
-  }, [searchResults, onFrameSelect, onTimeSeek]);
+  }, [searchResults, onFrameSelect, onTimeSeek, onSearchHighlight]);
 
   // Replace functionality
   const replaceCurrentResult = useCallback(() => {
@@ -226,54 +258,66 @@ const CompactSearchReplace: React.FC<CompactSearchReplaceProps> = ({
     }, 100);
   }, [aiSubtitleData, searchResults, searchTerm, replaceTerm, caseSensitive, wholeWord, onAISubtitleUpdate, performSearch]);
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts - only handle when focus is within the search component
   useEffect(() => {
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't handle shortcuts if user is typing in input fields
       const target = e.target as HTMLElement;
+      
+      // Only handle events if the target is within our search component
+      const searchContainer = document.querySelector('[data-search-container]');
+      const isWithinSearchComponent = searchContainer && searchContainer.contains(target);
+      
+      if (!isWithinSearchComponent) {
+        return; // Don't handle if focus is outside search component
+      }
+
       const isInInput = target && (
         target.tagName === 'INPUT' || 
         target.tagName === 'TEXTAREA' || 
         target.contentEditable === 'true'
       );
 
+      // Always handle Escape to close
       if (e.key === 'Escape') {
         e.preventDefault();
+        e.stopPropagation();
         onClose();
         return;
       }
 
-      // Only handle these shortcuts when NOT in an input field
-      if (!isInInput) {
-        if (e.key === 'F3') {
-          e.preventDefault();
-          if (e.shiftKey) {
-            navigateToResult(currentResultIndex - 1);
-          } else {
-            navigateToResult(currentResultIndex + 1);
-          }
-        }
-      }
-
-      // Handle Enter specifically for inputs
-      if (isInInput && e.key === 'Enter') {
-        if (e.ctrlKey || e.metaKey) {
-          e.preventDefault();
-          replaceAll();
-        } else if (target === replaceInputRef.current) {
-          e.preventDefault();
-          replaceCurrentResult();
-        } else if (target === searchInputRef.current) {
-          e.preventDefault();
+      // Handle F3 navigation only when not in input fields
+      if (!isInInput && e.key === 'F3') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.shiftKey) {
+          navigateToResult(currentResultIndex - 1);
+        } else {
           navigateToResult(currentResultIndex + 1);
         }
+        return;
+      }
+
+      // Handle Enter specifically for our inputs
+      if (isInInput && e.key === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        if (e.ctrlKey || e.metaKey) {
+          replaceAll();
+        } else if (target === replaceInputRef.current) {
+          replaceCurrentResult();
+        } else if (target === searchInputRef.current) {
+          navigateToResult(currentResultIndex + 1);
+        }
+        return;
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    // Use capture phase to handle events before they bubble up
+    document.addEventListener('keydown', handleKeyDown, true);
+    return () => document.removeEventListener('keydown', handleKeyDown, true);
   }, [isOpen, onClose, replaceAll, replaceCurrentResult, navigateToResult, currentResultIndex, showReplace]);
 
   return (
@@ -348,6 +392,7 @@ const CompactSearchReplace: React.FC<CompactSearchReplaceProps> = ({
       {/* Expanded search interface */}
       {isOpen && (
         <div
+          data-search-container
           style={{
             backgroundColor: theme.colors.surface,
             border: `1px solid ${theme.colors.border}`,
@@ -388,6 +433,29 @@ const CompactSearchReplace: React.FC<CompactSearchReplaceProps> = ({
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Find"
+              onKeyDown={(e) => {
+                // Prevent other keyboard shortcuts from triggering
+                e.stopPropagation();
+                
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (e.ctrlKey || e.metaKey) {
+                    replaceAll();
+                  } else {
+                    navigateToResult(currentResultIndex + 1);
+                  }
+                } else if (e.key === 'Escape') {
+                  e.preventDefault();
+                  onClose();
+                } else if (e.key === 'F3') {
+                  e.preventDefault();
+                  if (e.shiftKey) {
+                    navigateToResult(currentResultIndex - 1);
+                  } else {
+                    navigateToResult(currentResultIndex + 1);
+                  }
+                }
+              }}
               style={{
                 flex: 1,
                 border: 'none',
@@ -521,6 +589,29 @@ const CompactSearchReplace: React.FC<CompactSearchReplaceProps> = ({
                 value={replaceTerm}
                 onChange={(e) => setReplaceTerm(e.target.value)}
                 placeholder="Replace"
+                onKeyDown={(e) => {
+                  // Prevent other keyboard shortcuts from triggering
+                  e.stopPropagation();
+                  
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (e.ctrlKey || e.metaKey) {
+                      replaceAll();
+                    } else {
+                      replaceCurrentResult();
+                    }
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    onClose();
+                  } else if (e.key === 'F3') {
+                    e.preventDefault();
+                    if (e.shiftKey) {
+                      navigateToResult(currentResultIndex - 1);
+                    } else {
+                      navigateToResult(currentResultIndex + 1);
+                    }
+                  }
+                }}
                 style={{
                   flex: 1,
                   border: 'none',
