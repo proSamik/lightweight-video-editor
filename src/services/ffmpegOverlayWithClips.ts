@@ -1145,18 +1145,43 @@ export class FFmpegOverlayWithClips {
       
       fs.writeFileSync(concatFile, concatContent);
       
+      const codec = this.getVideoCodecForMac();
+      const outputOptions = [
+        '-c:v', codec, // Use quality encoding for video
+        '-c:a', 'aac', // Re-encode audio with AAC for compatibility
+        '-map', '0:v', // Map video stream
+        '-map', '0:a?', // Map audio stream if available (? makes it optional)
+        '-fflags', '+genpts'
+      ];
+      
+      // Add quality settings based on encoder type
+      if (codec === 'h264_videotoolbox') {
+        // Hardware encoder quality settings
+        switch (quality) {
+          case 'high':
+            outputOptions.push('-b:v', '8000k', '-maxrate', '8000k', '-bufsize', '16000k');
+            break;
+          case 'medium':
+            outputOptions.push('-b:v', '4000k', '-maxrate', '4000k', '-bufsize', '8000k');
+            break;
+          case 'low':
+            outputOptions.push('-b:v', '1500k', '-maxrate', '1500k', '-bufsize', '3000k');
+            break;
+          default:
+            outputOptions.push('-b:v', '4000k', '-maxrate', '4000k', '-bufsize', '8000k');
+        }
+      } else {
+        // Software encoder quality settings
+        const preset = this.getPresetForQuality(quality);
+        const crf = this.getCRFForQuality(quality);
+        if (preset) outputOptions.push('-preset', preset);
+        if (crf) outputOptions.push('-crf', crf);
+      }
+      
       const command = ffmpeg()
         .input(concatFile)
         .inputOptions(['-f', 'concat', '-safe', '0'])
-        .outputOptions([
-          '-c:v', this.getVideoCodecForMac(), // Use quality encoding for video
-          '-c:a', 'aac', // Re-encode audio with AAC for compatibility
-          '-preset', this.getPresetForQuality(quality),
-          '-crf', this.getCRFForQuality(quality),
-          '-map', '0:v', // Map video stream
-          '-map', '0:a?', // Map audio stream if available (? makes it optional)
-          '-fflags', '+genpts'
-        ])
+        .outputOptions(outputOptions)
         .output(outputPath);
         
       this.activeFFmpegProcesses.add(command);
