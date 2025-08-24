@@ -826,9 +826,10 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     const video = videoRef.current;
     if (!video) return;
 
-    if (isPlaying && video.paused) {
+    // Don't try to play if video has ended - let it stay paused
+    if (isPlaying && video.paused && !video.ended) {
       video.play().catch(console.error);
-    } else if (!isPlaying && !video.paused) {
+    } else if (!isPlaying && !video.paused && !video.ended) {
       video.pause();
     }
   }, [isPlaying]);
@@ -846,7 +847,15 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     };
     
     const handlePause = () => {
-      // Video paused/ended - call onPlayPause only if parent thinks it's playing
+      // Video paused - call onPlayPause only if parent thinks it's playing
+      if (isPlaying && !video.ended) {
+        onPlayPause();
+      }
+    };
+    
+    const handleEnded = () => {
+      // Video ended - call onPlayPause only if parent thinks it's playing
+      // Add additional check to prevent loop when video is already ended
       if (isPlaying) {
         onPlayPause();
       }
@@ -854,12 +863,12 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
 
     video.addEventListener('play', handlePlay);
     video.addEventListener('pause', handlePause);
-    video.addEventListener('ended', handlePause);
+    video.addEventListener('ended', handleEnded);
 
     return () => {
       video.removeEventListener('play', handlePlay);
       video.removeEventListener('pause', handlePause);
-      video.removeEventListener('ended', handlePause);
+      video.removeEventListener('ended', handleEnded);
     };
   }, [isPlaying, onPlayPause]);
 
