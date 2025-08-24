@@ -59,6 +59,7 @@ const AppContent: React.FC = () => {
   const [exportedFilePath, setExportedFilePath] = useState<string>('');
   const [pendingVideoPath, setPendingVideoPath] = useState<string | null>(null);
   const [pendingVideoDuration, setPendingVideoDuration] = useState<number | undefined>(undefined);
+  const [pendingVideoMetadata, setPendingVideoMetadata] = useState<{ width?: number; height?: number; duration?: number } | null>(null);
   const [pendingTranscriptionSettings, setPendingTranscriptionSettings] = useState<{ maxCharsPerLine: number; maxWordsPerLine: number } | null>(null);
   const [showAISettings, setShowAISettings] = useState(false);
   const [showAIContent, setShowAIContent] = useState(false);
@@ -67,6 +68,8 @@ const AppContent: React.FC = () => {
   const [showExportSettings, setShowExportSettings] = useState(false);
   const [showSrtSuccess, setShowSrtSuccess] = useState(false);
   const [showDependencyInstall, setShowDependencyInstall] = useState(false);
+  const [showVideoLoadingModal, setShowVideoLoadingModal] = useState(false);
+  const [videoLoadingMessage, setVideoLoadingMessage] = useState('Loading video...');
   const [missingDependencies, setMissingDependencies] = useState({ ffmpeg: false, whisper: false });
 
   // Update-related state
@@ -491,16 +494,27 @@ const AppContent: React.FC = () => {
     if (!(await checkDependencies())) return;
     
     try {
+      setShowVideoLoadingModal(true);
+      setVideoLoadingMessage('Selecting video file...');
+      
       const filePath = await window.electronAPI.selectVideoFile();
       if (filePath) {
+        setVideoLoadingMessage('Loading video metadata...');
+        
         // Load video metadata to get duration for time estimation
         const metadata = await window.electronAPI.getVideoMetadata(filePath);
         setPendingVideoDuration(metadata?.duration);
+        setPendingVideoMetadata(metadata);
+        
+        setShowVideoLoadingModal(false);
         setShowTranscriptionSettings(true);
         setPendingVideoPath(filePath);
+      } else {
+        setShowVideoLoadingModal(false);
       }
     } catch (error) {
       console.error('Error selecting video file:', error);
+      setShowVideoLoadingModal(false);
     }
   };
 
@@ -509,16 +523,25 @@ const AppContent: React.FC = () => {
     if (!(await checkDependencies())) return;
     
     console.log('Dependencies checked, opening transcription settings');
-    // Load video metadata to get duration for time estimation
+    
     try {
+      setShowVideoLoadingModal(true);
+      setVideoLoadingMessage('Loading dropped video...');
+      
+      // Load video metadata to get duration for time estimation
       const metadata = await window.electronAPI.getVideoMetadata(filePath);
       setPendingVideoDuration(metadata?.duration);
+      setPendingVideoMetadata(metadata);
+      
+      setShowVideoLoadingModal(false);
+      setShowTranscriptionSettings(true);
+      setPendingVideoPath(filePath);
     } catch (error) {
       console.error('Error loading video metadata:', error);
       setPendingVideoDuration(undefined);
+      setPendingVideoMetadata(null);
+      setShowVideoLoadingModal(false);
     }
-    setShowTranscriptionSettings(true);
-    setPendingVideoPath(filePath);
   };
 
 
@@ -558,7 +581,7 @@ const AppContent: React.FC = () => {
                         (videoMetadata.height / videoMetadata.width) > 1.5; // 9:16 or more vertical
       
       // Use smaller font size for vertical videos (9:16)
-      const defaultFontSize = isVertical ? 20 : 85;
+      const defaultFontSize = isVertical ? 50 : 85;
       
       console.log('Video metadata for font sizing:', {
         width: videoMetadata?.width,
@@ -573,7 +596,9 @@ const AppContent: React.FC = () => {
       // Create AI subtitle data directly from transcription (no captions)
       const aiData = createAISubtitleDataFromTranscription(
         transcriptionResult, 
-        defaultFontSize
+        defaultFontSize,
+        settings?.maxWordsPerLine || (isVertical ? 2 : 5),
+        settings?.maxCharsPerLine || (isVertical ? 12 : 16)
       );
       
       setTranscriptionStatus(prev => ({ ...prev, message: 'Finalizing AI subtitles...' }));
@@ -614,7 +639,7 @@ const AppContent: React.FC = () => {
   };
 
   // Convert transcription results directly to AI subtitle data (no captions)
-  const createAISubtitleDataFromTranscription = (transcriptionResult: any, defaultFontSize: number, maxWordsPerFrame: number = 5, maxCharsPerFrame: number = 30): AISubtitleData => {
+  const createAISubtitleDataFromTranscription = (transcriptionResult: any, defaultFontSize: number, maxWordsPerFrame: number = 2, maxCharsPerFrame: number = 16): AISubtitleData => {
     const frames: SubtitleFrame[] = [];
     const audioSegments: any[] = [];
     
@@ -725,25 +750,28 @@ const AppContent: React.FC = () => {
   const handleTranscriptionSettingsConfirm = async (settings: { maxCharsPerLine: number; maxWordsPerLine: number; whisperModel: string }) => {
     if (pendingVideoPath) {
       try {
-        // Start background processing without blocking UI
-        setTranscriptionStatus({ isTranscribing: true, progress: 0, message: 'Loading video metadata...' });
+        // Immediately show loading state to prevent UI freeze appearance
+        setShowTranscriptionSettings(false);
+        setTranscriptionStatus({ isTranscribing: true, progress: 0, message: 'Initializing transcription...' });
         
-        // Get video metadata
+        // Update status and get video metadata
+        setTranscriptionStatus(prev => ({ ...prev, message: 'Loading video metadata...' }));
         const videoMetadata = await window.electronAPI.getVideoMetadata(pendingVideoPath);
         setVideoFile(videoMetadata);
-        
-        // Close transcription settings dialog
-        setShowTranscriptionSettings(false);
         
         // Generate captions in background (UI remains responsive)
         await generateCaptions(pendingVideoPath, settings);
         setPendingVideoPath(null);
+        setPendingVideoDuration(undefined);
+        setPendingVideoMetadata(null);
         setPendingTranscriptionSettings(null);
       } catch (error) {
         console.error('Error in transcription setup:', error);
         setTranscriptionStatus({ isTranscribing: false, progress: 0, message: 'Failed to load video' });
         setShowTranscriptionSettings(false);
         setPendingVideoPath(null);
+        setPendingVideoDuration(undefined);
+        setPendingVideoMetadata(null);
       }
     }
   };
@@ -1678,9 +1706,11 @@ const AppContent: React.FC = () => {
           setShowTranscriptionSettings(false);
           setPendingVideoPath(null);
           setPendingVideoDuration(undefined);
+          setPendingVideoMetadata(null);
         }}
         onConfirm={handleTranscriptionSettingsConfirm}
         videoDuration={pendingVideoDuration || videoFile?.duration}
+        videoMetadata={pendingVideoMetadata || (videoFile ? { width: videoFile.width, height: videoFile.height } : undefined)}
       />
 
 
@@ -1722,7 +1752,7 @@ const AppContent: React.FC = () => {
       <AIContentModal
         isOpen={showAIContent}
         onClose={() => setShowAIContent(false)}
-        aiSubtitleData={aiSubtitleData}
+        aiSubtitleData={aiSubtitleData || null}
         onSave={(content) => {
           console.log('App.tsx - Received content from AIContentModal:', content);
           setGeneratedContent(content);
@@ -1747,7 +1777,7 @@ const AppContent: React.FC = () => {
           handleExport(settings);
         }}
         replacementAudioPath={replacementAudioPath}
-        aiSubtitleData={aiSubtitleData}
+        aiSubtitleData={aiSubtitleData || undefined}
         clips={clips}
       />
 
@@ -1758,6 +1788,15 @@ const AppContent: React.FC = () => {
         progress={loadingProgress}
         elapsedTime={elapsedTime}
         onCancel={cancelController ? handleCancel : undefined}
+      />
+
+      {/* Video Loading Modal */}
+      <ExportProcessingModal
+        isOpen={showVideoLoadingModal}
+        message={videoLoadingMessage}
+        progress={undefined}
+        elapsedTime={undefined}
+        onCancel={undefined}
       />
 
       {/* SRT Export Success Modal */}
@@ -1818,7 +1857,7 @@ const AppContent: React.FC = () => {
                 backgroundColor: theme.colors.backgroundSecondary,
               }}
             >
-              {exportedSrtPath}
+              {exportedSrtPath || ''}
             </Card>
             <div style={{ 
               display: 'flex', 
@@ -1848,7 +1887,7 @@ const AppContent: React.FC = () => {
       <UpdateModal
         isOpen={showUpdateModal}
         onClose={() => setShowUpdateModal(false)}
-        updateInfo={updateInfo}
+        updateInfo={updateInfo || undefined}
         type={updateModalType}
       />
 
