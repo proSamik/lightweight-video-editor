@@ -61,11 +61,11 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
       if (frame.id !== selectedFrame.id) return frame;
       const mergedStyle = { ...frame.style, ...styleUpdates } as any;
       const safeStyle = {
-        font: mergedStyle.font || 'Segoe UI',
+        font: mergedStyle.font || 'Poppins',
         fontSize: mergedStyle.fontSize ?? 85,
         textColor: mergedStyle.textColor || '#ffffff',
-        highlighterColor: mergedStyle.highlighterColor || '#ffff00',
-        backgroundColor: mergedStyle.backgroundColor ?? 'transparent',
+        highlighterColor: mergedStyle.highlighterColor || '#00ff00',
+        backgroundColor: mergedStyle.backgroundColor ?? '#000000',
         position: mergedStyle.position || { x: 50, y: 80 },
         strokeColor: mergedStyle.strokeColor,
         strokeWidth: mergedStyle.strokeWidth,
@@ -107,11 +107,11 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
         if (!frameOverlaps) return frame;
         const mergedStyle = { ...frame.style, ...selectedFrame.style } as any;
         const safeStyle = {
-          font: mergedStyle.font || 'Segoe UI',
+          font: mergedStyle.font || 'Poppins',
           fontSize: mergedStyle.fontSize ?? 85,
           textColor: mergedStyle.textColor || '#ffffff',
-          highlighterColor: mergedStyle.highlighterColor || '#ffff00',
-          backgroundColor: mergedStyle.backgroundColor ?? 'transparent',
+          highlighterColor: mergedStyle.highlighterColor || '#00ff00',
+          backgroundColor: mergedStyle.backgroundColor ?? '#000000',
           position: mergedStyle.position || { x: 50, y: 80 },
           strokeColor: mergedStyle.strokeColor,
           strokeWidth: mergedStyle.strokeWidth,
@@ -319,11 +319,11 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
             ) : (
               <StyleControls
                 style={selectedFrame.style || {
-                  font: 'Segoe UI',
+                  font: 'Poppins',
                   fontSize: 85,
                   textColor: '#ffffff',
-                  highlighterColor: '#ffff00',
-                  backgroundColor: 'transparent',
+                  highlighterColor: '#00ff00',
+                  backgroundColor: '#000000',
                   position: { x: 50, y: 80 },
                 }}
                 onStyleUpdate={handleStyleUpdate}
@@ -340,11 +340,11 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
           onClose={() => setIsTimelineModalOpen(false)}
           onApply={handleTimelineApply}
           currentStyle={selectedFrame?.style || {
-            font: 'Segoe UI',
+            font: 'Poppins',
             fontSize: 85,
             textColor: '#ffffff',
-            highlighterColor: '#ffff00',
-            backgroundColor: 'transparent',
+            highlighterColor: '#00ff00',
+            backgroundColor: '#000000',
             position: { x: 50, y: 80 },
           }}
           captions={aiSubtitleData?.frames.map(f => ({ id: f.id, startTime: f.startTime * 1000, endTime: f.endTime * 1000 })) || []}
