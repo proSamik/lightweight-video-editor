@@ -1657,20 +1657,20 @@ function renderSimpleTextOnCanvas(
   const strokeColor = parseColor(caption.style?.strokeColor || '#000000');
   const strokeWidth = caption.style?.strokeWidth || 0;
   
-  // Set font with actual font from caption style (matching VideoPanel exactly)
+  // Set font with actual font from caption style (matching export system exactly)
   const fontFamily = mapFontName(caption.style?.font || 'Segoe UI');
   ctx.font = `bold ${fontSize}px ${fontFamily}, Arial, sans-serif`;
   ctx.textAlign = 'center';
-  ctx.textBaseline = 'bottom';
+  ctx.textBaseline = 'middle';
   
   // Measure text for background box
   const textMetrics = ctx.measureText(text);
   const textWidth = textMetrics.width;
   const textHeight = fontSize;
   
-  // Calculate background box position and size (matching VideoPanel padding exactly)
-  const boxX = x - (textWidth / 2) - 12; // 12px padding from VideoPanel
-  const boxY = y - textHeight - 12;
+  // Calculate background box position and size (matching export system exactly)
+  const boxX = x - (textWidth / 2) - 12; // 12px padding
+  const boxY = y - (textHeight / 2) - 12; // Center-based positioning to match 'middle' baseline
   const boxWidth = textWidth + 24; // 12px padding on each side
   const boxHeight = textHeight + 24; // 12px padding top/bottom
   
@@ -1946,7 +1946,7 @@ function renderProgressiveTextOnCanvas(
   const textAlign = caption.style?.textAlign || 'center';
   ctx.font = `bold ${fontSize}px ${fontFamily}, Arial, sans-serif`;
   ctx.textAlign = textAlign;
-  ctx.textBaseline = 'bottom';
+  ctx.textBaseline = 'middle';
   
   // Find words that should be visible up to current time
   const visibleWords: any[] = [];
@@ -1991,7 +1991,7 @@ function renderProgressiveTextOnCanvas(
       const transformedWord = applyTextTransform(word.word, caption.style.textTransform);
       const wordWidth = ctx.measureText(transformedWord).width;
       const boxX = centerX - (wordWidth / 2) - 8;
-      const boxY = wordY - fontSize - 8;
+      const boxY = wordY - (fontSize / 2) - 8; // Center-based positioning to match 'middle' baseline
       const boxWidth = wordWidth + 16;
       const boxHeight = fontSize + 16;
       
