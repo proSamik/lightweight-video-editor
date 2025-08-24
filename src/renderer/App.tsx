@@ -1084,6 +1084,11 @@ const AppContent: React.FC = () => {
 
     setVideoFile(projectData.videoFile);
     
+    // Clear state unconditionally first to prevent previous data from persisting
+    setAiSubtitleData(null);
+    setClips([]);
+    setSelectedFrameId(null);
+    
     // Load AI subtitles as the single source of truth
     if (projectData.aiSubtitleData) {
       setAiSubtitleData(projectData.aiSubtitleData);
@@ -1092,13 +1097,10 @@ const AppContent: React.FC = () => {
     // Load clips from project data
     if (projectData.clips) {
       setClips(projectData.clips);
-    } else {
-      setClips([]);
     }
     
     setReplacementAudioPath(projectData.replacementAudioPath || null);
     setExtractedAudioPath(projectData.extractedAudioPath || null); // Restore extracted audio path for waveforms
-    setSelectedFrameId(null); // Reset frame selection
     setCurrentTime(0);
 
     // Clear localStorage when loading a project
@@ -1572,8 +1574,8 @@ const AppContent: React.FC = () => {
                   clips={clips}
                 />
                 
-                {/* Unified Timeline - Only show when video is loaded and data is ready */}
-                {!isLoading && aiSubtitleData && aiSubtitleData.frames && Array.isArray(aiSubtitleData.frames) && aiSubtitleData.frames.length > 0 && (
+                {/* Unified Timeline - Show when video is loaded */}
+                {videoFile && !isLoading && (
                 <UnifiedTimeline
                   currentTime={currentTime}
                   onTimeSeek={handleTimeSeek}
@@ -1591,9 +1593,9 @@ const AppContent: React.FC = () => {
                   onFrameSelect={setSelectedFrameId}
                   clips={clips}
                   onClipsChange={handleClipsChange}
-          
                   zoomLevel={zoomLevel}
                   onZoomChange={setZoomLevel}
+                  transcriptionStatus={transcriptionStatus}
                 />
                 )}
               </Card>

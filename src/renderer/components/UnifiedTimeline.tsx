@@ -37,6 +37,14 @@ interface UnifiedTimelineProps {
   // Shared zoom state
   zoomLevel?: number;
   onZoomChange?: (level: number) => void;
+  // Transcription status
+  transcriptionStatus?: {
+    isTranscribing: boolean;
+    progress: number;
+    message: string;
+    speed?: string;
+    eta?: string;
+  };
 }
 
 /**
@@ -61,12 +69,12 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   onFrameSelect,
   clips = [],
   onClipsChange,
-
   zoomLevel = 0,
   onZoomChange,
+  transcriptionStatus,
 }) => {
-  // Early return if data is not ready to prevent initialization errors
-  if (!aiSubtitleData?.frames || !Array.isArray(aiSubtitleData.frames)) {
+  // Show timeline if we have a video, even during transcription
+  if (!videoFile) {
     return null;
   }
 
@@ -883,6 +891,13 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
       display: 'flex',
       flexDirection: 'column'
     }}>
+      {/* CSS-in-JS Animation for Spinner */}
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
       {/* Timeline Controls */}
       <div style={{ 
         height: `${CONTROL_HEIGHT}px`,
@@ -1636,22 +1651,24 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                const activeClips = localClips.filter(clip => !clip.isRemoved);
                let overlappingSubtitles;
                
-               if (activeClips.length === 0) {
-                 // No active clips - show all subtitles
-                 overlappingSubtitles = effectiveCaptions;
-               } else {
-                 // Show subtitles that overlap with active clips
-                 overlappingSubtitles = effectiveCaptions.filter(segment => {
-                   return activeClips.some(clip => 
-                     segment.startTime < clip.endTime && segment.endTime > clip.startTime
-                   );
+               if (effectiveCaptions.length > 0) {
+                 if (activeClips.length === 0) {
+                   // No active clips - show all subtitles
+                   overlappingSubtitles = effectiveCaptions;
+                 } else {
+                   // Show subtitles that overlap with active clips
+                   overlappingSubtitles = effectiveCaptions.filter(segment => {
+                     return activeClips.some(clip => 
+                       segment.startTime < clip.endTime && segment.endTime > clip.startTime
+                     );
+                   });
+                 }
+                 
+                 const segmentsWithTracks = assignTracks(overlappingSubtitles);
+                 segmentsWithTracks.forEach(({ segment, track }) => {
+                   allSegments.push({ type: 'subtitle', data: segment, track: track + 1 }); // Offset by 1 to leave space for clips
                  });
                }
-               
-               const segmentsWithTracks = assignTracks(overlappingSubtitles);
-               segmentsWithTracks.forEach(({ segment, track }) => {
-                 allSegments.push({ type: 'subtitle', data: segment, track: track + 1 }); // Offset by 1 to leave space for clips
-               });
               
               return allSegments.map((segment, globalIndex) => {
                 if (segment.type === 'clip') {
@@ -1825,6 +1842,73 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                 }
               });
             })()}
+
+            {/* Transcription Status - Show when no subtitles are available but transcription is in progress */}
+            {effectiveCaptions.length === 0 && transcriptionStatus?.isTranscribing && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  backgroundColor: theme.colors.surface,
+                  border: `1px solid ${theme.colors.border}`,
+                  borderRadius: '8px',
+                  padding: '16px 24px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  zIndex: 20
+                }}
+              >
+                <div
+                  style={{
+                    width: '16px',
+                    height: '16px',
+                    border: `2px solid ${theme.colors.primary}40`,
+                    borderTop: `2px solid ${theme.colors.primary}`,
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite'
+                  }}
+                />
+                <div>
+                  <div style={{ 
+                    fontSize: '14px', 
+                    fontWeight: '500', 
+                    color: theme.colors.text,
+                    marginBottom: '4px'
+                  }}>
+                    {transcriptionStatus.message}
+                  </div>
+                  <div style={{ 
+                    fontSize: '12px', 
+                    color: theme.colors.textSecondary,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <div style={{ 
+                      width: '60px', 
+                      height: '4px', 
+                      backgroundColor: theme.colors.surface,
+                      borderRadius: '2px',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        width: `${transcriptionStatus.progress}%`,
+                        height: '100%',
+                        backgroundColor: theme.colors.primary,
+                        transition: 'width 0.3s ease'
+                      }} />
+                    </div>
+                    <span>{Math.round(transcriptionStatus.progress)}%</span>
+                    {transcriptionStatus.eta && (
+                      <span>ETA: {transcriptionStatus.eta}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
