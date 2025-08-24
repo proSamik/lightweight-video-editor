@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { LiquidModal } from './ui';
 import { SettingsIcon } from './IconComponents';
@@ -8,18 +8,42 @@ interface TranscriptionSettingsProps {
   onClose: () => void;
   onConfirm: (settings: { maxCharsPerLine: number; maxWordsPerLine: number; whisperModel: string }) => void;
   videoDuration?: number;
+  videoMetadata?: { width?: number; height?: number };
 }
 
 const TranscriptionSettings: React.FC<TranscriptionSettingsProps> = ({
   isOpen,
   onClose,
   onConfirm,
-  videoDuration = 0
+  videoDuration = 0,
+  videoMetadata
 }) => {
   const { theme } = useTheme();
+  
+  // State for transcription settings
   const [maxCharsPerLine, setMaxCharsPerLine] = useState(16);
   const [maxWordsPerLine, setMaxWordsPerLine] = useState(5);
   const [whisperModel, setWhisperModel] = useState('base');
+
+  // Update defaults when video metadata changes
+  useEffect(() => {
+    if (videoMetadata?.width && videoMetadata?.height) {
+      const isVertical = (videoMetadata.height / videoMetadata.width) > 1.5;
+      
+      console.log('TranscriptionSettings: Video aspect ratio detection:', {
+        width: videoMetadata.width,
+        height: videoMetadata.height,
+        aspectRatio: videoMetadata.width / videoMetadata.height,
+        isVertical,
+        settingWordsPerLine: isVertical ? 2 : 5,
+        settingCharsPerLine: isVertical ? 12 : 16
+      });
+      
+      // Set defaults based on video aspect ratio
+      setMaxCharsPerLine(isVertical ? 12 : 16);
+      setMaxWordsPerLine(isVertical ? 2 : 5);
+    }
+  }, [videoMetadata]);
 
   const whisperModels = [
     { value: 'tiny', label: 'Tiny' },
