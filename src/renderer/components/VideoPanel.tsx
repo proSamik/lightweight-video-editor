@@ -57,7 +57,6 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   const [scaleFactor, setScaleFactor] = useState(1);
   const [isHoveringCaption, setIsHoveringCaption] = useState(false);
   const [lastSkipTime, setLastSkipTime] = useState<number>(-1);
-  const skipCooldownRef = useRef<NodeJS.Timeout | null>(null);
   const isSkippingRef = useRef<boolean>(false);
 
   /**
@@ -424,11 +423,6 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
       setModalPosition({ x: e.clientX, y: e.clientY });
       setShowCaptionStyleModal(true);
     }
-  };
-
-
-  const handleCanvasMouseUp = () => {
-    setIsDragging(false);
   };
 
   // Global mouse move handler for dragging - real-time visual feedback
