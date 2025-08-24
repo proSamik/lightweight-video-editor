@@ -856,24 +856,47 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   // Update selected frame when playhead enters a new segment (debounced to prevent race conditions)
   useEffect(() => {
     const timeoutId = setTimeout(() => {
+      if (!onFrameSelect) return;
+      
+      const currentTimeMs = currentTime;
+      let targetSelection: string | null = null;
+      
       if (localClips.length > 0) {
-        // In clip mode, find the clip at current time
-        if (!localClips.length || !onFrameSelect) return;
-        const currentTimeMs = currentTime;
+        // Priority 1: Find active clip at current time
         const clipAtTime = localClips.find(clip => 
           currentTimeMs >= clip.startTime && currentTimeMs <= clip.endTime && !clip.isRemoved
         );
-        if (clipAtTime && clipAtTime.id !== selectedFrameId) {
-          onFrameSelect(clipAtTime.id);
+        if (clipAtTime) {
+          targetSelection = clipAtTime.id;
         }
-      } else {
-        // In subtitle mode, find the subtitle frame at current time
-        if (!aiSubtitleData?.frames?.length || !onFrameSelect) return;
-        const ms = currentTime;
-        const within = virtualCaptionsFromAI.find(seg => ms >= seg.startTime && ms <= seg.endTime);
-        if (within && within.id !== selectedFrameId) {
-          onFrameSelect(within.id);
+      }
+      
+      // Priority 2: If no clip selected, or if we want both clip and subtitle selection,
+      // find subtitle segment at current time that's within active clips
+      if (!targetSelection && aiSubtitleData?.frames?.length) {
+        const subtitleAtTime = virtualCaptionsFromAI.find(seg => {
+          // Check if subtitle is at current time
+          if (currentTimeMs < seg.startTime || currentTimeMs > seg.endTime) return false;
+          
+          // If clips exist, ensure subtitle is fully within an active clip
+          if (localClips.length > 0) {
+            const activeClips = localClips.filter(clip => !clip.isRemoved);
+            return activeClips.some(clip => 
+              seg.startTime >= clip.startTime && seg.endTime <= clip.endTime
+            );
+          }
+          
+          return true; // No clips - any subtitle is valid
+        });
+        
+        if (subtitleAtTime) {
+          targetSelection = subtitleAtTime.id;
         }
+      }
+      
+      // Update selection if it changed
+      if (targetSelection && targetSelection !== selectedFrameId) {
+        onFrameSelect(targetSelection);
       }
     }, 100); // 100ms debounce to prevent rapid-fire selection changes
 
@@ -1656,10 +1679,10 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
                    // No active clips - show all subtitles
                    overlappingSubtitles = effectiveCaptions;
                  } else {
-                   // Show subtitles that overlap with active clips
+                   // Show only subtitles that are fully contained within active clips (not clipped)
                    overlappingSubtitles = effectiveCaptions.filter(segment => {
                      return activeClips.some(clip => 
-                       segment.startTime < clip.endTime && segment.endTime > clip.startTime
+                       segment.startTime >= clip.startTime && segment.endTime <= clip.endTime
                      );
                    });
                  }
