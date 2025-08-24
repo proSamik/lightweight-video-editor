@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { ExportSettings, AISubtitleData, VideoClip } from '../../types';
 import { LiquidModal } from './ui';
-import { FiSettings, FiZap, FiTarget, FiStar, FiMusic, FiFileText, FiVideo, FiScissors } from 'react-icons/fi';
+import { FiSettings, FiZap, FiMusic, FiFileText, FiVideo, FiScissors } from 'react-icons/fi';
 
 interface ExportSettingsProps {
   isOpen: boolean;
@@ -22,12 +22,19 @@ const ExportSettingsModal: React.FC<ExportSettingsProps> = ({
   clips
 }) => {
   const { theme } = useTheme();
-  const [exportMode, setExportMode] = useState<'complete' | 'newAudio' | 'subtitlesOnly' | 'completeWithClips'>('complete');
   const quality = 'high'; // Always use high quality
   
   const hasSubtitles = Boolean(aiSubtitleData?.frames?.length);
   const hasReplacementAudio = Boolean(replacementAudioPath);
   const hasClips = Boolean(clips?.length); // Show clip export option for any clips, even single clips
+
+  const [exportMode, setExportMode] = useState<'newAudio' | 'subtitlesOnly' | 'completeWithClips'>(() => {
+    // Default to the first available option based on what content is available
+    if (hasReplacementAudio) return 'newAudio';
+    if (hasSubtitles) return 'subtitlesOnly';
+    if (hasClips) return 'completeWithClips';
+    return 'newAudio'; // fallback
+  });
 
   const handleConfirm = () => {
     onConfirm({
@@ -103,23 +110,6 @@ const ExportSettingsModal: React.FC<ExportSettingsProps> = ({
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {[
-              // Always show Export Complete Video - adjust description based on available content
-              { 
-                value: 'complete', 
-                label: 'Export Complete Video', 
-                description: (() => {
-                  if (hasReplacementAudio && hasSubtitles) {
-                    return 'Export video with new audio and subtitles';
-                  } else if (hasReplacementAudio && !hasSubtitles) {
-                    return 'Export video with new audio only';
-                  } else if (!hasReplacementAudio && hasSubtitles) {
-                    return 'Export video with original audio and subtitles';
-                  } else {
-                    return 'Export video with original audio only';
-                  }
-                })(), 
-                icon: FiVideo 
-              },
               // Show Export Video with New Audio only if replacement audio is available
               ...(hasReplacementAudio ? [{ 
                 value: 'newAudio', 

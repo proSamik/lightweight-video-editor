@@ -1080,7 +1080,7 @@ ipcMain.handle('export-modified-video', async (event, aiSubtitleData: any, video
     };
     
     const exportSettings = { 
-      exportMode: 'complete' as const, 
+      exportMode: 'subtitlesOnly' as const, 
       quality: 'balanced' as const 
     };
 

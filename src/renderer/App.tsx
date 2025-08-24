@@ -770,8 +770,11 @@ const AppContent: React.FC = () => {
         case 'subtitlesOnly':
           defaultFileName = `${videoFile.name.replace(/\.[^/.]+$/, "")}_with_subtitles.mp4`;
           break;
+        case 'completeWithClips':
+          defaultFileName = `${videoFile.name.replace(/\.[^/.]+$/, "")}_clipped.mp4`;
+          break;
         default:
-          defaultFileName = `${videoFile.name.replace(/\.[^/.]+$/, "")}_complete.mp4`;
+          defaultFileName = `${videoFile.name.replace(/\.[^/.]+$/, "")}_exported.mp4`;
       }
 
       const outputPath = await window.electronAPI.exportVideo(defaultFileName);
@@ -835,7 +838,7 @@ const AppContent: React.FC = () => {
           );
           break;
 
-        default: // 'complete'
+        default: // 'exported'
           // Export complete video (with AI subtitles and audio replacement if available)
           if (aiSubtitleData && aiSubtitleData.frames.length > 0) {
             setLoadingMessage('Rendering complete video with AI subtitles...');
