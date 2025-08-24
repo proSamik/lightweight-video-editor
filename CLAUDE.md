@@ -18,10 +18,12 @@ src/
 │   ├── index.html         # HTML template
 │   ├── global.d.ts        # Type definitions
 │   └── components/        # React components
-│       ├── VideoPanel.tsx      # Video preview with canvas overlay
-│       ├── TimelinePanel.tsx   # Caption timeline interface
-│       ├── StylingPanel.tsx    # Caption styling controls
-│       └── LoadingScreen.tsx   # Loading states
+│       ├── VideoPanel.tsx         # Video preview with canvas overlay
+│       ├── TimelinePanel.tsx      # Caption timeline interface
+│       ├── StylingPanel.tsx       # Caption styling controls
+│       ├── TabbedRightPanel.tsx   # Tabbed interface for styling and AI panels
+│       ├── TranscriptionModal.tsx # In-panel transcription progress modal
+│       └── LoadingScreen.tsx      # Loading states
 ├── services/              # Core business logic
 │   ├── ffmpeg.ts          # Video processing via FFmpeg
 │   ├── whisper.ts         # Audio transcription via OpenAI Whisper
@@ -126,6 +128,21 @@ npm run dev-renderer  # Start webpack dev server for renderer
 - Responsive canvas sizing matching video dimensions
 - Video seeking synchronization when currentTime prop changes
 - Modern UI with gradient headers and real-time indicators
+
+#### TabbedRightPanel.tsx - Tabbed Interface
+- Houses both styling and AI subtitle panels in a tabbed interface
+- Intelligent tab switching prevention during transcription
+- Visual feedback for disabled tabs (reduced opacity, cursor changes)
+- Seamless integration of TranscriptionModal during processing
+- Maintains active tab state across transcription sessions
+
+#### TranscriptionModal.tsx - In-Panel Progress Display
+- **Liquid design**: Gradient backgrounds and blur effects matching TranscriptionSettings
+- **Real-time progress**: Animated progress bar with shimmer effects and percentage display
+- **Status information**: Current transcription message, processing speed, and ETA
+- **Visual elements**: Floating background decorations and pulsing activity icon
+- **Tab overlay**: Completely replaces tab content during transcription to prevent interaction
+- **Responsive design**: Adapts to right panel dimensions with proper centering
 
 #### TimelinePanel.tsx - Caption Timeline
 - Visual timeline representation of caption segments
@@ -243,6 +260,15 @@ npm run dev-renderer  # Start webpack dev server for renderer
 - **Balanced workspace**: Updated to 60/40 split between video preview and styling panels
 - **Responsive design**: Improved panel sizing for better content visibility
 - **Streamlined controls**: Optimized for both video editing and caption styling workflows
+- **Tabbed right panel**: Integrated tabbed interface combining styling and AI subtitle panels
+- **In-panel transcription modal**: Non-intrusive progress display within the right panel during processing
+
+### Transcription User Experience Improvements
+- **Seamless workflow integration**: TranscriptionModal appears directly in the tabbed right panel
+- **Tab interaction prevention**: Automatic disabling of tab switching during transcription
+- **Visual progress feedback**: Real-time progress tracking with animated elements and status updates
+- **Liquid design consistency**: Matches the aesthetic of other modal components with gradient backgrounds
+- **Non-blocking interface**: Users can still interact with video playback while transcription runs
 
 ### Advanced Export Modes
 - **Complete Video**: Standard export with subtitles and optional audio replacement

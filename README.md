@@ -18,9 +18,11 @@ https://github.com/user-attachments/assets/8ae92f44-2fe0-4df4-91ab-221dc1178fee
 - **Video Clipping**: Create clips by removing unwanted sections with non-destructive editing
 - **Project Management**: Save, load, and manage multiple video editing projects with recent projects list
 - **Transcription Settings**: Configurable caption segmentation (character/word-based line wrapping)
+- **In-Panel Transcription Progress**: Real-time progress display within the tabbed interface during processing
 - **Progressive Rendering**: Optional vertical line-by-line text reveal for dynamic captions
 - **Word-Level Editing**: Delete individual words with automatic video segment processing
 - **Export Settings**: Customizable framerate and rendering quality with estimated rendering time
+- **Tabbed Interface**: Integrated styling and AI panels with intelligent interaction management
 - **Advanced Export Options**: 
   - Export complete video with subtitles and audio replacement
   - Export clipped video with automatic subtitle timing adjustment
@@ -170,6 +172,9 @@ npm run dist:all
    - Word-based line wrapping (3-20 words per line)
    - Minimum character validation (12 char minimum)
 3. **Auto-Generate Captions**: The app will automatically extract audio and generate captions using Whisper
+   - **In-panel progress display**: Watch real-time transcription progress in the right panel
+   - **Tab interaction prevention**: Tab switching is disabled during transcription to prevent interference
+   - **Liquid design**: Beautiful animated progress indicators with status information
 4. **Edit Styling**: Select caption segments to customize:
    - Font (5 presets available)
    - Font size (16-200px with 85px default)
@@ -245,6 +250,14 @@ npm run dist:all
 - **Double-click Selection**: Double-click segments to select and seek to start time
 - **Video Synchronization**: Automatic video seeking when timeline position changes
 - **Progress Tracking**: Visual indicators during transcription and rendering operations
+
+### Tabbed Interface & Transcription UX
+- **Integrated Panels**: Seamless switching between styling and AI subtitle panels
+- **Smart Interaction Management**: Automatic tab locking during transcription processes
+- **In-Panel Progress Display**: Non-intrusive progress modal within the right panel during processing
+- **Visual Feedback**: Reduced opacity and cursor changes for disabled interface elements
+- **Liquid Design Elements**: Gradient backgrounds, blur effects, and animated progress indicators
+- **Non-Blocking Workflow**: Video playback remains accessible during transcription operations
 
 ### Canvas Rendering System
 - **Pixel-perfect Preview**: Canvas overlay matches export rendering exactly
