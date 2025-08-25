@@ -351,8 +351,8 @@ export class FFmpegOverlayWithClips {
       
       console.log(`All ${processedSegmentPaths.length} segments processed, concatenating final video`);
       
-      // Concatenate all processed segments into final output
-      await this.concatenateVideoFiles(processedSegmentPaths, outputPath, exportSettings?.quality || 'high');
+      // Concatenate all processed segments into final output using stream copying
+      await this.concatenateVideoFiles(processedSegmentPaths, outputPath, true);
       
       if (onProgress) onProgress(100);
       
@@ -1001,8 +1001,8 @@ export class FFmpegOverlayWithClips {
         const chunkEnd = Math.min((i + 1) * chunkDuration, segmentDuration);
         const chunkPath = path.join(tempDir, `segment_chunk_${i}.mp4`);
         
-        // Extract chunk from segment
-        await this.extractVideoChunk(segmentPath, chunkPath, chunkStart, chunkEnd, exportSettings?.quality || 'high');
+        // Extract chunk from segment using stream copying to preserve quality
+        await this.extractVideoChunk(segmentPath, chunkPath, chunkStart, chunkEnd, true);
         
         // Filter overlays for this chunk and adjust timing
         const chunkOverlays = overlayFiles
@@ -1027,8 +1027,8 @@ export class FFmpegOverlayWithClips {
         fs.unlinkSync(chunkPath);
       }
       
-      // Merge all processed chunks
-      await this.concatenateVideoFiles(chunkPaths, outputPath, exportSettings?.quality || 'high');
+      // Merge all processed chunks using stream copying to preserve quality
+      await this.concatenateVideoFiles(chunkPaths, outputPath, true);
       
     } finally {
       // Clean up all chunk files
@@ -1091,31 +1091,47 @@ export class FFmpegOverlayWithClips {
   }
 
   /**
-   * Extract a chunk from a video file
+   * Extract a chunk from a video file using stream copying to preserve quality
    */
   private async extractVideoChunk(
     inputPath: string,
     outputPath: string,
     startTimeSeconds: number,
     endTimeSeconds: number,
-    quality: string = 'high'
+    useStreamCopy: boolean = true
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       const duration = endTimeSeconds - startTimeSeconds;
       
       const command = ffmpeg(inputPath)
         .seekInput(startTimeSeconds)
-        .duration(duration)
-        .videoCodec(this.getVideoCodecForMac())
-        .audioCodec('aac')
-        .outputOptions([
-          '-avoid_negative_ts', 'make_zero',
-          '-fflags', '+genpts',
-          '-preset', this.getPresetForQuality(quality),
-          '-crf', this.getCRFForQuality(quality)
-        ])
-        .output(outputPath);
-        
+        .duration(duration);
+      
+      if (useStreamCopy) {
+        // Use stream copying to preserve original quality - no re-encoding
+        console.log(`Extracting chunk with stream copying (no quality loss): ${startTimeSeconds}s-${endTimeSeconds}s`);
+        command
+          .videoCodec('copy')
+          .audioCodec('copy')
+          .outputOptions([
+            '-avoid_negative_ts', 'make_zero',
+            '-fflags', '+genpts'
+          ]);
+      } else {
+        // Fallback to re-encoding if stream copy fails
+        console.log(`Extracting chunk with re-encoding: ${startTimeSeconds}s-${endTimeSeconds}s`);
+        command
+          .videoCodec(this.getVideoCodecForMac())
+          .audioCodec('aac')
+          .outputOptions([
+            '-avoid_negative_ts', 'make_zero',
+            '-fflags', '+genpts',
+            '-preset', 'fast', // Use fast preset to minimize processing time
+            '-crf', '18' // High quality CRF
+          ]);
+      }
+      
+      command.output(outputPath);
       this.activeFFmpegProcesses.add(command);
       
       command
@@ -1124,8 +1140,18 @@ export class FFmpegOverlayWithClips {
           resolve();
         })
         .on('error', (err) => {
+          console.error(`Chunk extraction failed with ${useStreamCopy ? 'stream copy' : 're-encoding'}:`, err.message);
           this.activeFFmpegProcesses.delete(command);
-          reject(err);
+          
+          // If stream copy failed and we haven't tried re-encoding yet, retry with re-encoding
+          if (useStreamCopy) {
+            console.log('Retrying chunk extraction with re-encoding...');
+            this.extractVideoChunk(inputPath, outputPath, startTimeSeconds, endTimeSeconds, false)
+              .then(resolve)
+              .catch(reject);
+          } else {
+            reject(err);
+          }
         });
         
       command.run();
@@ -1133,46 +1159,45 @@ export class FFmpegOverlayWithClips {
   }
 
   /**
-   * Concatenate multiple video files into one
+   * Concatenate multiple video files using stream copying to preserve quality
    */
-  private async concatenateVideoFiles(filePaths: string[], outputPath: string, quality: string = 'high'): Promise<void> {
+  private async concatenateVideoFiles(filePaths: string[], outputPath: string, useStreamCopy: boolean = true): Promise<void> {
     return new Promise((resolve, reject) => {
       const concatFile = path.join(path.dirname(outputPath), `concat_${Date.now()}.txt`);
       const concatContent = filePaths.map(file => `file '${path.resolve(file)}'`).join('\n');
       
       fs.writeFileSync(concatFile, concatContent);
       
-      const codec = this.getVideoCodecForMac();
-      const outputOptions = [
-        '-c:v', codec, // Use quality encoding for video
-        '-c:a', 'aac', // Re-encode audio with AAC for compatibility
-        '-map', '0:v', // Map video stream
-        '-map', '0:a?', // Map audio stream if available (? makes it optional)
-        '-fflags', '+genpts'
-      ];
+      let outputOptions: string[];
       
-      // Add quality settings based on encoder type
-      if (codec === 'h264_videotoolbox') {
-        // Hardware encoder quality settings
-        switch (quality) {
-          case 'high':
-            outputOptions.push('-b:v', '8000k', '-maxrate', '8000k', '-bufsize', '16000k');
-            break;
-          case 'medium':
-            outputOptions.push('-b:v', '4000k', '-maxrate', '4000k', '-bufsize', '8000k');
-            break;
-          case 'low':
-            outputOptions.push('-b:v', '1500k', '-maxrate', '1500k', '-bufsize', '3000k');
-            break;
-          default:
-            outputOptions.push('-b:v', '4000k', '-maxrate', '4000k', '-bufsize', '8000k');
-        }
+      if (useStreamCopy) {
+        // Use stream copying to preserve quality - no re-encoding
+        console.log('Concatenating video files with stream copying (no quality loss)');
+        outputOptions = [
+          '-c:v', 'copy', // Copy video stream without re-encoding
+          '-c:a', 'copy', // Copy audio stream without re-encoding
+          '-map', '0:v', // Map video stream
+          '-map', '0:a?', // Map audio stream if available
+          '-fflags', '+genpts'
+        ];
       } else {
-        // Software encoder quality settings
-        const preset = this.getPresetForQuality(quality);
-        const crf = this.getCRFForQuality(quality);
-        if (preset) outputOptions.push('-preset', preset);
-        if (crf) outputOptions.push('-crf', crf);
+        // Fallback to re-encoding with high quality settings
+        console.log('Concatenating video files with re-encoding (quality may be affected)');
+        const codec = this.getVideoCodecForMac();
+        outputOptions = [
+          '-c:v', codec,
+          '-c:a', 'aac',
+          '-map', '0:v',
+          '-map', '0:a?',
+          '-fflags', '+genpts'
+        ];
+        
+        // Add high quality settings
+        if (codec === 'h264_videotoolbox') {
+          outputOptions.push('-b:v', '8000k', '-maxrate', '8000k', '-bufsize', '16000k');
+        } else {
+          outputOptions.push('-preset', 'slow', '-crf', '18');
+        }
       }
       
       const command = ffmpeg()
@@ -1194,13 +1219,23 @@ export class FFmpegOverlayWithClips {
           resolve();
         })
         .on('error', (err) => {
+          console.error(`Concatenation failed with ${useStreamCopy ? 'stream copy' : 're-encoding'}:`, err.message);
           this.activeFFmpegProcesses.delete(command);
           try {
             fs.unlinkSync(concatFile);
           } catch (error) {
             console.warn('Failed to cleanup concat file:', error);
           }
-          reject(err);
+          
+          // If stream copy failed and we haven't tried re-encoding yet, retry with re-encoding
+          if (useStreamCopy) {
+            console.log('Retrying concatenation with re-encoding...');
+            this.concatenateVideoFiles(filePaths, outputPath, false)
+              .then(resolve)
+              .catch(reject);
+          } else {
+            reject(err);
+          }
         });
         
       command.run();
