@@ -6,7 +6,7 @@ import { SettingsIcon } from './IconComponents';
 interface TranscriptionSettingsProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (settings: { maxCharsPerLine: number; maxWordsPerLine: number; whisperModel: string }) => void;
+  onConfirm: (settings: { maxCharsPerLine: number; maxWordsPerLine: number; whisperModel: string; language: string }) => void;
   videoDuration?: number;
   videoMetadata?: { width?: number; height?: number };
 }
@@ -24,6 +24,7 @@ const TranscriptionSettings: React.FC<TranscriptionSettingsProps> = ({
   const [maxCharsPerLine, setMaxCharsPerLine] = useState(16);
   const [maxWordsPerLine, setMaxWordsPerLine] = useState(5);
   const [whisperModel, setWhisperModel] = useState('base');
+  const [language, setLanguage] = useState('auto');
 
   // Update defaults when video metadata changes
   useEffect(() => {
@@ -42,6 +43,30 @@ const TranscriptionSettings: React.FC<TranscriptionSettingsProps> = ({
     { value: 'small', label: 'Small' },
     { value: 'medium', label: 'Medium' },
     { value: 'large', label: 'Large' }
+  ];
+
+  const supportedLanguages = [
+    { value: 'auto', label: 'Auto Detect' },
+    { value: 'en', label: 'English' },
+    { value: 'fr', label: 'French' },
+    { value: 'es', label: 'Spanish' },
+    { value: 'de', label: 'German' },
+    { value: 'it', label: 'Italian' },
+    { value: 'pt', label: 'Portuguese' },
+    { value: 'ru', label: 'Russian' },
+    { value: 'ja', label: 'Japanese' },
+    { value: 'ko', label: 'Korean' },
+    { value: 'zh', label: 'Chinese' },
+    { value: 'ar', label: 'Arabic' },
+    { value: 'hi', label: 'Hindi' },
+    { value: 'bn', label: 'Bengali' },
+    { value: 'tr', label: 'Turkish' },
+    { value: 'pl', label: 'Polish' },
+    { value: 'nl', label: 'Dutch' },
+    { value: 'sv', label: 'Swedish' },
+    { value: 'da', label: 'Danish' },
+    { value: 'no', label: 'Norwegian' },
+    { value: 'fi', label: 'Finnish' }
   ];
 
   const getEstimatedTime = (model: string, duration: number) => {
@@ -77,7 +102,7 @@ const TranscriptionSettings: React.FC<TranscriptionSettingsProps> = ({
       return;
     }
     
-    onConfirm({ maxCharsPerLine, maxWordsPerLine, whisperModel });
+    onConfirm({ maxCharsPerLine, maxWordsPerLine, whisperModel, language });
     onClose();
   };
 
@@ -194,6 +219,75 @@ const TranscriptionSettings: React.FC<TranscriptionSettingsProps> = ({
                 }}>
                   {getEstimatedTime(model.value, videoDuration)}
                 </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Language Selection */}
+        <div style={{ marginBottom: '24px' }}>
+          <h3 style={{
+            margin: '0 0 16px 0',
+            fontSize: '18px',
+            fontWeight: '600',
+            color: theme.colors.text
+          }}>
+            Language
+          </h3>
+          <p style={{
+            margin: '0 0 16px 0',
+            fontSize: '14px',
+            color: theme.colors.textSecondary,
+            lineHeight: '1.5'
+          }}>
+            Select the language for transcription. Auto-detect will identify the language automatically.
+          </p>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+            gap: '8px',
+            maxHeight: '200px',
+            overflowY: 'auto',
+            padding: '8px',
+            backgroundColor: theme.colors.modal.background,
+            borderRadius: theme.radius.lg,
+            border: `1px solid ${theme.colors.border}`
+          }}>
+            {supportedLanguages.map((lang) => (
+              <button
+                key={lang.value}
+                onClick={() => setLanguage(lang.value)}
+                style={{
+                  padding: '8px 12px',
+                  backgroundColor: language === lang.value 
+                    ? theme.colors.primary 
+                    : theme.colors.surface,
+                  color: language === lang.value 
+                    ? theme.colors.primaryForeground 
+                    : theme.colors.text,
+                  border: `1px solid ${language === lang.value 
+                    ? theme.colors.primary 
+                    : theme.colors.border}`,
+                  borderRadius: theme.radius.sm,
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: '500',
+                  transition: 'all 0.2s ease',
+                  textAlign: 'center',
+                  whiteSpace: 'nowrap'
+                }}
+                onMouseEnter={(e) => {
+                  if (language !== lang.value) {
+                    e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (language !== lang.value) {
+                    e.currentTarget.style.backgroundColor = theme.colors.surface;
+                  }
+                }}
+              >
+                {lang.label}
               </button>
             ))}
           </div>
