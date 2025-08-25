@@ -215,7 +215,8 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
           <div style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: '12px'
+            gap: '12px',
+            alignItems: 'center' // Center the cards horizontally
           }}>
             {currentPresets.map((preset) => (
               <div key={preset.id} style={{ position: 'relative' }}>
