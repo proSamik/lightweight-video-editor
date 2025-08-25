@@ -28,10 +28,9 @@ const ExportSettingsModal: React.FC<ExportSettingsProps> = ({
   const hasReplacementAudio = Boolean(replacementAudioPath);
   const hasClips = Boolean(clips?.length); // Show clip export option for any clips, even single clips
 
-  const [exportMode, setExportMode] = useState<'newAudio' | 'subtitlesOnly' | 'completeWithClips'>(() => {
+  const [exportMode, setExportMode] = useState<'newAudio' | 'completeWithClips'>(() => {
     // Default to the first available option based on what content is available
     if (hasReplacementAudio) return 'newAudio';
-    if (hasSubtitles) return 'subtitlesOnly';
     if (hasClips) return 'completeWithClips';
     return 'newAudio'; // fallback
   });
@@ -117,17 +116,10 @@ const ExportSettingsModal: React.FC<ExportSettingsProps> = ({
                 description: 'Export video with new audio only (no subtitles)', 
                 icon: FiMusic 
               }] : []),
-              // Show Export Video with Subtitles Only only if replacement audio AND subtitles are available
-              ...(hasReplacementAudio && hasSubtitles ? [{ 
-                value: 'subtitlesOnly', 
-                label: 'Export Video with Subtitles Only', 
-                description: 'Export video with original audio and subtitles', 
-                icon: FiFileText 
-              }] : []),
               // Show Export Complete Video with Clips if any clips exist (single or multiple)
               ...(hasClips ? [{ 
                 value: 'completeWithClips', 
-                label: 'Export Complete Video (Clipped)', 
+                label: 'Export Complete Video', 
                 description: (() => {
                   if (hasReplacementAudio && hasSubtitles) {
                     return 'Export clipped video with new audio and subtitles';
