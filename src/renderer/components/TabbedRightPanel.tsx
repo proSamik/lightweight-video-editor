@@ -45,20 +45,20 @@ const TabbedRightPanel: React.FC<TabbedRightPanelProps> = ({
 
   const tabStyle = (isActive: boolean) => ({
     flex: 1,
-    padding: '12px 16px',
+    padding: '8px 12px',
     backgroundColor: 'transparent',
     color: isActive ? theme.colors.text : theme.colors.textSecondary,
     border: 'none',
     borderBottom: isActive ? `2px solid ${theme.colors.primary}` : `2px solid transparent`,
     cursor: transcriptionStatus.isTranscribing ? 'not-allowed' : 'pointer',
-    fontSize: '14px',
-    fontWeight: isActive ? '500' : '400',
+    fontSize: '12px',
+    fontWeight: isActive ? '600' : '500',
     transition: 'all 0.15s ease',
     borderRadius: '0',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '8px',
+    gap: '6px',
     opacity: transcriptionStatus.isTranscribing && !isActive ? 0.5 : 1
   });
 
@@ -79,14 +79,14 @@ const TabbedRightPanel: React.FC<TabbedRightPanelProps> = ({
           onClick={() => !transcriptionStatus.isTranscribing && setActiveTab('styling')}
           style={tabStyle(activeTab === 'styling')}
         >
-          <Palette size={14} />
+          <Palette size={12} />
           Styling
         </button>
         <button
           onClick={() => !transcriptionStatus.isTranscribing && setActiveTab('aiSubtitles')}
           style={tabStyle(activeTab === 'aiSubtitles')}
         >
-          <Brain size={14} />
+          <Brain size={12} />
           AI Subtitles
         </button>
       </div>

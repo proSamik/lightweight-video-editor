@@ -3,6 +3,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { CaptionPreset, SubtitleStyle } from '../../../types';
 import { presetCategories } from '../../data/captionPresets';
 import { PresetPreview } from '../PresetPreview';
+import { FiSearch, FiGrid, FiCheck } from 'react-icons/fi';
 
 interface PresetSelectorProps {
   selectedPresetId?: string;
@@ -53,13 +54,13 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
   };
 
   const categoryButtonStyles = (isSelected: boolean): React.CSSProperties => ({
-    padding: '8px 16px',
-    backgroundColor: isSelected ? theme.colors.primary : theme.colors.surface,
+    padding: '10px 12px',
+    backgroundColor: isSelected ? theme.colors.primary : theme.colors.background,
     color: isSelected ? theme.colors.primaryForeground : theme.colors.text,
     border: `1px solid ${isSelected ? theme.colors.primary : theme.colors.border}`,
-    borderRadius: theme.radius.md,
+    borderRadius: '8px',
     cursor: 'pointer',
-    fontSize: '14px',
+    fontSize: '10px',
     fontWeight: '500',
     transition: 'all 0.2s ease',
     whiteSpace: 'nowrap'
@@ -67,11 +68,11 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
 
   const searchInputStyles: React.CSSProperties = {
     width: '100%',
-    padding: '12px 16px',
-    backgroundColor: theme.colors.surface,
+    padding: '10px 12px',
+    backgroundColor: theme.colors.background,
     border: `1px solid ${theme.colors.border}`,
-    borderRadius: theme.radius.lg,
-    fontSize: '14px',
+    borderRadius: '8px',
+    fontSize: '11px',
     color: theme.colors.text,
     outline: 'none',
     transition: 'border-color 0.2s ease'
@@ -81,41 +82,54 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
     <div style={{ 
       display: 'flex', 
       flexDirection: 'column', 
-      gap: '20px',
-      padding: '20px',
-      backgroundColor: theme.colors.background,
-      borderRadius: theme.radius.lg,
-      border: `1px solid ${theme.colors.border}`
+      gap: '16px',
+      padding: '16px',
+      backgroundColor: theme.colors.surface,
+      overflow: 'hidden'
     }}>
       {/* Header */}
-      <div>
-        <h3 style={{
-          margin: '0 0 8px 0',
-          fontSize: '18px',
-          fontWeight: '600',
-          color: theme.colors.text
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+        <div style={{
+          width: '24px',
+          height: '24px',
+          backgroundColor: theme.colors.accent,
+          borderRadius: '6px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
         }}>
-          Style Presets
-        </h3>
-        <p style={{
-          margin: 0,
-          fontSize: '14px',
-          color: theme.colors.textSecondary,
-          lineHeight: '1.5'
-        }}>
-          Choose from trending animated caption styles or customize your own
-        </p>
+          <FiGrid size={12} color={theme.colors.accentForeground} />
+        </div>
+        <div>
+          <h3 style={{
+            margin: 0,
+            fontSize: '13px',
+            fontWeight: '600',
+            color: theme.colors.text,
+            letterSpacing: '0.01em'
+          }}>
+            Style Presets
+          </h3>
+        </div>
       </div>
+      <p style={{
+        margin: '0 0 12px 0',
+        fontSize: '10px',
+        color: theme.colors.textSecondary,
+        lineHeight: '1.4'
+      }}>
+        Choose from trending animated caption styles or customize your own
+      </p>
 
       {/* Apply to All Checkbox */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         gap: '12px',
-        padding: '12px 16px',
-        backgroundColor: theme.colors.primarySubtle,
-        border: `1px solid ${theme.colors.primary}20`,
-        borderRadius: theme.radius.lg
+        padding: '12px',
+        backgroundColor: theme.colors.background,
+        border: `1px solid ${theme.colors.border}`,
+        borderRadius: '8px'
       }}>
         <input
           type="checkbox"
@@ -129,40 +143,55 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
           }}
         />
         <label htmlFor="applyToAll" style={{
-          fontSize: '14px',
+          fontSize: '11px',
           fontWeight: '500',
-          color: theme.colors.primary,
+          color: theme.colors.text,
           cursor: 'pointer',
           userSelect: 'none',
           display: 'flex',
           alignItems: 'center',
           gap: '6px'
         }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-            <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
+          <FiCheck size={12} />
           Apply to All Captions
         </label>
         <span style={{
-          fontSize: '12px',
+          fontSize: '10px',
           color: theme.colors.textSecondary,
           marginLeft: 'auto'
         }}>
-          {applyToAll ? 'Will apply to all segments' : 'Will apply to selected segment only'}
+          {applyToAll ? 'All segments' : 'Selected only'}
         </span>
       </div>
 
       {/* Search */}
-      <div>
+      <div style={{ position: 'relative' }}>
+        <div style={{
+          position: 'absolute',
+          left: '12px',
+          top: '50%',
+          transform: 'translateY(-50%)',
+          color: theme.colors.textSecondary,
+          pointerEvents: 'none'
+        }}>
+          <FiSearch size={14} />
+        </div>
         <input
           type="text"
-          placeholder="Search presets by name, style, or tags..."
+          placeholder="Search presets..."
           value={searchTerm}
           onChange={(e) => {
             setSearchTerm(e.target.value);
             setCurrentPage(0); // Reset to first page when searching
           }}
-          style={searchInputStyles}
+          style={{
+            ...searchInputStyles,
+            paddingLeft: '40px',
+            fontSize: '11px',
+            padding: '10px 12px 10px 40px',
+            backgroundColor: theme.colors.background,
+            borderRadius: '8px'
+          }}
           onFocus={(e) => {
             e.currentTarget.style.borderColor = theme.colors.primary;
           }}
@@ -176,7 +205,7 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(2, 1fr)',
-        gap: '8px'
+        gap: '6px'
       }}>
         {filteredCategories.map((category) => (
           <button
@@ -188,12 +217,12 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
             style={categoryButtonStyles(selectedCategory === category.id)}
             onMouseEnter={(e) => {
               if (selectedCategory !== category.id) {
-                e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+                e.currentTarget.style.backgroundColor = theme.colors.surfaceHover || theme.colors.background;
               }
             }}
             onMouseLeave={(e) => {
               if (selectedCategory !== category.id) {
-                e.currentTarget.style.backgroundColor = theme.colors.surface;
+                e.currentTarget.style.backgroundColor = theme.colors.background;
               }
             }}
           >
@@ -205,16 +234,17 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
       {/* Category Description */}
       {selectedCategoryData && (
         <div style={{
-          padding: '12px 16px',
-          backgroundColor: theme.colors.primarySubtle,
-          borderRadius: theme.radius.md,
-          border: `1px solid ${theme.colors.primary}20`
+          padding: '10px 12px',
+          backgroundColor: theme.colors.background,
+          borderRadius: '8px',
+          border: `1px solid ${theme.colors.border}`
         }}>
           <p style={{
             margin: 0,
-            fontSize: '14px',
-            color: theme.colors.primary,
-            fontWeight: '500'
+            fontSize: '10px',
+            color: theme.colors.textSecondary,
+            fontWeight: '500',
+            lineHeight: '1.4'
           }}>
             {selectedCategoryData.description}
           </p>
@@ -227,7 +257,7 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
           <div style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: '24px'
+            gap: '16px'
           }}>
             {currentPresets.map((preset) => (
               <div key={preset.id} style={{ position: 'relative' }}>
@@ -294,12 +324,12 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
                 disabled={currentPage === 0}
                 style={{
                   padding: '8px 12px',
-                  backgroundColor: currentPage === 0 ? theme.colors.surface : theme.colors.primary,
+                  backgroundColor: currentPage === 0 ? theme.colors.background : theme.colors.primary,
                   color: currentPage === 0 ? theme.colors.textSecondary : theme.colors.primaryForeground,
                   border: `1px solid ${theme.colors.border}`,
-                  borderRadius: theme.radius.md,
+                  borderRadius: '8px',
                   cursor: currentPage === 0 ? 'not-allowed' : 'pointer',
-                  fontSize: '12px',
+                  fontSize: '10px',
                   fontWeight: '500',
                   display: 'flex',
                   alignItems: 'center',
@@ -313,7 +343,7 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
               </button>
               
               <span style={{
-                fontSize: '12px',
+                fontSize: '10px',
                 color: theme.colors.textSecondary,
                 fontWeight: '500'
               }}>
@@ -325,12 +355,12 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
                 disabled={currentPage === totalPages - 1}
                 style={{
                   padding: '8px 12px',
-                  backgroundColor: currentPage === totalPages - 1 ? theme.colors.surface : theme.colors.primary,
+                  backgroundColor: currentPage === totalPages - 1 ? theme.colors.background : theme.colors.primary,
                   color: currentPage === totalPages - 1 ? theme.colors.textSecondary : theme.colors.primaryForeground,
                   border: `1px solid ${theme.colors.border}`,
-                  borderRadius: theme.radius.md,
+                  borderRadius: '8px',
                   cursor: currentPage === totalPages - 1 ? 'not-allowed' : 'pointer',
-                  fontSize: '12px',
+                  fontSize: '10px',
                   fontWeight: '500',
                   display: 'flex',
                   alignItems: 'center',
@@ -368,7 +398,7 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
           </div>
           <h4 style={{
             margin: '0 0 8px 0',
-            fontSize: '16px',
+            fontSize: '13px',
             fontWeight: '600',
             color: theme.colors.text
           }}>
@@ -376,7 +406,7 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
           </h4>
           <p style={{
             margin: 0,
-            fontSize: '14px',
+            fontSize: '10px',
             color: theme.colors.textSecondary
           }}>
             Try adjusting your search term or browse different categories
@@ -397,7 +427,7 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
           }
           
           div::-webkit-scrollbar-track {
-            background: ${theme.colors.surface};
+            background: ${theme.colors.background};
             border-radius: 4px;
           }
           
