@@ -132,6 +132,15 @@ const ProjectManagerModal: React.FC<ProjectManagerProps> = ({
     }
   };
 
+  const handleShowInFinder = async (filePath: string) => {
+    try {
+      await window.electronAPI.showItemInFolder(filePath);
+    } catch (error) {
+      console.error('Failed to show item in folder:', error);
+      alert('Failed to show project in Finder.');
+    }
+  };
+
   const formatDate = (timestamp: number) => {
     return new Date(timestamp).toLocaleString();
   };
@@ -459,6 +468,37 @@ const ProjectManagerModal: React.FC<ProjectManagerProps> = ({
                           }}
                         >
                           <FiEdit3 size={14} />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleShowInFinder(project.filePath);
+                          }}
+                          style={{
+                            padding: '8px',
+                            backgroundColor: 'transparent',
+                            color: theme.colors.textMuted,
+                            border: `1px solid ${theme.colors.border}`,
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = theme.colors.accent;
+                            e.currentTarget.style.color = theme.colors.accentForeground;
+                            e.currentTarget.style.borderColor = theme.colors.accent;
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                            e.currentTarget.style.color = theme.colors.textMuted;
+                            e.currentTarget.style.borderColor = theme.colors.border;
+                          }}
+                        >
+                          <FiFolder size={14} />
                         </button>
                         <button
                           onClick={(e) => {
