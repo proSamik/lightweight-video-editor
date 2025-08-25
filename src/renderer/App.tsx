@@ -539,7 +539,10 @@ const AppContent: React.FC = () => {
 
   const handleVideoDropped = async (filePath: string) => {
     console.log('handleVideoDropped called with:', filePath);
-    if (!dependenciesReady) {
+    
+    // Check dependencies in real-time instead of relying on state
+    const depsReady = await checkDependencies();
+    if (!depsReady) {
       console.log('Dependencies not ready yet');
       return;
     }
@@ -569,7 +572,7 @@ const AppContent: React.FC = () => {
 
   const generateCaptions = async (
     videoPath: string, 
-    settings?: { maxCharsPerLine: number; maxWordsPerLine: number; whisperModel?: string }
+    settings?: { maxCharsPerLine: number; maxWordsPerLine: number; whisperModel?: string; language?: string }
   ) => {
     try {
       // Start background transcription without blocking UI
@@ -593,7 +596,7 @@ const AppContent: React.FC = () => {
       setTranscriptionStatus(prev => ({ ...prev, message: 'Transcribing audio' }));
       
       // Transcribe entire audio
-      const transcriptionResult = await window.electronAPI.transcribeAudio(audioPath, settings?.whisperModel || 'base');
+      const transcriptionResult = await window.electronAPI.transcribeAudio(audioPath, settings?.whisperModel || 'base', settings?.language || 'auto');
       
       setTranscriptionStatus(prev => ({ ...prev, message: 'Processing transcription results...' }));
       
@@ -769,7 +772,7 @@ const AppContent: React.FC = () => {
   };
 
 
-  const handleTranscriptionSettingsConfirm = async (settings: { maxCharsPerLine: number; maxWordsPerLine: number; whisperModel: string }) => {
+  const handleTranscriptionSettingsConfirm = async (settings: { maxCharsPerLine: number; maxWordsPerLine: number; whisperModel: string; language: string }) => {
     if (pendingVideoPath) {
       try {
         // Immediately show loading state to prevent UI freeze appearance
