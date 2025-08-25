@@ -1344,7 +1344,8 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
         ))}
       </div>
 
-
+      {/* Context Menu */}
+      {renderContextMenu()}
     </div>
   );
 };
