@@ -114,7 +114,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginBottom: '8px'
+              marginBottom: '6px'
             }}>
               <label style={labelStyle}>
                 Z-Axis Rotation
@@ -304,7 +304,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginBottom: '8px'
+              marginBottom: '6px'
             }}>
               <label style={labelStyle}>
                 Font Size
@@ -350,7 +350,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginBottom: '8px'
+              marginBottom: '6px'
             }}>
               <label style={labelStyle}>
                 Scale
@@ -475,7 +475,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginBottom: '8px'
+              marginBottom: '6px'
             }}>
               <label style={labelStyle}>
                 Stroke Width
@@ -682,7 +682,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginBottom: '8px'
+              marginBottom: '6px'
             }}>
               <label style={labelStyle}>
                 X Position (Left/Right)
@@ -730,7 +730,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginBottom: '8px'
+              marginBottom: '6px'
             }}>
               <label style={labelStyle}>
                 Y Position (Top/Bottom)
@@ -789,7 +789,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
             backgroundColor: theme.colors.background,
             border: `1px solid ${theme.colors.border}`,
             borderRadius: '8px',
-            marginBottom: '8px'
+            marginBottom: '6px'
           }}>
             <input
               type="checkbox"
