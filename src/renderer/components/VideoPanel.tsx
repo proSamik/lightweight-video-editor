@@ -46,7 +46,6 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   const { theme } = useTheme();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const replacementAudioRef = useRef<HTMLAudioElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -241,6 +240,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     
     // Perform the skip
     video.currentTime = nextValidTime / 1000;
+    
     
     // Report original time to parent (parent will handle time conversion)
     onTimeUpdate(nextValidTime);
@@ -809,7 +809,6 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   // CRITICAL: Force re-render when canvas dimensions change to fix font truncation
   useEffect(() => {
     if (canvasSize.width > 0 && canvasSize.height > 0 && !isDragging) {
-      console.log(`Canvas dimensions changed to ${canvasSize.width}x${canvasSize.height}, re-rendering captions`);
       // Small delay to ensure canvas has been updated
       setTimeout(() => {
         renderCaptionsOnCanvas();
@@ -870,231 +869,16 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     };
   }, [isPlaying, onPlayPause]);
 
-  // Ensure video audio is always enabled when no replacement audio
+  // Simple video audio control - always at full volume
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    if (!replacementAudioPath) {
-      // No replacement audio - ensure video audio is on
-      video.volume = 1;
-      console.log('No replacement audio - video volume set to 1');
+    const videoAudio = videoRef.current;
+    if (videoAudio) {
+      videoAudio.volume = 1;
     }
-  }, [replacementAudioPath]);
+  }, []);
 
-  // Handle replacement audio setup (only when audio path changes)
-  useEffect(() => {
-    const video = videoRef.current;
-    const replacementAudio = replacementAudioRef.current;
 
-    if (!replacementAudioPath || !replacementAudio || !video) return;
 
-    // Set up replacement audio
-    replacementAudio.src = `file://${replacementAudioPath}`;
-    replacementAudio.preload = 'auto';
-    
-    // Load the audio and set initial volume states
-    replacementAudio.load();
-    
-    // Set initial volumes based on current state
-    if (isAudioPreviewEnabled) {
-      video.volume = 0.3; // Keep video audio as backup
-      replacementAudio.volume = 1;
-    } else {
-      video.volume = 1;
-      replacementAudio.volume = 0;
-    }
-
-    console.log('Audio setup:', {
-      replacementAudioPath,
-      isAudioPreviewEnabled,
-      videoVolume: video.volume,
-      audioVolume: replacementAudio.volume
-    });
-
-  }, [replacementAudioPath, isAudioPreviewEnabled]);
-
-  // Handle video-audio synchronization with current state access
-  useEffect(() => {
-    const video = videoRef.current;
-    const replacementAudio = replacementAudioRef.current;
-
-    if (!video) return;
-
-    let syncTimeoutId: NodeJS.Timeout | null = null;
-
-    // Debounced sync to avoid frequent corrections and apply dynamic muting
-    const syncAudio = () => {
-      if (!replacementAudio || !replacementAudioPath || !isAudioPreviewEnabled) return;
-      
-      if (syncTimeoutId) return; // Skip if already syncing
-      
-      syncTimeoutId = setTimeout(() => {
-        // Use effective time for replacement audio when clips exist (jcut implementation)
-        let targetAudioTime = video.currentTime;
-        if (clips.length > 0) {
-          // Convert video's original time to effective time for replacement audio
-          const originalTimeMs = video.currentTime * 1000;
-          const effectiveTimeMs = originalToEffectiveTime(originalTimeMs);
-          targetAudioTime = effectiveTimeMs / 1000;
-        }
-        
-        if (replacementAudio && Math.abs(replacementAudio.currentTime - targetAudioTime) > 0.2) {
-          replacementAudio.currentTime = targetAudioTime;
-        }
-        
-        // Maintain proper volume levels
-        if (isAudioPreviewEnabled) {
-          replacementAudio.volume = 1;
-          // Keep video audio at low volume as backup
-        } else {
-          replacementAudio.volume = 0;
-          // Video audio volume is managed by the separate useEffect
-        }
-        
-        syncTimeoutId = null;
-      }, 16); // More frequent updates for precise control
-    };
-
-    const handleVideoPlay = () => {
-      console.log('Video play event:', { isAudioPreviewEnabled, replacementAudioPath });
-      if (replacementAudio && isAudioPreviewEnabled && replacementAudioPath) {
-        // Use effective time for replacement audio when clips exist (jcut implementation)
-        let targetAudioTime = video.currentTime;
-        if (clips.length > 0) {
-          const originalTimeMs = video.currentTime * 1000;
-          const effectiveTimeMs = originalToEffectiveTime(originalTimeMs);
-          targetAudioTime = effectiveTimeMs / 1000;
-        }
-        replacementAudio.currentTime = targetAudioTime;
-        
-        // Retry mechanism for audio playback
-        const playAudio = (retryCount = 0) => {
-          if (replacementAudio && isAudioPreviewEnabled && !isSkippingRef.current) {
-            replacementAudio.play().catch((error) => {
-              console.error(`Failed to play replacement audio (attempt ${retryCount + 1}):`, error);
-              // Retry up to 3 times with increasing delays
-              if (retryCount < 3) {
-                setTimeout(() => playAudio(retryCount + 1), 200 * (retryCount + 1));
-              }
-            });
-          }
-        };
-        
-        // Start audio playback with retry mechanism
-        setTimeout(() => {
-          playAudio();
-        }, 150);
-      }
-    };
-
-    const handleVideoPause = () => {
-      if (replacementAudio) {
-        replacementAudio.pause();
-      }
-    };
-
-    const handleVideoSeeked = () => {
-      if (replacementAudio && replacementAudioPath) {
-        // Use effective time for replacement audio when clips exist (jcut implementation)
-        let targetAudioTime = video.currentTime;
-        if (clips.length > 0) {
-          const originalTimeMs = video.currentTime * 1000;
-          const effectiveTimeMs = originalToEffectiveTime(originalTimeMs);
-          targetAudioTime = effectiveTimeMs / 1000;
-        }
-        replacementAudio.currentTime = targetAudioTime;
-      }
-    };
-
-    // Add event listeners
-    video.addEventListener('play', handleVideoPlay);
-    video.addEventListener('pause', handleVideoPause);
-    video.addEventListener('seeked', handleVideoSeeked);
-    video.addEventListener('timeupdate', syncAudio);
-
-    return () => {
-      video.removeEventListener('play', handleVideoPlay);
-      video.removeEventListener('pause', handleVideoPause);
-      video.removeEventListener('seeked', handleVideoSeeked);
-      video.removeEventListener('timeupdate', syncAudio);
-      if (syncTimeoutId) {
-        clearTimeout(syncTimeoutId);
-      }
-    };
-  }, [isAudioPreviewEnabled, replacementAudioPath, clips]); // Include dependencies for current state access
-
-  // Ensure video audio is always at proper volume
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    
-    // Always keep video audio at full volume unless replacement audio is actively playing
-    if (replacementAudioPath && isAudioPreviewEnabled) {
-      // Only mute video if replacement audio is actually playing
-      const replacementAudio = replacementAudioRef.current;
-      if (replacementAudio && !replacementAudio.paused) {
-        video.volume = 0; // Use replacement audio
-      } else {
-        video.volume = 1; // Fallback to video audio
-      }
-    } else {
-      video.volume = 1; // Use original video audio
-    }
-  }, [replacementAudioPath, isAudioPreviewEnabled]);
-
-  // Handle audio preview toggle - simplified for debugging
-  useEffect(() => {
-    const video = videoRef.current;
-    const replacementAudio = replacementAudioRef.current;
-
-    if (!video || !replacementAudio || !replacementAudioPath) return;
-
-    console.log('Audio toggle:', {
-      isAudioPreviewEnabled,
-      videoPaused: video.paused,
-      audioReadyState: replacementAudio.readyState
-    });
-
-    if (isAudioPreviewEnabled) {
-      // Use replacement audio
-      replacementAudio.volume = 1;
-      
-      // Sync and play if video is playing
-      if (!video.paused) {
-        // Use effective time for replacement audio when clips exist (jcut implementation)
-        let targetAudioTime = video.currentTime;
-        if (clips.length > 0) {
-          const originalTimeMs = video.currentTime * 1000;
-          const effectiveTimeMs = originalToEffectiveTime(originalTimeMs);
-          targetAudioTime = effectiveTimeMs / 1000;
-        }
-        replacementAudio.currentTime = targetAudioTime;
-        
-        // Retry mechanism for audio playback
-        const playAudio = (retryCount = 0) => {
-          if (replacementAudio && isAudioPreviewEnabled && !isSkippingRef.current) {
-            replacementAudio.play().catch((error) => {
-              console.error(`Failed to play replacement audio (attempt ${retryCount + 1}):`, error);
-              // Retry up to 3 times with increasing delays
-              if (retryCount < 3) {
-                setTimeout(() => playAudio(retryCount + 1), 200 * (retryCount + 1));
-              }
-            });
-          }
-        };
-        
-        // Start audio playback with retry mechanism
-        setTimeout(() => {
-          playAudio();
-        }, 150);
-      }
-    } else {
-      // Use original video audio
-      replacementAudio.volume = 0;
-      replacementAudio.pause();
-    }
-  }, [isAudioPreviewEnabled, replacementAudioPath]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -1436,14 +1220,6 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
           </div>
         )}
 
-        {/* Replacement Audio Element */}
-        {replacementAudioPath && (
-          <audio
-            ref={replacementAudioRef}
-            preload="auto"
-            style={{ display: 'none' }}
-          />
-        )}
         
         {/* Canvas Overlay - Renders captions exactly like export */}
         <canvas
@@ -1717,42 +1493,6 @@ function renderSimpleTextOnCanvas(
   ctx.shadowBlur = 0;
   ctx.shadowOffsetX = 0;
   ctx.shadowOffsetY = 0;
-}
-
-function wrapTextToWidth(
-  ctx: CanvasRenderingContext2D,
-  words: any[],
-  maxWidth: number,
-  wordPadding: number,
-  wordSpacing: number
-): any[][] {
-  const lines: any[][] = [];
-  let currentLine: any[] = [];
-  let currentLineWidth = 0;
-  
-  for (const word of words) {
-    const wordWidth = ctx.measureText(word.word).width;
-    const wordFullWidth = wordWidth + (wordPadding * 2) + wordSpacing;
-    
-    // Check if adding this word would exceed the max width
-    if (currentLine.length > 0 && currentLineWidth + wordFullWidth > maxWidth) {
-      // Start new line
-      lines.push(currentLine);
-      currentLine = [word];
-      currentLineWidth = wordFullWidth;
-    } else {
-      // Add to current line
-      currentLine.push(word);
-      currentLineWidth += wordFullWidth;
-    }
-  }
-  
-  // Add the last line if it has words
-  if (currentLine.length > 0) {
-    lines.push(currentLine);
-  }
-  
-  return lines;
 }
 
 function renderKaraokeTextOnCanvas(
