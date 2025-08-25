@@ -878,11 +878,75 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   // Initialize replacement audio when path is provided
   useEffect(() => {
     const replacementAudio = replacementAudioRef.current;
-    if (!replacementAudioPath || !replacementAudio) return;
+    if (!replacementAudioPath || !replacementAudio) {
+      console.log('Skipping audio setup - no path or element:', { replacementAudioPath, hasElement: !!replacementAudio });
+      return;
+    }
 
+    console.log('Loading replacement audio:', replacementAudioPath);
     replacementAudio.src = `file://${replacementAudioPath}`;
     replacementAudio.preload = 'auto';
+    
+    const handleCanPlayThrough = () => {
+      console.log('Replacement audio ready to play');
+    };
+    
+    const handleLoadError = (e: Event) => {
+      console.error('Replacement audio load error:', e);
+    };
+    
+    const handleLoadStart = () => {
+      console.log('Replacement audio loading started');
+    };
+    
+    replacementAudio.addEventListener('loadstart', handleLoadStart);
+    replacementAudio.addEventListener('canplaythrough', handleCanPlayThrough);
+    replacementAudio.addEventListener('error', handleLoadError);
     replacementAudio.load();
+    
+    return () => {
+      replacementAudio.removeEventListener('loadstart', handleLoadStart);
+      replacementAudio.removeEventListener('canplaythrough', handleCanPlayThrough);
+      replacementAudio.removeEventListener('error', handleLoadError);
+    };
+  }, [replacementAudioPath]);
+
+  // Separate effect to ensure audio is loaded when both path and element are ready
+  useEffect(() => {
+    // Small delay to ensure element is attached
+    const timeout = setTimeout(() => {
+      const replacementAudio = replacementAudioRef.current;
+      console.log('Checking for delayed audio element:', {
+        replacementAudioPath,
+        hasElement: !!replacementAudio,
+        readyState: replacementAudio?.readyState
+      });
+      
+      if (replacementAudioPath && replacementAudio && replacementAudio.readyState === 0) {
+        console.log('Loading replacement audio (delayed):', replacementAudioPath);
+        replacementAudio.src = `file://${replacementAudioPath}`;
+        replacementAudio.preload = 'auto';
+        
+        const handleCanPlayThrough = () => {
+          console.log('Replacement audio ready to play (delayed)');
+        };
+        
+        const handleLoadError = (e: Event) => {
+          console.error('Replacement audio load error (delayed):', e);
+        };
+        
+        const handleLoadStart = () => {
+          console.log('Replacement audio loading started (delayed)');
+        };
+        
+        replacementAudio.addEventListener('loadstart', handleLoadStart, { once: true });
+        replacementAudio.addEventListener('canplaythrough', handleCanPlayThrough, { once: true });
+        replacementAudio.addEventListener('error', handleLoadError, { once: true });
+        replacementAudio.load();
+      }
+    }, 100);
+    
+    return () => clearTimeout(timeout);
   }, [replacementAudioPath]);
 
   // Audio control - DRY principle: single source of truth  
@@ -890,6 +954,15 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     const videoAudio = videoRef.current;
     const replacementAudio = replacementAudioRef.current;
     if (!videoAudio) return;
+
+    console.log('Audio control update:', {
+      replacementAudioPath,
+      isAudioPreviewEnabled,
+      isPlaying,
+      videoPaused: videoAudio.paused,
+      replacementAudioPaused: replacementAudio?.paused,
+      replacementAudioReady: replacementAudio?.readyState
+    });
 
     if (!replacementAudioPath || !replacementAudio) {
       // No replacement audio - use original video audio
@@ -899,16 +972,44 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
 
     // Replacement audio exists - decide which to play
     if (isAudioPreviewEnabled) {
-      // Use replacement audio (JCut logic will control volume dynamically)
+      // Use replacement audio - completely mute video
+      console.log('Setting up replacement audio mode');
+      videoAudio.muted = true;
       videoAudio.volume = 0;
-      // Start with volume 1, JCut logic will adjust based on clips
       replacementAudio.volume = 1;
+      
+      // Ensure replacement audio matches video play state
+      if (!videoAudio.paused && replacementAudio.paused) {
+        // Video is playing but replacement audio is paused - start it
+        if (replacementAudio.readyState >= 3) {
+          console.log('Starting replacement audio playback (audio ready)');
+          replacementAudio.currentTime = videoAudio.currentTime;
+          replacementAudio.play().then(() => {
+            console.log('Replacement audio started successfully');
+          }).catch((error) => {
+            console.error('Failed to start replacement audio:', error);
+          });
+        } else {
+          console.log('Replacement audio not ready yet, readyState:', replacementAudio.readyState);
+        }
+      } else if (videoAudio.paused && !replacementAudio.paused) {
+        // Video is paused but replacement audio is still playing - pause it
+        console.log('Pausing replacement audio (video paused)');
+        replacementAudio.pause();
+      }
     } else {
-      // Use original video audio  
+      // Use original video audio - unmute video
+      console.log('Setting up original video audio mode');
+      videoAudio.muted = false;
       videoAudio.volume = 1;
       replacementAudio.volume = 0;
+      
+      // Pause replacement audio when not in use
+      if (!replacementAudio.paused) {
+        replacementAudio.pause();
+      }
     }
-  }, [replacementAudioPath, isAudioPreviewEnabled]);
+  }, [replacementAudioPath, isAudioPreviewEnabled, isPlaying]);
 
   // Sync replacement audio with video timeline (JCut behavior)
   useEffect(() => {
@@ -948,8 +1049,9 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     };
 
     const handleVideoPause = () => {
-      // Only pause if replacement audio is actually playing
-      if (!replacementAudio.paused) {
+      // Always pause replacement audio when video pauses
+      if (isAudioPreviewEnabled && !replacementAudio.paused) {
+        console.log('Pausing replacement audio');
         replacementAudio.pause();
       }
     };
@@ -1311,14 +1413,12 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
           </div>
         )}
 
-        {/* Replacement Audio Element */}
-        {replacementAudioPath && (
-          <audio
-            ref={replacementAudioRef}
-            preload="auto"
-            style={{ display: 'none' }}
-          />
-        )}
+        {/* Replacement Audio Element - Always render so ref is available */}
+        <audio
+          ref={replacementAudioRef}
+          preload="auto"
+          style={{ display: 'none' }}
+        />
         
         {/* Canvas Overlay - Renders captions exactly like export */}
         <canvas
