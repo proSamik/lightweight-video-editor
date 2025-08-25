@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { ExportSettings, AISubtitleData, VideoClip } from '../../types';
 import { LiquidModal } from './ui';
-import { FiSettings, FiZap, FiMusic, FiFileText, FiVideo, FiScissors } from 'react-icons/fi';
+import { FiSettings, FiZap, FiMusic, FiScissors } from 'react-icons/fi';
 
 interface ExportSettingsProps {
   isOpen: boolean;
