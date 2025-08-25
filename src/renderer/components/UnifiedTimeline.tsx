@@ -27,6 +27,7 @@ interface UnifiedTimelineProps {
   canRedo?: boolean;
   replacementAudioPath?: string | null;
   onAudioPreviewToggle?: (enabled: boolean) => void;
+  isAudioPreviewEnabled?: boolean;
   // AI Subtitle support - when available, use instead of captions
   aiSubtitleData?: AISubtitleData | null;
   onAISubtitleUpdate?: (data: AISubtitleData) => void;
@@ -65,6 +66,7 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   canRedo = false,
   replacementAudioPath,
   onAudioPreviewToggle,
+  isAudioPreviewEnabled = true,
   aiSubtitleData,
   onAISubtitleUpdate,
   selectedFrameId,
@@ -85,7 +87,6 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
   const timelineContainerRef = useRef<HTMLDivElement>(null);
   const rulerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [isAudioPreviewEnabled, setIsAudioPreviewEnabled] = useState(true); // Default to enabled when replacement audio is loaded
 
   const [contextMenu, setContextMenu] = useState<{x: number, y: number, segmentId: string} | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{segmentId: string, text: string} | null>(null);
@@ -1078,25 +1079,6 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
           }
         </div>
 
-        {/* Unified Timeline Controls */}
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '4px',
-          background: theme.colors.surface,
-          border: `1px solid ${theme.colors.border}`,
-          borderRadius: '4px',
-          padding: '4px 8px',
-          fontSize: '10px',
-          color: theme.colors.textSecondary
-        }}>
-          <span>Unified Timeline</span>
-          {localClips.length > 0 && (
-            <span style={{ color: theme.colors.primary }}>
-              • {localClips.filter(c => !c.isRemoved).length} Active Clips
-            </span>
-          )}
-        </div>
 
         {/* Clip Editing Controls - Only show when clips exist */}
         {localClips.length > 0 && (
@@ -1181,7 +1163,6 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
               }
               onClick={() => {
                 const newState = !isAudioPreviewEnabled;
-                setIsAudioPreviewEnabled(newState);
                 onAudioPreviewToggle?.(newState);
                 console.log('Audio preview toggled:', newState);
               }}
@@ -1621,58 +1602,6 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
               if (time > duration) break;
               
               const percentage = (time / duration) * 100;
-              
-              // Always include the final tick at the end of the video
-              if (i === maxTicks - 1 && time < duration) {
-                const finalTime = duration;
-                const finalPercentage = (finalTime / duration) * 100;
-                
-                ticks.push(
-                  <div key={`final-${finalTime}`} style={{ position: 'absolute', left: `${finalPercentage}%`, bottom: 0, height: '100%' }}>
-                    <div
-                      style={{
-                        position: 'absolute',
-                        bottom: 0,
-                        width: '1px',
-                        height: '50%',
-                        backgroundColor: theme.colors.textSecondary,
-                        opacity: 0.7,
-                      }}
-                    />
-                    <div
-                      style={{
-                        position: 'absolute',
-                        bottom: '8px',
-                        left: actualDuration < 60000 ? '-15px' : // "30s" format
-                              actualDuration < 3600000 ? '-25px' : // "5:30" format
-                              '-35px', // "1:23:45" format
-                        width: actualDuration < 60000 ? '30px' : // "30s" format
-                               actualDuration < 3600000 ? '50px' : // "5:30" format  
-                               '70px', // "1:23:45" format
-                        fontSize: '10px',
-                        color: theme.colors.textSecondary,
-                        textAlign: 'center',
-                        fontFamily: 'system-ui, -apple-system, sans-serif',
-                        fontWeight: '400',
-                        whiteSpace: 'nowrap',
-                        userSelect: 'none',
-                      }}
-                    >
-                      {(() => {
-                        if (actualDuration < 60000) {
-                          return `${Math.floor(finalTime / 1000)}s`;
-                        } else if (actualDuration < 3600000) {
-                          const minutes = Math.floor(finalTime / 60000);
-                          const seconds = Math.floor((finalTime % 60000) / 1000);
-                          return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-                        } else {
-                          return formatTime(finalTime);
-                        }
-                      })()}
-                    </div>
-                  </div>
-                );
-              }
               
               ticks.push(
                 <div key={time} style={{ position: 'absolute', left: `${percentage}%`, bottom: 0, height: '100%' }}>
