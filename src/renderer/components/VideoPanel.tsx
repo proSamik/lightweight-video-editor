@@ -46,6 +46,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   const { theme } = useTheme();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const replacementAudioRef = useRef<HTMLAudioElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -241,6 +242,11 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     // Perform the skip
     video.currentTime = nextValidTime / 1000;
     
+    // Sync replacement audio during auto-skip (use same timeline as video)
+    const replacementAudio = replacementAudioRef.current;
+    if (replacementAudio && replacementAudioPath) {
+      replacementAudio.currentTime = nextValidTime / 1000;
+    }
     
     // Report original time to parent (parent will handle time conversion)
     onTimeUpdate(nextValidTime);
@@ -265,7 +271,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
         isSkippingRef.current = false;
       }, 500);
     }
-  }, [shouldSkip, findNextValidTime, originalToEffectiveTime, onTimeUpdate, clips.length, lastSkipTime]);
+  }, [shouldSkip, findNextValidTime, originalToEffectiveTime, onTimeUpdate, clips.length, lastSkipTime, replacementAudioPath]);
 
   // Check if video file exists when videoFile changes
   useEffect(() => {
@@ -869,13 +875,98 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     };
   }, [isPlaying, onPlayPause]);
 
-  // Simple video audio control - always at full volume
+  // Initialize replacement audio when path is provided
+  useEffect(() => {
+    const replacementAudio = replacementAudioRef.current;
+    if (!replacementAudioPath || !replacementAudio) return;
+
+    replacementAudio.src = `file://${replacementAudioPath}`;
+    replacementAudio.preload = 'auto';
+    replacementAudio.load();
+  }, [replacementAudioPath]);
+
+  // Audio control - DRY principle: single source of truth  
   useEffect(() => {
     const videoAudio = videoRef.current;
-    if (videoAudio) {
+    const replacementAudio = replacementAudioRef.current;
+    if (!videoAudio) return;
+
+    if (!replacementAudioPath || !replacementAudio) {
+      // No replacement audio - use original video audio
       videoAudio.volume = 1;
+      return;
     }
-  }, []);
+
+    // Replacement audio exists - decide which to play
+    if (isAudioPreviewEnabled) {
+      // Use replacement audio (JCut logic will control volume dynamically)
+      videoAudio.volume = 0;
+      // Start with volume 1, JCut logic will adjust based on clips
+      replacementAudio.volume = 1;
+    } else {
+      // Use original video audio  
+      videoAudio.volume = 1;
+      replacementAudio.volume = 0;
+    }
+  }, [replacementAudioPath, isAudioPreviewEnabled]);
+
+  // Sync replacement audio with video timeline (JCut behavior)
+  useEffect(() => {
+    const videoAudio = videoRef.current;
+    const replacementAudio = replacementAudioRef.current;
+    
+    if (!videoAudio || !replacementAudio || !replacementAudioPath) return;
+
+    const syncAudio = () => {
+      // Replacement audio should use original timeline (same as video)
+      const targetTime = videoAudio.currentTime;
+      
+      // Sync if difference is significant
+      if (Math.abs(replacementAudio.currentTime - targetTime) > 0.2) {
+        replacementAudio.currentTime = targetTime;
+      }
+
+      // JCut behavior: mute replacement audio when video is in deleted clips
+      if (isAudioPreviewEnabled) {
+        const originalTimeMs = videoAudio.currentTime * 1000;
+        const isInDeletedClip = shouldSkip(originalTimeMs);
+        const targetVolume = isInDeletedClip ? 0 : 1;
+        
+        if (Math.abs(replacementAudio.volume - targetVolume) > 0.1) {
+          replacementAudio.volume = targetVolume;
+          console.log(`Replacement audio: time=${originalTimeMs.toFixed(1)}ms, deleted=${isInDeletedClip}, volume=${targetVolume}`);
+        }
+      }
+    };
+
+    const handleVideoPlay = () => {
+      if (isAudioPreviewEnabled && !isSkippingRef.current) {
+        // Sync to same original time as video
+        replacementAudio.currentTime = videoAudio.currentTime;
+        replacementAudio.play().catch(console.error);
+      }
+    };
+
+    const handleVideoPause = () => {
+      // Only pause if replacement audio is actually playing
+      if (!replacementAudio.paused) {
+        replacementAudio.pause();
+      }
+    };
+
+    // Add event listeners
+    videoAudio.addEventListener('timeupdate', syncAudio);
+    videoAudio.addEventListener('play', handleVideoPlay);
+    videoAudio.addEventListener('pause', handleVideoPause);
+    videoAudio.addEventListener('seeked', syncAudio);
+
+    return () => {
+      videoAudio.removeEventListener('timeupdate', syncAudio);
+      videoAudio.removeEventListener('play', handleVideoPlay);
+      videoAudio.removeEventListener('pause', handleVideoPause);
+      videoAudio.removeEventListener('seeked', syncAudio);
+    };
+  }, [replacementAudioPath, isAudioPreviewEnabled, clips, shouldSkip, originalToEffectiveTime]);
 
 
 
@@ -1220,6 +1311,14 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
           </div>
         )}
 
+        {/* Replacement Audio Element */}
+        {replacementAudioPath && (
+          <audio
+            ref={replacementAudioRef}
+            preload="auto"
+            style={{ display: 'none' }}
+          />
+        )}
         
         {/* Canvas Overlay - Renders captions exactly like export */}
         <canvas
