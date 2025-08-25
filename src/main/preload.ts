@@ -8,9 +8,9 @@ const electronAPI = {
   replaceAudioTrack: (videoPath: string, audioPath: string, outputName?: string) => ipcRenderer.invoke('replace-audio-track', videoPath, audioPath, outputName),
   getVideoMetadata: (videoPath: string) => ipcRenderer.invoke('get-video-metadata', videoPath),
   extractAudio: (videoPath: string) => ipcRenderer.invoke('extract-audio', videoPath),
-  transcribeAudio: (audioPath: string, model?: string) => ipcRenderer.invoke('transcribe-audio', audioPath, model),
-  transcribeAudioSegments: (audioPath: string, timelineSelections: any[], model?: string) => 
-    ipcRenderer.invoke('transcribe-audio-segments', audioPath, timelineSelections, model),
+  transcribeAudio: (audioPath: string, model?: string, language?: string) => ipcRenderer.invoke('transcribe-audio', audioPath, model, language),
+  transcribeAudioSegments: (audioPath: string, timelineSelections: any[], model?: string, language?: string) => 
+    ipcRenderer.invoke('transcribe-audio-segments', audioPath, timelineSelections, model, language),
   checkDependencies: () => ipcRenderer.invoke('check-dependencies'),
   testWhisperInstallation: () => ipcRenderer.invoke('test-whisper-installation'),
   renderVideoWithCaptions: (videoPath: string, captionsData: any[], outputPath: string, exportSettings?: any, replacementAudioPath?: string) => 
