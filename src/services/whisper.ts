@@ -142,14 +142,15 @@ export class WhisperService {
   public async transcribeAudio(
     audioPath: string,
     onProgress?: (progress: number, speed?: string, eta?: string) => void,
-    model: string = 'base'
+    model: string = 'base',
+    language: string = 'auto'
   ): Promise<TranscriptionResult> {
     // Wait for device detection to complete
     await this.waitForDeviceDetection();
     
     // Try with best device first, then fall back to CPU if it fails
     try {
-      return await this.attemptTranscription(audioPath, this.bestDevice, onProgress, model);
+      return await this.attemptTranscription(audioPath, this.bestDevice, onProgress, model, language);
     } catch (error) {
       const errorMessage = (error as Error).message;
       
@@ -160,7 +161,7 @@ export class WhisperService {
         // Force CPU fallback
         const cpuDevice = { type: 'cpu' as const, available: true, name: 'CPU Fallback' };
         try {
-          return await this.attemptTranscription(audioPath, cpuDevice, onProgress, model);
+          return await this.attemptTranscription(audioPath, cpuDevice, onProgress, model, language);
         } catch (cpuError) {
           throw new Error(`Transcription failed on both ${this.bestDevice?.type} and CPU: ${(cpuError as Error).message}`);
         }
@@ -189,7 +190,8 @@ export class WhisperService {
     audioPath: string,
     device: DeviceInfo | null,
     onProgress?: (progress: number, speed?: string, eta?: string) => void,
-    model: string = 'base'
+    model: string = 'base',
+    language: string = 'auto'
   ): Promise<TranscriptionResult> {
     return new Promise((resolve, reject) => {
       if (!this.whisperPath) {
@@ -230,6 +232,12 @@ export class WhisperService {
           '--output_dir', outputDir,
           '--verbose', 'False'
         ];
+        
+        // Add language parameter if not auto-detect
+        if (language !== 'auto') {
+          args.push('--language', language);
+        }
+        
         console.log(`Running: python3 ${args.join(' ')}`);
         whisperProcess = spawn('python3', args, { env });
       } else {
@@ -243,6 +251,12 @@ export class WhisperService {
           '--output_dir', outputDir,
           '--verbose', 'False'
         ];
+        
+        // Add language parameter if not auto-detect
+        if (language !== 'auto') {
+          args.push('--language', language);
+        }
+        
         console.log(`Running: ${this.whisperPath} ${args.join(' ')}`);
         whisperProcess = spawn(this.whisperPath, args, { env });
       }
@@ -533,11 +547,12 @@ export class WhisperService {
     audioPath: string,
     timelineSelections: any[],
     onProgress?: (progress: number, speed?: string, eta?: string) => void,
-    model: string = 'base'
+    model: string = 'base',
+    language: string = 'auto'
   ): Promise<TranscriptionResult[]> {
     // For now, we'll transcribe the whole audio and then filter the results
     // This is simpler than extracting audio segments
-    const fullTranscription = await this.transcribeAudio(audioPath, onProgress, model);
+    const fullTranscription = await this.transcribeAudio(audioPath, onProgress, model, language);
     
     // Filter segments to only include those within selected timeline ranges
     const filteredSegments = fullTranscription.segments.filter(segment => {
