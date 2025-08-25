@@ -7,6 +7,7 @@ interface PresetPreviewProps {
   isSelected?: boolean;
   onClick?: () => void;
   size?: 'small' | 'medium' | 'large';
+  selectedFrameText?: string; // Add prop for the actual selected text
 }
 
 // Import the same rendering functions from VideoPanel
@@ -38,7 +39,8 @@ export const PresetPreview: React.FC<PresetPreviewProps> = ({
   preset,
   isSelected = false,
   onClick,
-  size = 'medium'
+  size = 'medium',
+  selectedFrameText
 }) => {
   const { theme } = useTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -71,7 +73,8 @@ export const PresetPreview: React.FC<PresetPreviewProps> = ({
 
   // Create a mock caption segment from the preset
   const createMockCaption = (timeOffset: number = 0): PreviewCaption => {
-    const demoText = ['PREVIEW', 'YOUR', 'STYLE'];
+    // Use selected frame text if available, otherwise use demo text
+    const demoText = selectedFrameText ? selectedFrameText.split(' ') : ['PREVIEW', 'YOUR', 'STYLE'];
     
     // Apply text transform to demo text first
     const transformedDemoText = demoText.map(word => 

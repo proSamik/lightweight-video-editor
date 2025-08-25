@@ -315,6 +315,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
                 selectedPresetId={selectedPresetId}
                 onPresetSelect={handlePresetSelect}
                 onStyleUpdate={handleStyleUpdate}
+                selectedFrameText={selectedFrame.words.length > 0 ? selectedFrame.words.map(w => w.word).join(' ') : 'Sample Text'}
               />
             ) : (
               <StyleControls

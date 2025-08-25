@@ -10,13 +10,15 @@ interface PresetSelectorProps {
   onPresetSelect: (preset: CaptionPreset) => void;
   onStyleUpdate: (style: Partial<SubtitleStyle>) => void;
   onApplyToAll?: (style: Partial<SubtitleStyle>) => void;
+  selectedFrameText?: string; // Add prop for the actual selected text
 }
 
 export const PresetSelector: React.FC<PresetSelectorProps> = ({
   selectedPresetId,
   onPresetSelect,
   onStyleUpdate,
-  onApplyToAll
+  onApplyToAll,
+  selectedFrameText
 }) => {
   const { theme } = useTheme();
   const [selectedCategory, setSelectedCategory] = useState('modern');
@@ -225,6 +227,7 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
                   isSelected={selectedPresetId === preset.id}
                   onClick={() => handlePresetSelect(preset)}
                   size="medium"
+                  selectedFrameText={selectedFrameText}
                 />
                 
                 {/* Preset Info Overlay */}
