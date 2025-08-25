@@ -82,8 +82,8 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
     <div style={{ 
       display: 'flex', 
       flexDirection: 'column', 
-      gap: '16px',
-      padding: '16px',
+      gap: '12px',
+      padding: '12px 16px',
       backgroundColor: theme.colors.surface,
       overflow: 'hidden'
     }}>
@@ -121,48 +121,6 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
         Choose from trending animated caption styles or customize your own
       </p>
 
-      {/* Apply to All Checkbox */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-        padding: '12px',
-        backgroundColor: theme.colors.background,
-        border: `1px solid ${theme.colors.border}`,
-        borderRadius: '8px'
-      }}>
-        <input
-          type="checkbox"
-          id="applyToAll"
-          checked={applyToAll}
-          onChange={(e) => setApplyToAll(e.target.checked)}
-          style={{
-            width: '16px',
-            height: '16px',
-            accentColor: theme.colors.primary
-          }}
-        />
-        <label htmlFor="applyToAll" style={{
-          fontSize: '11px',
-          fontWeight: '500',
-          color: theme.colors.text,
-          cursor: 'pointer',
-          userSelect: 'none',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px'
-        }}>
-          <FiCheck size={12} />
-          Apply to All Captions
-        </label>
-        <span style={{
-          fontSize: '10px',
-          color: theme.colors.textSecondary,
-          marginLeft: 'auto'
-        }}>
-          {applyToAll ? 'All segments' : 'Selected only'}
-        </span>
-      </div>
 
       {/* Search */}
       <div style={{ position: 'relative' }}>
@@ -257,7 +215,7 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
           <div style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: '16px'
+            gap: '12px'
           }}>
             {currentPresets.map((preset) => (
               <div key={preset.id} style={{ position: 'relative' }}>
