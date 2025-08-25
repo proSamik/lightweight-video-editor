@@ -146,14 +146,14 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
   };
 
   const headerStyles: React.CSSProperties = {
-    padding: spacing['2xl'],
+    padding: '12px 16px',
     borderBottom: `1px solid ${theme.colors.border}`,
     backgroundColor: theme.colors.background,
   };
 
   const contentStyles: React.CSSProperties = {
     flex: 1,
-    padding: spacing['2xl'],
+    padding: '0',
     overflowY: 'auto',
     backgroundColor: theme.colors.sidebar.background,
   };
@@ -232,19 +232,19 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
     <>
       <div style={panelStyles}>
         <div style={headerStyles}>
-          <HStack justify="between" align="center" style={{ marginBottom: spacing.lg }}>
+          <HStack justify="between" align="center" style={{ marginBottom: '8px' }}>
             <div>
               <h3 style={{ 
                 margin: 0, 
-                fontSize: typography.fontSize.xl, 
-                fontWeight: typography.fontWeight.semibold,
+                fontSize: '16px', 
+                fontWeight: '600',
                 color: theme.colors.text 
               }}>
                 Subtitle Styling
               </h3>
               <p style={{
-                margin: '4px 0 0 0',
-                fontSize: typography.fontSize.sm,
+                margin: '2px 0 0 0',
+                fontSize: '11px',
                 color: theme.colors.textSecondary
               }}>
                 Customize appearance for frame: {selectedFrame.startTime.toFixed(2)}s - {selectedFrame.endTime.toFixed(2)}s
