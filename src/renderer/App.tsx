@@ -1174,7 +1174,25 @@ const AppContent: React.FC = () => {
       setClips(projectData.clips);
     }
     
-    setReplacementAudioPath(projectData.replacementAudioPath || null);
+    // Load replacement audio path and verify file exists
+    const replacementPath = projectData.replacementAudioPath;
+    if (replacementPath) {
+      // Check if the replacement audio file still exists
+      try {
+        const exists = await window.electronAPI.fileExists(replacementPath);
+        if (exists) {
+          setReplacementAudioPath(replacementPath);
+        } else {
+          console.warn('Replacement audio file not found:', replacementPath);
+          setReplacementAudioPath(null);
+        }
+      } catch (error) {
+        console.error('Error checking replacement audio file:', error);
+        setReplacementAudioPath(null);
+      }
+    } else {
+      setReplacementAudioPath(null);
+    }
     setExtractedAudioPath(projectData.extractedAudioPath || null); // Restore extracted audio path for waveforms
     setCurrentTime(0);
 
@@ -1665,6 +1683,7 @@ const AppContent: React.FC = () => {
                   canRedo={historyIndex < history.length - 1}
                   replacementAudioPath={replacementAudioPath}
                   onAudioPreviewToggle={setIsAudioPreviewEnabled}
+                  isAudioPreviewEnabled={isAudioPreviewEnabled}
                   aiSubtitleData={aiSubtitleData}
                   onAISubtitleUpdate={setAiSubtitleData}
                   selectedFrameId={selectedFrameId}
