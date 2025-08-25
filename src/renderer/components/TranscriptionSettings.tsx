@@ -30,15 +30,6 @@ const TranscriptionSettings: React.FC<TranscriptionSettingsProps> = ({
     if (videoMetadata?.width && videoMetadata?.height) {
       const isVertical = (videoMetadata.height / videoMetadata.width) > 1.5;
       
-      console.log('TranscriptionSettings: Video aspect ratio detection:', {
-        width: videoMetadata.width,
-        height: videoMetadata.height,
-        aspectRatio: videoMetadata.width / videoMetadata.height,
-        isVertical,
-        settingWordsPerLine: isVertical ? 2 : 5,
-        settingCharsPerLine: isVertical ? 12 : 16
-      });
-      
       // Set defaults based on video aspect ratio
       setMaxCharsPerLine(isVertical ? 12 : 16);
       setMaxWordsPerLine(isVertical ? 2 : 5);
