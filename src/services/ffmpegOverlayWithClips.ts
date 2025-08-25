@@ -230,17 +230,32 @@ export class FFmpegOverlayWithClips {
       
       // Phase 2: Generate clipped video segments (15-50%)
       console.log('=== PHASE 2: Video Clipping ===');
-      const clippedVideoPath = await this.generateClippedVideo(
-        workingVideoPath,
-        clips,
-        tempDir,
-        metadata,
-        (progress) => {
-          if (onProgress) onProgress(15 + Math.min(35, (progress / 100) * 35));
-        },
-        exportSettings?.quality // Pass quality setting (will be overridden to 'high' in Phase 2)
-      );
-      console.log('Video clipping completed:', clippedVideoPath);
+      
+      // Check if we can skip Phase 2 optimization: single clip spanning entire video duration
+      const canSkipPhase2 = this.canSkipVideoClipping(clips.filter(clip => !clip.isRemoved), metadata);
+      
+      let clippedVideoPath: string;
+      
+      if (canSkipPhase2) {
+        console.log('OPTIMIZATION: Skipping Phase 2 - single clip spans entire video duration');
+        console.log('Using working video directly as clipped video (no quality loss)');
+        clippedVideoPath = workingVideoPath;
+        
+        // Update progress to Phase 2 completion
+        if (onProgress) onProgress(50);
+      } else {
+        clippedVideoPath = await this.generateClippedVideo(
+          workingVideoPath,
+          clips,
+          tempDir,
+          metadata,
+          (progress) => {
+            if (onProgress) onProgress(15 + Math.min(35, (progress / 100) * 35));
+          },
+          exportSettings?.quality // Pass quality setting (will be overridden to 'high' in Phase 2)
+        );
+        console.log('Video clipping completed:', clippedVideoPath);
+      }
       
       // Check if cancelled after clipping
       if (this.isCancelled) {
@@ -264,12 +279,19 @@ export class FFmpegOverlayWithClips {
         throw new Error('Rendering cancelled after caption timing adjustment');
       }
       
-      // Get the list of segment files created in Phase 2
+      // Get the list of segment files created in Phase 2 or use clipped video directly
       const activeClips = clips.filter(clip => !clip.isRemoved).sort((a, b) => a.startTime - b.startTime);
       const segmentPaths: string[] = [];
       
-      for (let i = 0; i < activeClips.length; i++) {
-        segmentPaths.push(path.join(tempDir, `segment_${i}.mp4`));
+      if (canSkipPhase2) {
+        // Phase 2 was skipped, use the clipped video directly as the only segment
+        console.log('Using clipped video as single segment (Phase 2 was skipped)');
+        segmentPaths.push(clippedVideoPath);
+      } else {
+        // Phase 2 created individual segment files
+        for (let i = 0; i < activeClips.length; i++) {
+          segmentPaths.push(path.join(tempDir, `segment_${i}.mp4`));
+        }
       }
       
       console.log(`Processing ${segmentPaths.length} video segments with overlays`);
@@ -349,10 +371,16 @@ export class FFmpegOverlayWithClips {
         console.log(`Segment ${i + 1} processing completed`);
       }
       
-      console.log(`All ${processedSegmentPaths.length} segments processed, concatenating final video`);
+      console.log(`All ${processedSegmentPaths.length} segments processed`);
       
-      // Concatenate all processed segments into final output using stream copying
-      await this.concatenateVideoFiles(processedSegmentPaths, outputPath, true);
+      // Final output: concatenate segments or copy single segment
+      if (processedSegmentPaths.length === 1) {
+        console.log('Single processed segment, copying directly to output (no concatenation needed)');
+        await this.copyVideoFile(processedSegmentPaths[0], outputPath);
+      } else {
+        console.log('Multiple processed segments, concatenating final video');
+        await this.concatenateVideoFiles(processedSegmentPaths, outputPath, true);
+      }
       
       if (onProgress) onProgress(100);
       
@@ -397,6 +425,38 @@ export class FFmpegOverlayWithClips {
       
       throw error;
     }
+  }
+
+  /**
+   * Check if Phase 2 video clipping can be skipped
+   * Returns true if there's only one active clip that spans the entire video duration
+   */
+  private canSkipVideoClipping(activeClips: VideoClip[], metadata: any): boolean {
+    if (activeClips.length !== 1) {
+      console.log(`Cannot skip Phase 2: ${activeClips.length} active clips (need exactly 1)`);
+      return false;
+    }
+    
+    const clip = activeClips[0];
+    const videoDurationMs = metadata.duration * 1000; // Convert to milliseconds
+    const clipDurationMs = clip.endTime - clip.startTime;
+    const tolerance = 1000; // 1 second tolerance for duration comparison
+    
+    // Check if clip starts at beginning and spans entire duration
+    const startsAtBeginning = clip.startTime <= tolerance; // Allow small tolerance at start
+    const spansFullDuration = Math.abs(clipDurationMs - videoDurationMs) <= tolerance;
+    
+    console.log(`Phase 2 skip analysis:`);
+    console.log(`  Video duration: ${(videoDurationMs/1000).toFixed(3)}s`);
+    console.log(`  Clip timing: ${(clip.startTime/1000).toFixed(3)}s - ${(clip.endTime/1000).toFixed(3)}s`);
+    console.log(`  Clip duration: ${(clipDurationMs/1000).toFixed(3)}s`);
+    console.log(`  Starts at beginning: ${startsAtBeginning} (start <= ${tolerance}ms)`);
+    console.log(`  Spans full duration: ${spansFullDuration} (diff <= ${tolerance}ms)`);
+    
+    const canSkip = startsAtBeginning && spansFullDuration;
+    console.log(`  Can skip Phase 2: ${canSkip}`);
+    
+    return canSkip;
   }
 
   /**
@@ -460,9 +520,9 @@ export class FFmpegOverlayWithClips {
     videoPath: string,
     clips: VideoClip[],
     tempDir: string,
-    metadata: any,
+    _metadata: any,
     onProgress?: (progress: number) => void,
-    quality?: string
+    _quality?: string
   ): Promise<string> {
     // Filter out removed clips and sort by start time
     const activeClips = clips
