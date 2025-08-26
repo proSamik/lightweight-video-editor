@@ -51,6 +51,10 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
   clips = [],
 }) => {
   const { theme } = useTheme();
+  
+  // Detect if we're on macOS to show correct modifier key
+  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+  const modifierKey = isMac ? 'Cmd' : 'Ctrl';
   const [internalAiSubtitleData, setInternalAiSubtitleData] = useState<AISubtitleData | null>(null);
   
   // Use prop data if available, otherwise use internal data
@@ -1202,14 +1206,14 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     const isRemovedCaption = word.editState === 'removedCaption';
 
     const canSplit = !isMultiSelect;
-
+    
     const menuItems = [
-      { icon: Copy, label: 'Copy', action: 'copy', shortcut: 'Ctrl+C' },
+      { icon: Copy, label: 'Copy', action: 'copy', shortcut: `${modifierKey}+C` },
       { icon: Edit3, label: 'Edit', action: 'edit', shortcut: 'F2' },
-      ...(isMultiSelect ? [{ icon: Edit3, label: 'Combine', action: 'combine', color: theme.colors.accent, shortcut: 'Ctrl+M' }] : []),
-      ...(canSplit ? [{ icon: Scissors, label: 'Split', action: 'split', color: theme.colors.accent, shortcut: 'Ctrl+D' }] : []),
-      { icon: Hash, label: isCensored ? 'Uncensor' : 'Censor', action: 'censor', color: theme.colors.warning, shortcut: 'Ctrl+H' },
-      { icon: FileX, label: isRemovedCaption ? 'Restore Caption' : 'Remove Caption', action: 'removeCaption', color: theme.colors.textSecondary, shortcut: 'Ctrl+R' }
+      ...(isMultiSelect ? [{ icon: Edit3, label: 'Combine', action: 'combine', color: theme.colors.accent, shortcut: `${modifierKey}+M` }] : []),
+      ...(canSplit ? [{ icon: Scissors, label: 'Split', action: 'split', color: theme.colors.accent, shortcut: `${modifierKey}+D` }] : []),
+      { icon: Hash, label: isCensored ? 'Uncensor' : 'Censor', action: 'censor', color: theme.colors.warning, shortcut: `${modifierKey}+H` },
+      { icon: FileX, label: isRemovedCaption ? 'Restore Caption' : 'Remove Caption', action: 'removeCaption', color: theme.colors.textSecondary, shortcut: `${modifierKey}+R` }
     ];
 
     return (
@@ -1339,19 +1343,19 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
                 }}
               >
                 <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Keyboard Shortcuts:</div>
-                <div>• <strong>Ctrl/Cmd + F:</strong> Search & Replace</div>
-                <div>• <strong>Ctrl/Cmd + C:</strong> Copy selected word</div>
+                <div>• <strong>{modifierKey} + F:</strong> Search & Replace</div>
+                <div>• <strong>{modifierKey} + C:</strong> Copy selected word</div>
                 <div>• <strong>F2:</strong> Edit selected word</div>
-                <div>• <strong>Ctrl/Cmd + D:</strong> Split selected word</div>
-                <div>• <strong>Ctrl/Cmd + M:</strong> Combine selected words</div>
-                <div>• <strong>Ctrl/Cmd + H:</strong> Censor/Uncensor word</div>
-                <div>• <strong>Ctrl/Cmd + R:</strong> Remove/Restore caption</div>
+                <div>• <strong>{modifierKey} + D:</strong> Split selected word</div>
+                <div>• <strong>{modifierKey} + M:</strong> Combine selected words</div>
+                <div>• <strong>{modifierKey} + H:</strong> Censor/Uncensor word</div>
+                <div>• <strong>{modifierKey} + R:</strong> Remove/Restore caption</div>
                 <div>• <strong>Single click:</strong> Select word & show context menu</div>
                 <div>• <strong>Double click:</strong> Edit word</div>
                 <div>• <strong>Shift + click:</strong> Multi-select words</div>
                 <div>• <strong>Double Enter:</strong> Split frame at selected word</div>
                 <div>• <strong>↑↓:</strong> Combine frames</div>
-                <div>• <strong>Ctrl/Cmd + Z:</strong> Undo all changes</div>
+                <div>• <strong>{modifierKey} + Z:</strong> Undo all changes</div>
               </div>
             )}
           </div>
