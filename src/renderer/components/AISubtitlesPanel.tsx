@@ -10,6 +10,7 @@ import {
 import { Copy, Edit3, Hash, FileX, ChevronUp, ChevronDown, HelpCircle, Scissors } from 'lucide-react';
 import CompactSearchReplace from './CompactSearchReplace';
 import { formatTimeHHMMSS } from '../../utils/timeFormatting';
+import { LiquidModal } from './ui';
 
 interface AISubtitlesPanelProps {
   currentTime: number;
@@ -496,6 +497,11 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
         return;
       }
 
+      // Don't handle shortcuts if split modal is open (after input field check)
+      if (splitModal.show) {
+        return; // Let the modal handle its own keyboard events
+      }
+
       if (e.key === 'Shift') {
         setIsShiftPressed(true);
       }
@@ -929,8 +935,8 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     const { wordId } = splitModal;
     const userInput = splitInput.trim();
     
-    if (!userInput || userInput === splitModal.originalText.trim()) {
-      // User cancelled or didn't change anything
+    if (!userInput) {
+      // No input provided
       setSplitModal({ show: false, wordId: '', originalText: '' });
       setSplitInput('');
       return;
@@ -958,7 +964,10 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     const splitWords = userInput.split(/\s+/).filter(w => w.length > 0);
     
     if (splitWords.length <= 1) {
-      // Nothing to split or only one word
+      // Only one word - update the existing word if text changed
+      if (userInput !== splitModal.originalText.trim()) {
+        updateWordInFrames(wordId, userInput, word.editState || 'normal');
+      }
       setSplitModal({ show: false, wordId: '', originalText: '' });
       setSplitInput('');
       return;
@@ -1150,7 +1159,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
           ...baseStyle,
           backgroundColor: theme.colors.primary + '20',
           outline: `2px solid ${theme.colors.primary}`
-        };
+        }; 
       default:
         if (word.isPause) {
           return {
@@ -1565,61 +1574,79 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
       </div>
 
       {/* Split Word Modal */}
-      {splitModal.show && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 2000
-          }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              handleSplitCancel();
-            }
-          }}
-        >
-          <div
-            style={{
-              backgroundColor: theme.colors.surface,
-              borderRadius: '8px',
-              padding: '24px',
-              minWidth: '400px',
-              maxWidth: '500px',
-              border: `1px solid ${theme.colors.border}`,
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
-            }}
-          >
+      <LiquidModal
+        isOpen={splitModal.show}
+        onClose={handleSplitCancel}
+        title="Split Word"
+        subtitle={`Split "${splitModal.originalText}" into multiple words`}
+        icon={<Scissors size={24} />}
+        maxWidth="600px"
+      >
+        <div style={{ padding: '20px' }}>
+          <div style={{ marginBottom: '24px' }}>
             <h3 style={{
               margin: '0 0 16px 0',
               fontSize: '18px',
               fontWeight: '600',
               color: theme.colors.text
             }}>
-              Split Word
+              How it works
             </h3>
-            
             <p style={{
               margin: '0 0 16px 0',
               fontSize: '14px',
-              color: theme.colors.textSecondary
+              color: theme.colors.textSecondary,
+              lineHeight: '1.5'
             }}>
-              Split "<strong>{splitModal.originalText}</strong>" into multiple words:
-              <br />
-              <small>(Enter words separated by spaces)</small>
+              Enter words separated by spaces. Each word will get timing proportional to its character length.
             </p>
+            
+            {/* Examples */}
+            <div style={{
+              padding: '16px',
+              backgroundColor: theme.colors.modal.background,
+              borderRadius: theme.radius.lg,
+              border: `1px solid ${theme.colors.border}`,
+              marginBottom: '20px'
+            }}>
+              <h4 style={{
+                margin: '0 0 12px 0',
+                fontSize: '14px',
+                fontWeight: '600',
+                color: theme.colors.text
+              }}>
+                Examples:
+              </h4>
+              <div style={{ fontSize: '13px', color: theme.colors.textSecondary, lineHeight: '1.6' }}>
+                <div style={{ marginBottom: '8px' }}>
+                  <strong style={{ color: theme.colors.text }}>Input:</strong> "helloworld" → <strong style={{ color: theme.colors.text }}>Output:</strong> "hello world"
+                </div>
+                <div style={{ marginBottom: '8px' }}>
+                  <strong style={{ color: theme.colors.text }}>Input:</strong> "folks," → <strong style={{ color: theme.colors.text }}>Output:</strong> "folks there"
+                </div>
+                <div>
+                  <strong style={{ color: theme.colors.text }}>Input:</strong> "iPhone15Pro" → <strong style={{ color: theme.colors.text }}>Output:</strong> "iPhone 15 Pro"
+                </div>
+              </div>
+            </div>
+          </div>
 
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '14px',
+              fontWeight: '500',
+              color: theme.colors.text,
+              marginBottom: '8px'
+            }}>
+              Split "{splitModal.originalText}" into:
+            </label>
             <input
               type="text"
               value={splitInput}
               onChange={(e) => setSplitInput(e.target.value)}
               onKeyDown={(e) => {
+                e.stopPropagation(); // Prevent event bubbling to global handlers
                 if (e.key === 'Enter') {
                   e.preventDefault();
                   handleSplitConfirm();
@@ -1635,52 +1662,113 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
                 color: theme.colors.text,
                 backgroundColor: theme.colors.input.background,
                 border: `1px solid ${theme.colors.border}`,
-                borderRadius: '6px',
-                outline: 'none',
-                marginBottom: '20px'
+                borderRadius: theme.radius.md,
+                outline: 'none'
               }}
-              placeholder={splitModal.originalText}
+              placeholder="Enter words separated by spaces"
               autoFocus
+              data-split-modal-input="true"
             />
-
-            <div style={{
-              display: 'flex',
-              gap: '12px',
-              justifyContent: 'flex-end'
+            <small style={{
+              display: 'block',
+              marginTop: '6px',
+              fontSize: '12px',
+              color: theme.colors.textSecondary
             }}>
-              <button
-                onClick={handleSplitCancel}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: 'transparent',
-                  color: theme.colors.textSecondary,
-                  border: `1px solid ${theme.colors.border}`,
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '14px'
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSplitConfirm}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: theme.colors.primary,
-                  color: theme.colors.primaryForeground,
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '500'
-                }}
-              >
-                Split
-              </button>
+              Timing will be distributed based on character count of each word
+            </small>
+          </div>
+
+          {/* Preview */}
+          {splitInput.trim() && (
+            <div style={{
+              padding: '12px',
+              backgroundColor: theme.colors.accent + '20',
+              borderRadius: theme.radius.md,
+              border: `1px solid ${theme.colors.accent}40`,
+              marginBottom: '24px'
+            }}>
+              <div style={{ fontSize: '12px', color: theme.colors.textSecondary, marginBottom: '4px' }}>
+                {splitInput.trim().split(/\s+/).filter(w => w.length > 0).length > 1 ? 'Will split into:' : 'Will update to:'}
+              </div>
+              <div style={{ fontSize: '14px', color: theme.colors.text }}>
+                {splitInput.trim().split(/\s+/).filter(w => w.length > 0).map((word, index, arr) => (
+                  <span key={index}>
+                    <strong>"{word}"</strong>
+                    {index < arr.length - 1 ? ' + ' : ''}
+                  </span>
+                ))}
+              </div>
             </div>
+          )}
+
+          {/* Action Buttons */}
+          <div style={{
+            display: 'flex',
+            gap: '12px',
+            justifyContent: 'flex-end',
+            borderTop: `1px solid ${theme.colors.border}`,
+            paddingTop: '20px'
+          }}>
+            <button
+              onClick={handleSplitCancel}
+              style={{
+                padding: '12px 24px',
+                backgroundColor: 'transparent',
+                color: theme.colors.text,
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: theme.radius.md,
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSplitConfirm}
+              disabled={!splitInput.trim()}
+              style={{
+                padding: '12px 24px',
+                backgroundColor: !splitInput.trim() 
+                  ? theme.colors.textMuted 
+                  : theme.colors.primary,
+                color: !splitInput.trim()
+                  ? theme.colors.text
+                  : theme.colors.primaryForeground,
+                border: 'none',
+                borderRadius: theme.radius.md,
+                cursor: !splitInput.trim() 
+                  ? 'not-allowed' 
+                  : 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+                transition: 'all 0.2s ease',
+                opacity: !splitInput.trim() ? 0.6 : 1
+              }}
+              onMouseEnter={(e) => {
+                if (splitInput.trim()) {
+                  e.currentTarget.style.backgroundColor = theme.colors.primaryHover;
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (splitInput.trim()) {
+                  e.currentTarget.style.backgroundColor = theme.colors.primary;
+                }
+              }}
+            >
+              {splitInput.trim().split(/\s+/).filter(w => w.length > 0).length > 1 ? 'Split Word' : 'Update Word'}
+            </button>
           </div>
         </div>
-      )}
+      </LiquidModal>
 
       {/* Context Menu */}
       {renderContextMenu()}
