@@ -203,21 +203,24 @@ export class FFmpegOverlayWithClips {
       // Validate inputs
       await this.validateInputs(videoPath, clips, captions, outputPath);
       
-      // Get video metadata
-      const metadata = await this.getVideoMetadata(videoPath);
+      // Phase 0: Convert to MP4 if needed for consistent metadata handling
+      const normalizedVideoPath = await this.normalizeVideoFormat(videoPath, onProgress);
+      
+      // Get video metadata from normalized video
+      const metadata = await this.getVideoMetadata(normalizedVideoPath);
       console.log('Video metadata:', metadata);
       
-      // Phase 1: Replace audio if provided (0-15%)
-      let workingVideoPath = videoPath;
+      // Phase 1: Replace audio if provided (10-25%)
+      let workingVideoPath = normalizedVideoPath;
       if (replacementAudioPath) {
         console.log('=== PHASE 1: Audio Replacement ===');
         const audioReplacedPath = path.join(tempDir, 'video_with_new_audio.mp4');
         workingVideoPath = await this.replaceVideoAudio(
-          videoPath, 
+          normalizedVideoPath, 
           replacementAudioPath, 
           audioReplacedPath,
           (progress) => {
-            if (onProgress) onProgress(Math.min(15, (progress / 100) * 15));
+            if (onProgress) onProgress(Math.min(25, 10 + (progress / 100) * 15));
           }
         );
         console.log('Audio replacement completed:', workingVideoPath);
@@ -228,7 +231,7 @@ export class FFmpegOverlayWithClips {
         throw new Error('Rendering cancelled after audio replacement');
       }
       
-      // Phase 2: Generate clipped video segments (15-50%)
+      // Phase 2: Generate clipped video segments (25-60%)
       console.log('=== PHASE 2: Video Clipping ===');
       
       // Check if we can skip Phase 2 optimization: single clip spanning entire video duration
@@ -242,7 +245,7 @@ export class FFmpegOverlayWithClips {
         clippedVideoPath = workingVideoPath;
         
         // Update progress to Phase 2 completion
-        if (onProgress) onProgress(50);
+        if (onProgress) onProgress(60); // Accounting for Phase 0 (10%)
       } else {
         clippedVideoPath = await this.generateClippedVideo(
           workingVideoPath,
@@ -250,7 +253,7 @@ export class FFmpegOverlayWithClips {
           tempDir,
           metadata,
           (progress) => {
-            if (onProgress) onProgress(15 + Math.min(35, (progress / 100) * 35));
+            if (onProgress) onProgress(25 + Math.min(35, (progress / 100) * 35)); // 25-60%
           },
           exportSettings?.quality // Pass quality setting (will be overridden to 'high' in Phase 2)
         );
@@ -262,7 +265,7 @@ export class FFmpegOverlayWithClips {
         throw new Error('Rendering cancelled after video clipping');
       }
       
-      // Phase 3: Direct segment processing with overlays (50-100%)
+      // Phase 3: Direct segment processing with overlays (60-100%)
       console.log('=== PHASE 3: Direct Segment Processing with Overlays ===');
       
       // Adjust caption timing for the clipped timeline
@@ -364,7 +367,7 @@ export class FFmpegOverlayWithClips {
         
         // Progress update
         if (onProgress) {
-          const segmentProgress = 60 + ((i + 1) / segmentPaths.length) * 35; // 60-95%
+          const segmentProgress = 70 + ((i + 1) / segmentPaths.length) * 25; // 70-95%
           onProgress(Math.round(segmentProgress));
         }
         
@@ -1466,16 +1469,121 @@ export class FFmpegOverlayWithClips {
         const videoStream = metadata.streams.find((s: any) => s.codec_type === 'video');
         const audioStream = metadata.streams.find((s: any) => s.codec_type === 'audio');
 
+        // Validate that we have proper video dimensions
+        if (!videoStream?.width || !videoStream?.height) {
+          reject(new Error(`Invalid video dimensions: ${videoStream?.width}x${videoStream?.height}. Could not extract video metadata.`));
+          return;
+        }
+
         resolve({
           duration: metadata.format.duration || 0,
-          width: videoStream?.width || 1920,
-          height: videoStream?.height || 1080,
+          width: videoStream.width,
+          height: videoStream.height,
           framerate: videoStream?.r_frame_rate ? eval(videoStream.r_frame_rate) : 30,
           hasAudio: !!audioStream,
           bitrate: metadata.format.bit_rate || 0
         });
       });
     });
+  }
+
+  /**
+   * Phase 0: Normalize video format to MP4 for consistent metadata handling
+   * Converts MOV, AVI, and other formats to MP4 to ensure proper dimension extraction
+   */
+  private async normalizeVideoFormat(videoPath: string, onProgress?: (progress: number) => void): Promise<string> {
+    // Check if the file is already MP4
+    const fileExtension = path.extname(videoPath).toLowerCase();
+    if (fileExtension === '.mp4') {
+      console.log('=== PHASE 0: Video format check ===');
+      console.log(`Input file: ${path.basename(videoPath)} (${fileExtension.toUpperCase()})`);
+      console.log('Video is already MP4, skipping normalization');
+      console.log('Phase 0 complete: No conversion needed');
+      console.log('=== PHASE 0 COMPLETE ===');
+      return videoPath;
+    }
+    
+    console.log(`=== PHASE 0: Converting ${fileExtension} to MP4 for consistent metadata ===`);
+    console.log(`Input: ${path.basename(videoPath)} (${fileExtension.toUpperCase()})`);
+    
+    // Create normalized MP4 path in temp directory
+    const normalizedPath = path.join(this.currentTempDir!, `normalized_${Date.now()}.mp4`);
+    
+    console.log(`Output: ${path.basename(normalizedPath)} (MP4)`);
+    
+    return new Promise((resolve, reject) => {
+      const command = ffmpeg(videoPath)
+        .videoCodec('libx264')
+        .audioCodec('aac')
+        .outputOptions([
+          '-preset', 'fast',  // Fast encoding for normalization
+          '-crf', '23',       // Reasonable quality
+          '-movflags', '+faststart',
+          '-pix_fmt', 'yuv420p'
+        ])
+        .output(normalizedPath)
+        .on('start', (commandLine: string) => {
+          this.activeFFmpegProcesses.add(command);
+          console.log('Phase 0 conversion started with settings:');
+          console.log('  - Codec: libx264 (H.264)');
+          console.log('  - Audio: AAC');
+          console.log('  - Preset: fast');
+          console.log('  - CRF: 23 (high quality)');
+          console.log('  - Pixel format: yuv420p');
+          console.log(`Phase 0 FFmpeg command: ${commandLine}`);
+        })
+        .on('progress', (progress: any) => {
+          if (onProgress && progress.percent) {
+            // Phase 0 takes 10% of total progress
+            const phaseProgress = Math.min(10, (progress.percent / 100) * 10);
+            onProgress(Math.round(phaseProgress));
+          }
+          // Log detailed progress every 25%
+          if (progress.percent && progress.percent % 25 === 0) {
+            console.log(`Phase 0 progress: ${Math.round(progress.percent)}% - Converting to MP4...`);
+          }
+        })
+        .on('end', () => {
+          this.activeFFmpegProcesses.delete(command);
+          console.log(`Phase 0 complete: Successfully normalized ${fileExtension} to MP4`);
+          console.log(`Normalized file: ${normalizedPath}`);
+          console.log(`File size: ${this.getFileSizeString(normalizedPath)}`);
+          console.log('Phase 0 metadata normalization ready for overlay processing');
+          console.log('=== PHASE 0 COMPLETE ===');
+          resolve(normalizedPath);
+        })
+        .on('error', (err: any) => {
+          this.activeFFmpegProcesses.delete(command);
+          console.error('Phase 0 normalization failed:', err);
+          reject(err);
+        });
+      
+      // Handle cancellation
+      if (this.isCancelled) {
+        command.kill('SIGKILL');
+        reject(new Error('Normalization cancelled'));
+        return;
+      }
+      
+      command.run();
+    });
+  }
+
+  private getFileSizeString(filePath: string): string {
+    try {
+      const stats = fs.statSync(filePath);
+      const bytes = stats.size;
+      
+      if (bytes === 0) return '0 Bytes';
+      
+      const k = 1024;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    } catch (error) {
+      return 'Unknown size';
+    }
   }
 
   /**
