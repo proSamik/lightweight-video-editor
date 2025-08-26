@@ -271,11 +271,11 @@ export class WhisperService {
       let currentProcessingSpeed = '';
       let currentETA = '';
 
-      // Start a timer to provide regular progress updates
+      // Start a timer to provide regular progress updates only when no real progress is available
       if (onProgress) {
         progressTimer = setInterval(() => {
-          if (progressStarted && lastProgressUpdate < 85) {
-            // Gradually increase progress over time to show activity
+          if (progressStarted && lastProgressUpdate < 85 && !currentProcessingSpeed) {
+            // Only provide fake progress if we haven't received real progress indicators
             lastProgressUpdate = Math.min(lastProgressUpdate + 1, 85);
             onProgress(lastProgressUpdate, currentProcessingSpeed, currentETA);
           }
@@ -286,24 +286,25 @@ export class WhisperService {
         stdoutOutput += data.toString();
         const output = data.toString();
         
-        // Track progress based on Whisper's actual output patterns
-        if (onProgress) {
+        // Track progress based on Whisper's actual output patterns (fallback only)
+        if (onProgress && !currentProcessingSpeed) {
           // Look for segment processing indicators in stderr/stdout
           if (output.includes('segment')) {
             segmentCount++;
           }
           
-          // Estimate progress based on output activity
+          // Estimate progress based on output activity only if no real progress
           if (!progressStarted && output.length > 0) {
             progressStarted = true;
-            lastProgressUpdate = 10;
+            lastProgressUpdate = Math.max(lastProgressUpdate, 10);
             onProgress(lastProgressUpdate); // Start at 10%
           }
           
-          // Increment progress gradually as we see output
-          if (progressStarted) {
+          // Only increment progress gradually if we don't have real Whisper progress
+          if (progressStarted && !currentProcessingSpeed) {
             processedSegments++;
-            lastProgressUpdate = Math.min(10 + (processedSegments * 2), 80);
+            const estimatedProgress = Math.min(10 + (processedSegments * 2), 80);
+            lastProgressUpdate = Math.max(lastProgressUpdate, estimatedProgress);
             onProgress(lastProgressUpdate, currentProcessingSpeed, currentETA);
           }
         }
@@ -321,11 +322,9 @@ export class WhisperService {
           if (progressMatch) {
             const [, progressPercent, elapsed, remaining, framesPerSec] = progressMatch;
             
-            // Update progress percentage
+            // Update progress percentage with real Whisper progress
             const newProgress = parseInt(progressPercent);
-            if (newProgress > lastProgressUpdate) {
-              lastProgressUpdate = newProgress;
-            }
+            lastProgressUpdate = newProgress;
             
             // Format ETA
             currentETA = remaining.trim();
@@ -337,11 +336,11 @@ export class WhisperService {
             return; // Skip other progress logic when we have detailed progress
           }
 
-          // Fallback: Look for processing speed information in output
+          // Fallback: Look for processing speed information in output (but don't update progress)
           const speedMatch = output.match(/(\d+\.\d+)x\s+realtime/i) || 
                            output.match(/(\d+\.\d+)\s*fps/i) ||
                            output.match(/(\d+\.\d+)\s*frames?\s*\/\s*sec/i);
-          if (speedMatch) {
+          if (speedMatch && !currentProcessingSpeed) {
             if (output.includes('realtime')) {
               currentProcessingSpeed = `${speedMatch[1]}x realtime`;
             } else {
@@ -349,22 +348,24 @@ export class WhisperService {
             }
           }
 
-          // Look for Whisper's actual progress indicators
-          if (output.includes('Loading model') || output.includes('Detecting language')) {
-            lastProgressUpdate = 15;
-            onProgress(lastProgressUpdate, currentProcessingSpeed, currentETA);
-          } else if (output.includes('transcribing')) {
-            lastProgressUpdate = 25;
-            onProgress(lastProgressUpdate, currentProcessingSpeed, currentETA);
-          } else if (output.includes('segment') || output.includes('words')) {
-            processedSegments++;
-            lastProgressUpdate = Math.min(25 + (processedSegments * 3), 85);
-            onProgress(lastProgressUpdate, currentProcessingSpeed, currentETA);
-          } else if (output.includes('Processing')) {
-            // Increment progress for any processing activity
-            processedSegments++;
-            lastProgressUpdate = Math.min(25 + (processedSegments * 2), 85);
-            onProgress(lastProgressUpdate, currentProcessingSpeed, currentETA);
+          // Only use fallback progress indicators if we don't have real progress yet
+          if (!currentProcessingSpeed) {
+            if (output.includes('Loading model') || output.includes('Detecting language')) {
+              lastProgressUpdate = Math.max(lastProgressUpdate, 15);
+              onProgress(lastProgressUpdate, currentProcessingSpeed, currentETA);
+            } else if (output.includes('transcribing')) {
+              lastProgressUpdate = Math.max(lastProgressUpdate, 25);
+              onProgress(lastProgressUpdate, currentProcessingSpeed, currentETA);
+            } else if (output.includes('segment') || output.includes('words')) {
+              processedSegments++;
+              lastProgressUpdate = Math.max(lastProgressUpdate, Math.min(25 + (processedSegments * 3), 85));
+              onProgress(lastProgressUpdate, currentProcessingSpeed, currentETA);
+            } else if (output.includes('Processing')) {
+              // Increment progress for any processing activity
+              processedSegments++;
+              lastProgressUpdate = Math.max(lastProgressUpdate, Math.min(25 + (processedSegments * 2), 85));
+              onProgress(lastProgressUpdate, currentProcessingSpeed, currentETA);
+            }
           }
         }
       });
