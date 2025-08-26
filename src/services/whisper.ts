@@ -270,11 +270,12 @@ export class WhisperService {
       let lastProgressUpdate = 0;
       let currentProcessingSpeed = '';
       let currentETA = '';
+      let hasRealProgress = false;
 
       // Start a timer to provide regular progress updates only when no real progress is available
       if (onProgress) {
         progressTimer = setInterval(() => {
-          if (progressStarted && lastProgressUpdate < 85 && !currentProcessingSpeed) {
+          if (progressStarted && lastProgressUpdate < 85 && !hasRealProgress) {
             // Only provide fake progress if we haven't received real progress indicators
             lastProgressUpdate = Math.min(lastProgressUpdate + 1, 85);
             onProgress(lastProgressUpdate, currentProcessingSpeed, currentETA);
@@ -287,7 +288,7 @@ export class WhisperService {
         const output = data.toString();
         
         // Track progress based on Whisper's actual output patterns (fallback only)
-        if (onProgress && !currentProcessingSpeed) {
+        if (onProgress && !hasRealProgress) {
           // Look for segment processing indicators in stderr/stdout
           if (output.includes('segment')) {
             segmentCount++;
@@ -301,7 +302,7 @@ export class WhisperService {
           }
           
           // Only increment progress gradually if we don't have real Whisper progress
-          if (progressStarted && !currentProcessingSpeed) {
+          if (progressStarted && !hasRealProgress) {
             processedSegments++;
             const estimatedProgress = Math.min(10 + (processedSegments * 2), 80);
             lastProgressUpdate = Math.max(lastProgressUpdate, estimatedProgress);
@@ -320,7 +321,10 @@ export class WhisperService {
           // Look for progress bar with ETA: 44%|████▎     | 29640/67955 [08:40<10:53, 58.64frames/s]
           const progressMatch = output.match(/(\d+)%\|[^|]+\|\s*\d+\/\d+\s*\[([^<]+)<([^,]+),\s*([\d.]+)frames?\/s\]/i);
           if (progressMatch) {
-            const [, progressPercent, elapsed, remaining, framesPerSec] = progressMatch;
+            const [, progressPercent, , remaining, framesPerSec] = progressMatch;
+            
+            // Mark that we have real progress to stop fallback systems
+            hasRealProgress = true;
             
             // Update progress percentage with real Whisper progress
             const newProgress = parseInt(progressPercent);
@@ -340,7 +344,7 @@ export class WhisperService {
           const speedMatch = output.match(/(\d+\.\d+)x\s+realtime/i) || 
                            output.match(/(\d+\.\d+)\s*fps/i) ||
                            output.match(/(\d+\.\d+)\s*frames?\s*\/\s*sec/i);
-          if (speedMatch && !currentProcessingSpeed) {
+          if (speedMatch && !hasRealProgress) {
             if (output.includes('realtime')) {
               currentProcessingSpeed = `${speedMatch[1]}x realtime`;
             } else {
@@ -349,7 +353,7 @@ export class WhisperService {
           }
 
           // Only use fallback progress indicators if we don't have real progress yet
-          if (!currentProcessingSpeed) {
+          if (!hasRealProgress) {
             if (output.includes('Loading model') || output.includes('Detecting language')) {
               lastProgressUpdate = Math.max(lastProgressUpdate, 15);
               onProgress(lastProgressUpdate, currentProcessingSpeed, currentETA);
@@ -464,8 +468,7 @@ export class WhisperService {
         return;
       }
 
-      // Download model by running whisper with a dummy command
-      const dummyAudio = path.join(__dirname, 'dummy.wav');
+      // Download model by running whisper with help command
       
       // Create a 1-second silent audio file for model download
       const args = [
@@ -475,7 +478,7 @@ export class WhisperService {
 
       const whisperProcess = spawn(this.whisperPath, args);
       
-      whisperProcess.on('close', (code) => {
+      whisperProcess.on('close', () => {
         resolve();
       });
 
@@ -568,24 +571,11 @@ export class WhisperService {
       });
     });
 
-    // Adjust timing for filtered segments if needed
-    const adjustedSegments = filteredSegments.map(segment => {
-      // Find which selection this segment belongs to
-      const matchingSelection = timelineSelections.find(selection => {
-        const segmentStart = segment.start; // Already in milliseconds
-        const segmentEnd = segment.end; // Already in milliseconds
-        const selectionStart = selection.startTime; // Already in milliseconds
-        const selectionEnd = selection.endTime; // Already in milliseconds
-        
-        return (segmentStart < selectionEnd && segmentEnd > selectionStart);
-      });
-
-      // Keep original timing - user selected these specific time ranges
-      return segment;
-    });
+    // Keep original timing - user selected these specific time ranges
+    const adjustedSegments = filteredSegments;
 
     // Return as array of TranscriptionResult objects, one for each timeline selection
-    return timelineSelections.map(selection => ({
+    return timelineSelections.map(() => ({
       text: adjustedSegments.map(s => s.text).join(' '),
       segments: adjustedSegments
     }));
