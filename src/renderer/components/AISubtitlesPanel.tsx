@@ -84,6 +84,12 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [showHelpTooltip, setShowHelpTooltip] = useState(false);
   const [searchHighlight, setSearchHighlight] = useState<{frameId: string, wordIndex: number} | null>(null);
+  const [splitModal, setSplitModal] = useState<{show: boolean, wordId: string, originalText: string}>({
+    show: false,
+    wordId: '',
+    originalText: ''
+  });
+  const [splitInput, setSplitInput] = useState('');
   
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -494,14 +500,60 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
         setIsShiftPressed(true);
       }
       if (e.key === 'Escape') {
-        setContextMenu(prev => ({ ...prev, show: false }));
-        setEditingWordId(null);
+        if (splitModal.show) {
+          handleSplitCancel();
+        } else {
+          setContextMenu(prev => ({ ...prev, show: false }));
+          setEditingWordId(null);
+        }
       }
       // Search and replace shortcut
       if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
         e.preventDefault();
         setIsSearchOpen(true);
       }
+
+      // Context menu shortcuts
+      if (selectedWordIds.size > 0) {
+        const selectedWordId = Array.from(selectedWordIds)[0];
+        const frame = renderFrames.find(f => f.words.some(w => w.id === selectedWordId));
+        const word = frame?.words.find(w => w.id === selectedWordId);
+
+        if (word) {
+          if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
+            e.preventDefault();
+            navigator.clipboard.writeText(word.word);
+          } else if (e.key === 'F2') {
+            e.preventDefault();
+            handleWordDoubleClick(selectedWordId, word.word);
+          } else if ((e.metaKey || e.ctrlKey) && e.key === 'd') {
+            e.preventDefault();
+            handleSplitWord(selectedWordId);
+          } else if ((e.metaKey || e.ctrlKey) && e.key === 'm' && selectedWordIds.size > 1) {
+            e.preventDefault();
+            handleCombineWords(Array.from(selectedWordIds));
+          } else if ((e.metaKey || e.ctrlKey) && e.key === 'h') {
+            e.preventDefault();
+            if (word.editState === 'censored') {
+              updateWordInFrames(selectedWordId, word.originalWord, 'normal');
+            } else {
+              const censoredWord = word.originalWord.length <= 2 
+                ? '**' 
+                : word.originalWord[0] + '*'.repeat(Math.max(2, word.originalWord.length - 1));
+              updateWordInFrames(selectedWordId, censoredWord, 'censored');
+            }
+          } else if ((e.metaKey || e.ctrlKey) && e.key === 'r') {
+            e.preventDefault();
+            if (word.editState === 'removedCaption') {
+              const textToRestore = word.previousWord || word.word;
+              updateWordInFrames(selectedWordId, textToRestore, 'normal');
+            } else {
+              updateWordInFramesWithPrevious(selectedWordId, word.word, 'removedCaption', word.word);
+            }
+          }
+        }
+      }
+
       if (e.key === 'Enter' && !editingWordId && selectedWordIds.size === 1) {
         const currentTime = Date.now();
         const timeDiff = currentTime - lastEnterTime;
@@ -549,7 +601,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [editingWordId, selectedWordIds, aiSubtitleData, enterPressCount, lastEnterTime, isSearchOpen]);
+  }, [editingWordId, selectedWordIds, aiSubtitleData, enterPressCount, lastEnterTime, isSearchOpen, splitModal.show]);
 
   // Close context menu when clicking outside
   useEffect(() => {
@@ -835,40 +887,107 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     setSelectedWordIds(new Set([combinedWord.id]));
   };
 
-  // Handle splitting a word into individual character words
+  // Handle splitting a word into multiple words
   const handleSplitWord = (wordId: string) => {
-    if (!aiSubtitleData) return;
+    console.log('handleSplitWord called with wordId:', wordId);
+    
+    if (!aiSubtitleData) {
+      console.log('No aiSubtitleData');
+      return;
+    }
 
     // Find the frame containing this word
     const frameWithWord = renderFrames.find(frame => 
       frame.words.some(w => w.id === wordId)
     );
 
-    if (!frameWithWord) return;
+    if (!frameWithWord) {
+      console.log('No frame found for word');
+      return;
+    }
 
     const word = frameWithWord.words.find(w => w.id === wordId);
-    if (!word || word.word.length <= 1) return; // Can't split single character or empty words
-
-    const wordText = word.word.trim();
-    const characters = wordText.split('');
+    if (!word) {
+      console.log('No word found');
+      return;
+    }
     
-    if (characters.length <= 1) return; // Nothing to split
+    console.log('Found word to split:', word.word);
 
-    // Calculate timing for each character
+    // Show split modal
+    const originalText = word.word;
+    setSplitInput(originalText);
+    setSplitModal({
+      show: true,
+      wordId: wordId,
+      originalText: originalText
+    });
+  };
+
+  // Handle split modal confirm
+  const handleSplitConfirm = () => {
+    const { wordId } = splitModal;
+    const userInput = splitInput.trim();
+    
+    if (!userInput || userInput === splitModal.originalText.trim()) {
+      // User cancelled or didn't change anything
+      setSplitModal({ show: false, wordId: '', originalText: '' });
+      setSplitInput('');
+      return;
+    }
+
+    // Find the word and frame again
+    const frameWithWord = renderFrames.find(frame => 
+      frame.words.some(w => w.id === wordId)
+    );
+    
+    if (!frameWithWord || !aiSubtitleData) {
+      setSplitModal({ show: false, wordId: '', originalText: '' });
+      setSplitInput('');
+      return;
+    }
+
+    const word = frameWithWord.words.find(w => w.id === wordId);
+    if (!word) {
+      setSplitModal({ show: false, wordId: '', originalText: '' });
+      setSplitInput('');
+      return;
+    }
+
+    // Split the input by spaces
+    const splitWords = userInput.split(/\s+/).filter(w => w.length > 0);
+    
+    if (splitWords.length <= 1) {
+      // Nothing to split or only one word
+      setSplitModal({ show: false, wordId: '', originalText: '' });
+      setSplitInput('');
+      return;
+    }
+
+    // Calculate timing for each word based on character length
     const totalDuration = word.end - word.start;
-    const charDuration = totalDuration / characters.length;
+    const totalChars = splitWords.reduce((sum, w) => sum + w.length, 0);
+    
+    let currentStart = word.start;
+    const newWordSegments: WordSegment[] = [];
 
-    // Create individual character words
-    const splitWords: WordSegment[] = characters.map((char, index) => ({
-      id: `${wordId}-split-${index}-${Date.now()}`,
-      word: char,
-      originalWord: char,
-      start: word.start + (charDuration * index),
-      end: word.start + (charDuration * (index + 1)),
-      editState: word.editState || 'normal',
-      isKeyword: word.isKeyword,
-      isPause: false
-    }));
+    splitWords.forEach((splitWord, index) => {
+      const wordDuration = totalChars > 0 ? (splitWord.length / totalChars) * totalDuration : totalDuration / splitWords.length;
+      const wordEnd = index === splitWords.length - 1 ? word.end : currentStart + wordDuration;
+
+      newWordSegments.push({
+        id: `${wordId}-split-${index}-${Date.now()}`,
+        word: splitWord,
+        originalWord: splitWord,
+        start: currentStart,
+        end: wordEnd,
+        editState: word.editState || 'normal',
+        isKeyword: word.isKeyword,
+        isPause: false
+      });
+
+      currentStart = wordEnd;
+    });
 
     // Update the frame with split words
     const updatedFrames = aiSubtitleData.frames.map(frame => {
@@ -881,7 +1000,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
       // Replace the original word with split words
       const newWords = [
         ...frame.words.slice(0, wordIndex),
-        ...splitWords,
+        ...newWordSegments,
         ...frame.words.slice(wordIndex + 1)
       ];
 
@@ -900,7 +1019,17 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     updateAISubtitleData(newAIData);
 
     // Select the first split word
-    setSelectedWordIds(new Set([splitWords[0].id]));
+    setSelectedWordIds(new Set([newWordSegments[0].id]));
+
+    // Close modal
+    setSplitModal({ show: false, wordId: '', originalText: '' });
+    setSplitInput('');
+  };
+
+  // Handle split modal cancel
+  const handleSplitCancel = () => {
+    setSplitModal({ show: false, wordId: '', originalText: '' });
+    setSplitInput('');
   };
 
   // Context menu actions
@@ -1063,15 +1192,15 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     const isCensored = word.editState === 'censored';
     const isRemovedCaption = word.editState === 'removedCaption';
 
-    const canSplit = !isMultiSelect && word.word.trim().length > 1;
+    const canSplit = !isMultiSelect;
 
     const menuItems = [
-      { icon: Copy, label: 'Copy', action: 'copy' },
-      { icon: Edit3, label: 'Edit', action: 'edit' },
-      ...(isMultiSelect ? [{ icon: Edit3, label: 'Combine', action: 'combine', color: theme.colors.accent }] : []),
-      ...(canSplit ? [{ icon: Scissors, label: 'Split', action: 'split', color: theme.colors.accent }] : []),
-      { icon: Hash, label: isCensored ? 'Uncensor' : 'Censor', action: 'censor', color: theme.colors.warning },
-      { icon: FileX, label: isRemovedCaption ? 'Restore Caption' : 'Remove Caption', action: 'removeCaption', color: theme.colors.textSecondary }
+      { icon: Copy, label: 'Copy', action: 'copy', shortcut: 'Ctrl+C' },
+      { icon: Edit3, label: 'Edit', action: 'edit', shortcut: 'F2' },
+      ...(isMultiSelect ? [{ icon: Edit3, label: 'Combine', action: 'combine', color: theme.colors.accent, shortcut: 'Ctrl+M' }] : []),
+      ...(canSplit ? [{ icon: Scissors, label: 'Split', action: 'split', color: theme.colors.accent, shortcut: 'Ctrl+D' }] : []),
+      { icon: Hash, label: isCensored ? 'Uncensor' : 'Censor', action: 'censor', color: theme.colors.warning, shortcut: 'Ctrl+H' },
+      { icon: FileX, label: isRemovedCaption ? 'Restore Caption' : 'Remove Caption', action: 'removeCaption', color: theme.colors.textSecondary, shortcut: 'Ctrl+R' }
     ];
 
     return (
@@ -1103,7 +1232,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
               borderRadius: '4px',
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
+              justifyContent: 'space-between',
               fontSize: '14px',
               transition: 'background-color 0.2s ease'
             }}
@@ -1114,8 +1243,19 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
               e.currentTarget.style.backgroundColor = 'transparent';
             }}
           >
-            <item.icon size={14} />
-            {item.label}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <item.icon size={14} />
+              {item.label}
+            </div>
+            {item.shortcut && (
+              <span style={{
+                fontSize: '12px',
+                color: theme.colors.textMuted,
+                fontFamily: 'monospace'
+              }}>
+                {item.shortcut}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -1191,6 +1331,12 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
               >
                 <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Keyboard Shortcuts:</div>
                 <div>• <strong>Ctrl/Cmd + F:</strong> Search & Replace</div>
+                <div>• <strong>Ctrl/Cmd + C:</strong> Copy selected word</div>
+                <div>• <strong>F2:</strong> Edit selected word</div>
+                <div>• <strong>Ctrl/Cmd + D:</strong> Split selected word</div>
+                <div>• <strong>Ctrl/Cmd + M:</strong> Combine selected words</div>
+                <div>• <strong>Ctrl/Cmd + H:</strong> Censor/Uncensor word</div>
+                <div>• <strong>Ctrl/Cmd + R:</strong> Remove/Restore caption</div>
                 <div>• <strong>Single click:</strong> Select word & show context menu</div>
                 <div>• <strong>Double click:</strong> Edit word</div>
                 <div>• <strong>Shift + click:</strong> Multi-select words</div>
@@ -1417,6 +1563,124 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
           </div>
         ))}
       </div>
+
+      {/* Split Word Modal */}
+      {splitModal.show && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2000
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              handleSplitCancel();
+            }
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: theme.colors.surface,
+              borderRadius: '8px',
+              padding: '24px',
+              minWidth: '400px',
+              maxWidth: '500px',
+              border: `1px solid ${theme.colors.border}`,
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
+            }}
+          >
+            <h3 style={{
+              margin: '0 0 16px 0',
+              fontSize: '18px',
+              fontWeight: '600',
+              color: theme.colors.text
+            }}>
+              Split Word
+            </h3>
+            
+            <p style={{
+              margin: '0 0 16px 0',
+              fontSize: '14px',
+              color: theme.colors.textSecondary
+            }}>
+              Split "<strong>{splitModal.originalText}</strong>" into multiple words:
+              <br />
+              <small>(Enter words separated by spaces)</small>
+            </p>
+
+            <input
+              type="text"
+              value={splitInput}
+              onChange={(e) => setSplitInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleSplitConfirm();
+                } else if (e.key === 'Escape') {
+                  e.preventDefault();
+                  handleSplitCancel();
+                }
+              }}
+              style={{
+                width: '100%',
+                padding: '12px',
+                fontSize: '14px',
+                color: theme.colors.text,
+                backgroundColor: theme.colors.input.background,
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: '6px',
+                outline: 'none',
+                marginBottom: '20px'
+              }}
+              placeholder={splitModal.originalText}
+              autoFocus
+            />
+
+            <div style={{
+              display: 'flex',
+              gap: '12px',
+              justifyContent: 'flex-end'
+            }}>
+              <button
+                onClick={handleSplitCancel}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: 'transparent',
+                  color: theme.colors.textSecondary,
+                  border: `1px solid ${theme.colors.border}`,
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '14px'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSplitConfirm}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: theme.colors.primary,
+                  color: theme.colors.primaryForeground,
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500'
+                }}
+              >
+                Split
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Context Menu */}
       {renderContextMenu()}
