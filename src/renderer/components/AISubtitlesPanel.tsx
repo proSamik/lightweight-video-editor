@@ -7,7 +7,7 @@ import {
   WordEditState,
   VideoClip,
 } from '../../types';
-import { Copy, Edit3, Hash, FileX, ChevronUp, ChevronDown, HelpCircle } from 'lucide-react';
+import { Copy, Edit3, Hash, FileX, ChevronUp, ChevronDown, HelpCircle, Scissors } from 'lucide-react';
 import CompactSearchReplace from './CompactSearchReplace';
 import { formatTimeHHMMSS } from '../../utils/timeFormatting';
 
@@ -835,6 +835,74 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     setSelectedWordIds(new Set([combinedWord.id]));
   };
 
+  // Handle splitting a word into individual character words
+  const handleSplitWord = (wordId: string) => {
+    if (!aiSubtitleData) return;
+
+    // Find the frame containing this word
+    const frameWithWord = renderFrames.find(frame => 
+      frame.words.some(w => w.id === wordId)
+    );
+
+    if (!frameWithWord) return;
+
+    const word = frameWithWord.words.find(w => w.id === wordId);
+    if (!word || word.word.length <= 1) return; // Can't split single character or empty words
+
+    const wordText = word.word.trim();
+    const characters = wordText.split('');
+    
+    if (characters.length <= 1) return; // Nothing to split
+
+    // Calculate timing for each character
+    const totalDuration = word.end - word.start;
+    const charDuration = totalDuration / characters.length;
+
+    // Create individual character words
+    const splitWords: WordSegment[] = characters.map((char, index) => ({
+      id: `${wordId}-split-${index}-${Date.now()}`,
+      word: char,
+      originalWord: char,
+      start: word.start + (charDuration * index),
+      end: word.start + (charDuration * (index + 1)),
+      editState: word.editState || 'normal',
+      isKeyword: word.isKeyword,
+      isPause: false
+    }));
+
+    // Update the frame with split words
+    const updatedFrames = aiSubtitleData.frames.map(frame => {
+      if (frame.id !== frameWithWord.id) return frame;
+
+      // Find the original word index
+      const wordIndex = frame.words.findIndex(w => w.id === wordId);
+      if (wordIndex === -1) return frame;
+
+      // Replace the original word with split words
+      const newWords = [
+        ...frame.words.slice(0, wordIndex),
+        ...splitWords,
+        ...frame.words.slice(wordIndex + 1)
+      ];
+
+      return {
+        ...frame,
+        words: newWords
+      };
+    });
+
+    const newAIData = {
+      ...aiSubtitleData,
+      frames: updatedFrames,
+      lastModified: Date.now()
+    };
+    
+    updateAISubtitleData(newAIData);
+
+    // Select the first split word
+    setSelectedWordIds(new Set([splitWords[0].id]));
+  };
+
   // Context menu actions
   const handleContextAction = (action: string) => {
     if (!contextMenu.wordId || !aiSubtitleData) return;
@@ -881,6 +949,9 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
           break;
         case 'combine':
           handleCombineWords(Array.from(selectedWordIds));
+          break;
+        case 'split':
+          handleSplitWord(wordId);
           break;
       }
     });
@@ -992,10 +1063,13 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
     const isCensored = word.editState === 'censored';
     const isRemovedCaption = word.editState === 'removedCaption';
 
+    const canSplit = !isMultiSelect && word.word.trim().length > 1;
+
     const menuItems = [
       { icon: Copy, label: 'Copy', action: 'copy' },
       { icon: Edit3, label: 'Edit', action: 'edit' },
       ...(isMultiSelect ? [{ icon: Edit3, label: 'Combine', action: 'combine', color: theme.colors.accent }] : []),
+      ...(canSplit ? [{ icon: Scissors, label: 'Split', action: 'split', color: theme.colors.accent }] : []),
       { icon: Hash, label: isCensored ? 'Uncensor' : 'Censor', action: 'censor', color: theme.colors.warning },
       { icon: FileX, label: isRemovedCaption ? 'Restore Caption' : 'Remove Caption', action: 'removeCaption', color: theme.colors.textSecondary }
     ];
