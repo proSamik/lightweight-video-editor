@@ -73,8 +73,6 @@ This will start both the main process and renderer development servers.
 npm run build          # Build both main and renderer
 npm run build-main     # Build Electron main process only
 npm run build-renderer # Build React renderer only
-npm run watch-main     # Watch main process changes
-npm run dev-renderer   # Start webpack dev server for renderer
 ```
 
 ## Building Apps for All Platforms
