@@ -66,15 +66,6 @@ npm run build
 npm start
 ```
 
-## Development
-
-For development with hot reload:
-
-```bash
-# Start the development server
-npm run dev
-```
-
 This will start both the main process and renderer development servers.
 
 ### Build Commands
