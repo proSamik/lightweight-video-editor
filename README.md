@@ -95,30 +95,18 @@ npm run dev-renderer   # Start webpack dev server for renderer
 
 #### macOS
 ```bash
-# Automated build script
-./scripts/build-mac.sh
-
 # Manual build
 npm run dist:mac
 ```
 
 #### Linux
 ```bash
-# Automated build script
-./scripts/build-linux.sh
-
 # Manual build
 npm run dist:linux
 ```
 
 #### Windows
 ```bash
-# Automated build script (run in Command Prompt)
-scripts\build-windows.bat
-
-# Automated build script (run in PowerShell)
-scripts\build-windows.ps1
-
 # Manual build
 npm run dist:win
 ```
@@ -134,8 +122,8 @@ npm run dist:all
 #### macOS
 - **App Bundles**: `dist/mac/` and `dist/mac-arm64/`
 - **DMG Installers**: 
-  - Intel Mac: `dist/Lightweight Video Editor-1.0.0.dmg` (288MB)
-  - Apple Silicon: `dist/Lightweight Video Editor-1.0.0-arm64.dmg` (594MB)
+  - Intel Mac: `dist/Lightweight Video Editor-1.0.0.dmg` 
+  - Apple Silicon: `dist/Lightweight Video Editor-1.0.0-arm64.dmg` 
 
 #### Linux
 - **AppImage**: `dist/Lightweight Video Editor-1.0.0.AppImage`
@@ -191,10 +179,10 @@ npm run dist:all
 ## Architecture
 
 - **Frontend**: Electron + TypeScript + React
-- **Video Processing**: FFmpeg with canvas-based rendering fallback
+- **Video Processing**: FFmpeg
 - **Transcription**: OpenAI Whisper (local) with word-level timestamps
 - **Rendering**: Canvas-based caption rendering for pixel-perfect output
-- **Platform**: macOS only
+- **Platform**: macOS first, then others
 
 ## Styling Options
 
