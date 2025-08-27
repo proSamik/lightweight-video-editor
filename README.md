@@ -43,7 +43,7 @@ brew install ffmpeg
 pip install openai-whisper
 ```
 
-## Installation
+## Installation & Local run
 
 1. Clone the repository:
 ```bash
