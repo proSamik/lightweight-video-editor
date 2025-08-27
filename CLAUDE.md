@@ -17,23 +17,44 @@ src/
 │   ├── index.tsx          # Entry point
 │   ├── index.html         # HTML template
 │   ├── global.d.ts        # Type definitions
+│   ├── contexts/          # React contexts
+│   │   └── ThemeContext.tsx       # Theme management context
+│   ├── design/            # Design system
+│   │   └── tokens.ts              # Design tokens and theming
+│   ├── data/              # Static data
+│   │   └── captionPresets.ts      # Predefined caption styling presets
 │   └── components/        # React components
 │       ├── VideoPanel.tsx         # Video preview with canvas overlay
-│       ├── TimelinePanel.tsx      # Caption timeline interface
+│       ├── UnifiedTimeline.tsx    # Combined clip and subtitle timeline interface
 │       ├── StylingPanel.tsx       # Caption styling controls
 │       ├── TabbedRightPanel.tsx   # Tabbed interface for styling and AI panels
 │       ├── TranscriptionModal.tsx # In-panel transcription progress modal
-│       └── LoadingScreen.tsx      # Loading states
+│       ├── UpdateModal.tsx        # Auto-update interface with changelog
+│       ├── DependencyInstallModal.tsx # Automatic dependency installation
+│       ├── ProjectManager.tsx     # Project save/load interface
+│       ├── AISubtitlesPanel.tsx   # Advanced AI subtitle editing panel
+│       ├── LoadingScreen.tsx      # Loading states
+│       └── ui/                    # Reusable UI components
+│           ├── LiquidModal.tsx    # Animated modal with liquid design
+│           ├── Button.tsx         # Styled button component
+│           ├── Card.tsx           # Card layout component
+│           └── ...               # Other UI primitives
 ├── services/              # Core business logic
 │   ├── ffmpeg.ts          # Video processing via FFmpeg
-│   ├── whisper.ts         # Audio transcription via OpenAI Whisper
+│   ├── whisper.ts         # Audio transcription via OpenAI Whisper with GPU detection
 │   ├── videoEditor.ts     # Video editing operations (word deletions)
-│   ├── canvasRenderer.ts  # Canvas-based caption rendering
 │   ├── ffmpegOverlayRenderer.ts # FFmpeg-based overlay rendering with timing precision
 │   ├── ffmpegOverlayWithClips.ts # Advanced video rendering with clipping support
 │   ├── srtExporter.ts     # SRT subtitle export for YouTube
 │   ├── aiService.ts       # AI content generation (descriptions/titles)
-│   └── settingsManager.ts # Persistent settings storage
+│   ├── settingsManager.ts # Persistent settings storage
+│   ├── projectManager.ts  # Project persistence and management
+│   ├── clipManager.ts     # Video clip editing and timeline management
+│   ├── updateService.ts   # Auto-update system with VS Code-like UX
+│   ├── dependencyInstaller.ts # Automatic FFmpeg/Whisper installation
+│   └── deviceDetector.ts  # GPU acceleration detection (CUDA/MPS/CPU)
+├── utils/                 # Utility functions
+│   └── timeFormatting.ts  # Time display and formatting utilities
 └── types/
     └── index.ts           # TypeScript type definitions
 ```
@@ -64,24 +85,83 @@ npm run dev-renderer  # Start webpack dev server for renderer
 
 ### Core Data Flow
 
-1. **Video Import**: Drag & drop or file selection → video metadata extraction
-2. **Transcription Pipeline**: Video → Audio extraction → Whisper transcription → Caption segments
-3. **Caption Editing**: Real-time styling updates with undo/redo system
-4. **Video Export**: Canvas-based caption rendering → FFmpeg video encoding
+1. **Application Startup**: 
+   - System dependency detection (FFmpeg/Whisper availability)
+   - GPU device detection and compatibility testing (CUDA/MPS/CPU)
+   - Auto-update checks with VS Code-like notifications
+   - Recent project loading and UI initialization
+
+2. **Video Import**: 
+   - Drag & drop or file selection → video metadata extraction
+   - Automatic clip timeline initialization
+   - Project structure setup with persistent storage
+
+3. **Transcription Pipeline**: 
+   - Video → Audio extraction with device-optimized processing
+   - Hardware-accelerated Whisper transcription with progress tracking
+   - Word-level timestamp generation → AI subtitle frame creation
+   - Unified timeline population with intelligent track assignment
+
+4. **Caption & Clip Editing**: 
+   - Real-time styling updates with unified timeline interface
+   - Clip management with automatic subtitle frame splitting
+   - Word-level editing with advanced edit states (censored, silenced, removed)
+   - Undo/redo system for all operations
+
+5. **Video Export**: 
+   - Export mode selection (complete, clipped, audio replacement, subtitles only)
+   - FFmpeg-based overlay rendering with precise timing controls
+   - Multi-threaded processing with progress tracking
+   - Automatic cleanup of temporary files
 
 ### Key Services
+
+#### UpdateService (`src/services/updateService.ts`)
+- VS Code-like auto-updater with non-intrusive notifications
+- Automatic update detection with changelog support
+- Background downloads with progress tracking
+- Install-on-quit functionality with user control
+
+#### DependencyInstaller (`src/services/dependencyInstaller.ts`)
+- Cross-platform automatic installation of FFmpeg and Whisper
+- Platform detection (macOS/Homebrew, Linux/APT/YUM/DNF, Windows/portable)
+- Real-time installation progress tracking with detailed status messages
+- System capability assessment before installation attempts
+
+#### DeviceDetector (`src/services/deviceDetector.ts`)
+- Intelligent GPU acceleration detection for Whisper transcription
+- CUDA, MPS (Apple Silicon), and CPU compatibility testing
+- Real-world Whisper compatibility validation for hardware acceleration
+- Automatic fallback to CPU when GPU acceleration is unavailable
+- Performance optimization with up to 10x transcription speed improvements
+
+#### ClipManager (`src/services/clipManager.ts`)
+- Video clip editing and timeline management
+- Clip splitting, deletion, and timeline reconstruction
+- Time conversion between original and effective (clipped) timelines
+- Integration with project persistence (.lvep files)
+- Automatic subtitle frame adjustment when clips are modified
+
+#### ProjectManager (`src/services/projectManager.ts`)
+- Persistent project storage with comprehensive metadata
+- Recent projects tracking with visual previews
+- Project operations (save, load, delete) with user confirmations
+- Integration with clip timeline and subtitle data
 
 #### FFmpegService (`src/services/ffmpeg.ts`)
 - Singleton service for video processing
 - Auto-detects FFmpeg installation paths (macOS homebrew, system PATH)
 - Handles video metadata extraction, audio extraction, and final video rendering
-- Streamlined architecture with removed legacy Canvas and GPU renderers
+- Streamlined architecture with intelligent overlap detection
 
 #### WhisperService (`src/services/whisper.ts`)
-- Interfaces with OpenAI Whisper for audio transcription
-- Provides word-level timestamps for karaoke-style captions
+- Hardware-accelerated audio transcription with OpenAI Whisper
+- Automatic device detection and optimal device selection (CUDA/MPS/CPU)
+- Word-level timestamp generation for karaoke-style captions
 - Supports multiple Whisper models (tiny, base, small, medium, large)
+- Real-world compatibility testing for MPS devices with Whisper
 - Auto-detects Whisper installation and handles model downloads
+- Enhanced progress tracking with speed estimates and ETA calculations
 
 #### VideoEditor (`src/services/videoEditor.ts`)
 - Handles complex video editing operations
@@ -113,13 +193,15 @@ npm run dev-renderer  # Start webpack dev server for renderer
 ### UI Components
 
 #### App.tsx - Main Application State
-- Manages global state: video file, captions, selection, history
+- Manages global state: video file, captions, clips, selection, history
 - Implements undo/redo system with keyboard shortcuts (Cmd/Ctrl+Z)
-- Handles dependency checking (FFmpeg/Whisper availability)
-- Coordinates video processing pipeline
+- Handles dependency checking with automatic installation prompts
+- Coordinates video processing pipeline with GPU acceleration
+- Auto-update integration with progress tracking and user notifications
 - Sets default caption styling: 85px font, transparent background, emphasis mode enabled
 - Provides progress tracking for transcription and rendering operations
 - Features 60/40 split layout between video preview and styling panels for balanced workspace
+- Project management integration with recent projects and persistence
 
 #### VideoPanel.tsx - Video Preview
 - HTML5 video element with Canvas overlay for caption preview
@@ -144,13 +226,18 @@ npm run dev-renderer  # Start webpack dev server for renderer
 - **Tab overlay**: Completely replaces tab content during transcription to prevent interaction
 - **Responsive design**: Adapts to right panel dimensions with proper centering
 
-#### TimelinePanel.tsx - Caption Timeline
-- Visual timeline representation of caption segments
-- Click-to-seek functionality
-- Double-click segment synchronization (selects segment and seeks to start time)
-- Current time indicator and segment highlighting
-- Scroll support for long videos
-- Segment deletion functionality with confirmation
+#### UnifiedTimeline.tsx - Combined Timeline Interface
+- **Unified Architecture**: Combined clip and subtitle editing in a single timeline interface
+- **Intelligent Track Assignment**: Automatic track allocation to prevent overlaps between clips and subtitles
+- **Clip Editing Tools**: Split clips at playhead position (Ctrl+S) and delete clips (Delete/Backspace)
+- **Subtitle Frame Splitting**: Automatic subtitle adjustment when clips are split to maintain sync
+- **Visual Feedback**: Clear distinction between clips (top track) and subtitle segments (lower tracks)
+- **Time Conversion**: Seamless conversion between original video time and effective timeline time
+- **Real-time Updates**: Instant timeline updates as clips are modified
+- **Click-to-Seek**: Click any segment to jump to that position
+- **Double-click Selection**: Double-click segments to select and seek to middle time
+- **Zoom and Scroll**: Advanced zoom controls with viewport position maintenance
+- **Progress Integration**: Real-time transcription progress display within timeline
 
 #### StylingPanel.tsx - Caption Controls
 - Font, color, and positioning controls
@@ -209,6 +296,41 @@ npm run dev-renderer  # Start webpack dev server for renderer
 - Efficient segment merging for video editing
 
 ## Recent Features & Improvements
+
+### Auto-Update System
+- **UpdateService.tsx**: VS Code-like update notifications with detailed changelogs
+- **Non-intrusive UX**: Background update checks with user control over downloads
+- **Automatic Installation**: Install-on-quit functionality with progress tracking
+- **GitHub Integration**: Direct links to release pages with formatted release notes
+- **Update Modals**: Comprehensive update UI with download progress and error handling
+
+### Dependency Management System
+- **DependencyInstallModal.tsx**: Automated FFmpeg and Whisper installation
+- **Platform Detection**: Smart installation methods per OS (Homebrew, APT, YUM, DNF, portable)
+- **Progress Tracking**: Real-time installation progress with detailed status messages
+- **Capability Assessment**: Pre-installation system requirements checking
+- **Manual Fallback**: Detailed manual installation instructions when automatic fails
+
+### Hardware Acceleration & Device Detection
+- **DeviceDetector.ts**: Intelligent GPU acceleration detection for transcription
+- **Multi-GPU Support**: CUDA (NVIDIA), MPS (Apple Silicon), and CPU optimization
+- **Compatibility Testing**: Real-world Whisper compatibility validation for hardware
+- **Performance Optimization**: Up to 10x transcription speed improvements on compatible hardware
+- **Graceful Fallback**: Automatic CPU fallback when GPU acceleration unavailable
+
+### Unified Timeline Architecture
+- **UnifiedTimeline.tsx**: Revolutionary timeline combining clips and subtitles in one interface
+- **Intelligent Track Management**: Automatic track allocation to prevent overlaps
+- **Clip Editing Integration**: Split (Ctrl+S) and delete (Delete/Backspace) clips with timeline updates
+- **Subtitle Frame Splitting**: Automatic subtitle adjustment when clips are modified
+- **Time Conversion System**: Seamless original ↔ effective timeline time conversion
+- **Advanced Zoom**: Viewport-aware zoom with position maintenance during timeline changes
+
+### Project Management Enhancement
+- **ProjectManager.tsx**: Comprehensive project persistence with visual interface
+- **Recent Projects**: Quick access with thumbnails and metadata display
+- **Clip Integration**: Full clip timeline data persistence in .lvep project files
+- **Keyboard Shortcuts**: Cmd/Ctrl+S (save), Cmd/Ctrl+O (open) with native dialogs
 
 ### Transcription Settings
 - **TranscriptionSettings.tsx**: Dialog for configuring caption segmentation
@@ -279,9 +401,11 @@ npm run dev-renderer  # Start webpack dev server for renderer
 ### Keyboard Shortcuts
 - **Cmd/Ctrl + ,**: Open AI Settings
 - **Cmd/Ctrl + G**: Generate AI content (when captions exist)
-- **Cmd/Ctrl + S**: Save project
+- **Cmd/Ctrl + S**: Save project (or split clip in clip mode)
 - **Cmd/Ctrl + O**: Open project manager
 - **Cmd/Ctrl + Z**: Undo/Redo
+- **Delete/Backspace**: Delete clip at playhead (in clip mode)
+- **Spacebar**: Play/Pause video
 
 ## Word Editing States & Behavior
 

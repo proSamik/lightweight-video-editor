@@ -130,6 +130,11 @@ npm run dist:all
   - Export clipped video with automatic subtitle timing adjustment
   - Export SRT files for external use
 - **High-Performance Rendering**: FFmpeg-based overlay rendering with multi-threading support
+- **Unified Timeline**: Combined clip and subtitle editing with intelligent track assignment
+- **Auto-Update System**: VS Code-like update notifications with changelog support and automatic downloading
+- **Dependency Manager**: Automatic installation of FFmpeg and Whisper with platform detection
+- **Device Detection**: Intelligent GPU acceleration (CUDA/MPS) with Whisper compatibility testing
+- **Smart Audio Handling**: Hardware-optimized transcription with device-specific acceleration
 
 
 ### App Features
@@ -175,10 +180,14 @@ npm run dist:all
 ## Architecture
 
 - **Frontend**: Electron + TypeScript + React
-- **Video Processing**: FFmpeg
-- **Transcription**: OpenAI Whisper (local) with word-level timestamps
-- **Rendering**: Canvas-based caption rendering for pixel-perfect output
-- **Platform**: macOS first, then others
+- **Video Processing**: FFmpeg with intelligent overlap detection
+- **Transcription**: OpenAI Whisper (local) with word-level timestamps and GPU acceleration
+- **Rendering**: FFmpeg-based overlay rendering with precise timing controls
+- **Device Detection**: Automatic CUDA/MPS/CPU detection with compatibility testing
+- **Update System**: Auto-updater with VS Code-like notifications and changelog support
+- **Dependency Management**: Automated FFmpeg and Whisper installation with platform detection
+- **Timeline Architecture**: Unified timeline combining clips and subtitles with track assignment
+- **Platform**: Cross-platform with macOS, Linux, and Windows support
 
 ## Styling Options
 
@@ -250,6 +259,31 @@ npm run dist:all
 - **Recent Projects**: Quick access to recently edited projects with visual previews
 - **Project Operations**: Load, save, and delete projects with confirmation dialogs
 - **Keyboard Integration**: Full keyboard shortcut support for project operations
+- **Clip Management**: Integrated video clipping with automatic subtitle frame splitting
+
+### Unified Timeline System
+- **Combined Interface**: Clips and subtitles displayed together with intelligent track assignment
+- **Automatic Track Management**: Dynamic track allocation to prevent overlaps
+- **Clip Editing Tools**: Split clips at playhead position with Ctrl+S shortcut
+- **Subtitle Frame Splitting**: Automatic subtitle adjustment when clips are split
+- **Visual Feedback**: Clear distinction between clips and subtitle segments
+- **Real-time Updates**: Instant timeline updates as clips are modified
+
+### Auto-Update & Dependency Management
+- **VS Code-like Updates**: Non-intrusive update notifications with detailed changelogs
+- **Automatic Downloads**: Background update downloads with progress tracking
+- **Install on Quit**: Updates applied automatically on application restart
+- **Dependency Detection**: Automatic detection of missing FFmpeg and Whisper installations
+- **Platform-Aware Installation**: Smart installation methods per platform (Homebrew, APT, portable downloads)
+- **Progress Tracking**: Real-time installation progress with detailed status messages
+- **Capability Assessment**: Pre-installation system requirements checking
+
+### Smart Device Detection
+- **Hardware Acceleration**: Automatic detection of CUDA, MPS (Apple Silicon), and CPU capabilities
+- **Compatibility Testing**: Real-world Whisper compatibility validation for MPS devices
+- **Optimal Performance**: Automatic selection of best available device for transcription
+- **Fallback Systems**: Graceful degradation to CPU when GPU acceleration fails
+- **Enhanced Performance**: Up to 10x transcription speed improvement on compatible hardware
 
 ### Export Settings
 - **Framerate Options**: Choose from 24fps, 30fps, or 60fps for optimal quality/file size balance
@@ -263,14 +297,24 @@ npm run dist:all
 - **Redo**: Cmd/Ctrl + Shift + Z (when available)
 - **Save Project**: Cmd/Ctrl + S
 - **Load Project**: Cmd/Ctrl + O
+- **Split Clip**: Cmd/Ctrl + S (when in clip mode)
+- **Delete Clip**: Delete/Backspace (when in clip mode)
+- **Play/Pause**: Spacebar
 
 ## Troubleshooting
 
 ### Dependencies Not Found
-If you see dependency errors:
-1. Ensure FFmpeg is installed: `ffmpeg -version`
-2. Ensure Whisper is installed: `whisper --help`
-3. Restart the application after installing dependencies
+The app now includes an automatic dependency installer:
+1. **Automatic Detection**: The app will detect missing FFmpeg and Whisper on startup
+2. **Installation Modal**: A modal will guide you through automatic installation for your platform
+3. **Manual Installation**: If automatic installation fails, detailed manual instructions are provided
+4. **Platform Support**: Automatic installation works on macOS (Homebrew), Linux (APT/YUM/DNF), and Windows (portable download)
+5. **Progress Tracking**: Real-time installation progress with detailed status messages
+
+For manual installation:
+- Ensure FFmpeg is installed: `ffmpeg -version`
+- Ensure Whisper is installed: `whisper --help`
+- Restart the application after installing dependencies
 
 ### Video Won't Load
 - Ensure your video is in a supported format (MP4, MOV, AVI)
