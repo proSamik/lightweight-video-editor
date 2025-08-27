@@ -2,32 +2,8 @@
 
 A professional Electron-based video editor that specializes in adding captions to videos with word-level timing. Create karaoke-style subtitles with AI transcription, real-time editing, and pixel-perfect preview.
 
-
-
 https://github.com/user-attachments/assets/8ae92f44-2fe0-4df4-91ab-221dc1178fee
 
-
-
-## Features
-
-- **Video Import**: Support for MP4, MOV, AVI video formats with drag-and-drop interface
-- **AI Transcription**: Automatic caption generation using OpenAI Whisper with word-level timestamps
-- **Karaoke Highlighting**: Word-by-word highlighting synchronized with video playback
-- **Visual Editor**: Customize fonts, colors, positioning, and sizing with real-time preview
-- **Advanced Timeline**: Interactive timeline with click-to-seek and double-click segment selection
-- **Video Clipping**: Create clips by removing unwanted sections with non-destructive editing
-- **Project Management**: Save, load, and manage multiple video editing projects with recent projects list
-- **Transcription Settings**: Configurable caption segmentation (character/word-based line wrapping)
-- **In-Panel Transcription Progress**: Real-time progress display within the tabbed interface during processing
-- **Progressive Rendering**: Optional vertical line-by-line text reveal for dynamic captions
-- **Word-Level Editing**: Delete individual words with automatic video segment processing
-- **Export Settings**: Customizable framerate and rendering quality with estimated rendering time
-- **Tabbed Interface**: Integrated styling and AI panels with intelligent interaction management
-- **Advanced Export Options**: 
-  - Export complete video with subtitles and audio replacement
-  - Export clipped video with automatic subtitle timing adjustment
-  - Export SRT files for external use
-- **High-Performance Rendering**: FFmpeg-based overlay rendering with multi-threading support
 
 ## Prerequisites
 
@@ -133,6 +109,28 @@ npm run dist:all
 - **Installer**: `dist/Lightweight Video Editor Setup 1.0.0.exe`
 - **MSI Package**: `dist/Lightweight Video Editor-1.0.0.msi`
 - **Portable App**: `dist/win-unpacked/`
+
+## Features
+
+- **Video Import**: Support for MP4, MOV, AVI video formats with drag-and-drop interface
+- **AI Transcription**: Automatic caption generation using OpenAI Whisper with word-level timestamps
+- **Karaoke Highlighting**: Word-by-word highlighting synchronized with video playback
+- **Visual Editor**: Customize fonts, colors, positioning, and sizing with real-time preview
+- **Advanced Timeline**: Interactive timeline with click-to-seek and double-click segment selection
+- **Video Clipping**: Create clips by removing unwanted sections with non-destructive editing
+- **Project Management**: Save, load, and manage multiple video editing projects with recent projects list
+- **Transcription Settings**: Configurable caption segmentation (character/word-based line wrapping)
+- **In-Panel Transcription Progress**: Real-time progress display within the tabbed interface during processing
+- **Progressive Rendering**: Optional vertical line-by-line text reveal for dynamic captions
+- **Word-Level Editing**: Delete individual words with automatic video segment processing
+- **Export Settings**: Customizable framerate and rendering quality with estimated rendering time
+- **Tabbed Interface**: Integrated styling and AI panels with intelligent interaction management
+- **Advanced Export Options**: 
+  - Export complete video with subtitles and audio replacement
+  - Export clipped video with automatic subtitle timing adjustment
+  - Export SRT files for external use
+- **High-Performance Rendering**: FFmpeg-based overlay rendering with multi-threading support
+
 
 ### App Features
 - ✅ **Universal Support**: Intel and ARM64 architectures
