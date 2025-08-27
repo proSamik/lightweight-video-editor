@@ -1509,7 +1509,43 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
           isOpen={showCaptionStyleModal}
           onClose={() => setShowCaptionStyleModal(false)}
           caption={selectedCaptionForStyling}
-          onUpdate={() => {}}
+          onUpdate={({ style }) => {
+            if (!selectedCaptionForStyling || !aiSubtitleData || !onAISubtitleUpdate) return;
+            
+            // Update the specific frame's style in aiSubtitleData
+            const updatedFrames = aiSubtitleData.frames.map(frame => {
+              if (frame.id !== selectedCaptionForStyling.id) return frame;
+              const safeStyle = {
+                font: style.font || 'Poppins',
+                fontSize: style.fontSize ?? 85,
+                textColor: style.textColor || '#ffffff',
+                highlighterColor: style.highlighterColor || '#00ff00',
+                backgroundColor: style.backgroundColor ?? '#000000',
+                position: style.position || { x: 50, y: 80 },
+                strokeColor: style.strokeColor,
+                strokeWidth: style.strokeWidth,
+                textTransform: style.textTransform,
+                scale: style.scale,
+                emphasizeMode: style.emphasizeMode,
+                renderMode: style.renderMode,
+                textAlign: style.textAlign,
+                burnInSubtitles: style.burnInSubtitles,
+              };
+              return { ...frame, style: safeStyle };
+            });
+
+            onAISubtitleUpdate({
+              ...aiSubtitleData,
+              frames: updatedFrames,
+              lastModified: Date.now()
+            });
+            
+            // Update the local selection state
+            setSelectedCaptionForStyling({
+              ...selectedCaptionForStyling,
+              style
+            });
+          }}
           position={modalPosition}
         />
       </div>
