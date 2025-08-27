@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { SubtitleFrame, SubtitleStyle } from '../../types';
 import { useTheme } from '../contexts/ThemeContext';
-import { FiType, FiRotateCw, FiDroplet, FiAlignLeft, FiAlignCenter, FiAlignRight } from 'react-icons/fi';
+import { FiType, FiRotateCw, FiDroplet, FiAlignLeft, FiAlignCenter, FiAlignRight, FiSettings } from 'react-icons/fi';
 
 interface CaptionStyleModalProps {
   isOpen: boolean;
@@ -19,6 +19,7 @@ const CaptionStyleModal: React.FC<CaptionStyleModalProps> = ({
   position
 }) => {
   const { theme } = useTheme();
+  const [activeTab, setActiveTab] = useState<'presets' | 'custom'>('custom');
   const [localStyle, setLocalStyle] = useState<SubtitleStyle>({
     font: 'Poppins',
     fontSize: 85,
@@ -39,7 +40,22 @@ const CaptionStyleModal: React.FC<CaptionStyleModalProps> = ({
   // Update local style when caption changes
   React.useEffect(() => {
     if (caption) {
-      setLocalStyle(caption.style);
+      setLocalStyle({
+        font: caption.style.font || 'Poppins',
+        fontSize: caption.style.fontSize ?? 85,
+        textColor: caption.style.textColor || '#ffffff',
+        highlighterColor: caption.style.highlighterColor || '#00ff00',
+        backgroundColor: caption.style.backgroundColor || '#000000',
+        strokeColor: caption.style.strokeColor || '#000000',
+        strokeWidth: caption.style.strokeWidth ?? 0,
+        textTransform: caption.style.textTransform || 'none',
+        position: caption.style.position || { x: 50, y: 50, z: 0 },
+        scale: caption.style.scale ?? 1,
+        emphasizeMode: caption.style.emphasizeMode ?? false,
+        renderMode: caption.style.renderMode || 'horizontal',
+        textAlign: caption.style.textAlign || 'center',
+        burnInSubtitles: caption.style.burnInSubtitles ?? true // Default to true
+      });
     }
   }, [caption]);
 
@@ -182,7 +198,56 @@ const CaptionStyleModal: React.FC<CaptionStyleModalProps> = ({
             </p>
           </div>
         </div>
+
+        {/* Tab Navigation */}
+        <div style={{
+          display: 'flex',
+          gap: '3px',
+          backgroundColor: theme.colors.surface,
+          padding: '3px',
+          borderRadius: '8px',
+          border: `1px solid ${theme.colors.border}`,
+          margin: '8px 12px'
+        }}>
+          <button
+            onClick={() => setActiveTab('presets')}
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              backgroundColor: activeTab === 'presets' ? theme.colors.primary : 'transparent',
+              color: activeTab === 'presets' ? theme.colors.primaryForeground : theme.colors.text,
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '11px',
+              fontWeight: '500',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            Presets
+          </button>
+          <button
+            onClick={() => setActiveTab('custom')}
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              backgroundColor: activeTab === 'custom' ? theme.colors.primary : 'transparent',
+              color: activeTab === 'custom' ? theme.colors.primaryForeground : theme.colors.text,
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '11px',
+              fontWeight: '500',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            Custom Controls
+          </button>
+        </div>
+
         <div style={{ padding: '12px' }}>
+          {activeTab === 'custom' && (
+            <>
           {/* Z-Axis Rotation */}
           <div style={{ marginBottom: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
@@ -463,6 +528,67 @@ const CaptionStyleModal: React.FC<CaptionStyleModalProps> = ({
               </select>
             </div>
 
+            {/* Font Size */}
+            <div style={{ marginBottom: '12px' }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '6px'
+              }}>
+                <label style={{
+                  fontSize: '12px',
+                  fontWeight: '500',
+                  color: theme.colors.text
+                }}>
+                  Font Size
+                </label>
+                <span style={{
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: theme.colors.text
+                }}>
+                  {localStyle.fontSize}px
+                </span>
+              </div>
+              <div style={{
+                padding: '8px',
+                backgroundColor: theme.colors.modal.background,
+                borderRadius: theme.radius.md,
+                border: `1px solid ${theme.colors.border}`
+              }}>
+                <input
+                  type="range"
+                  min="16"
+                  max="200"
+                  value={localStyle.fontSize}
+                  onChange={(e) => updateStyle({ fontSize: parseInt(e.target.value) })}
+                  style={{
+                    width: '100%',
+                    height: '6px',
+                    borderRadius: '3px',
+                    background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${((localStyle.fontSize - 16) / (200 - 16)) * 100}%, ${theme.colors.border} ${((localStyle.fontSize - 16) / (200 - 16)) * 100}%, ${theme.colors.border} 100%)`,
+                    outline: 'none',
+                    appearance: 'none',
+                    cursor: 'pointer',
+                    WebkitAppearance: 'none',
+                    MozAppearance: 'none'
+                  }}
+                />
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  marginTop: '6px',
+                  fontSize: '10px',
+                  color: theme.colors.textSecondary,
+                  fontWeight: '500'
+                }}>
+                  <span>16px</span>
+                  <span>200px</span>
+                </div>
+              </div>
+            </div>
+
             {/* Text Transform */}
             <div>
               <label style={{
@@ -479,12 +605,12 @@ const CaptionStyleModal: React.FC<CaptionStyleModalProps> = ({
                 onChange={(e) => updateStyle({ textTransform: e.target.value as 'none' | 'capitalize' | 'uppercase' | 'lowercase' })}
                 style={{
                   width: '100%',
-                  padding: '12px 16px',
+                  padding: '8px 12px',
                   backgroundColor: theme.colors.modal.background,
                   color: theme.colors.text,
                   border: `1px solid ${theme.colors.border}`,
                   borderRadius: theme.radius.md,
-                  fontSize: '14px',
+                  fontSize: '11px',
                   transition: 'all 0.2s ease',
                   outline: 'none'
                 }}
@@ -736,6 +862,136 @@ const CaptionStyleModal: React.FC<CaptionStyleModalProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Behavior Controls */}
+          <div style={{ marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+              <div style={{
+                width: '24px',
+                height: '24px',
+                backgroundColor: theme.colors.accent,
+                borderRadius: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <FiSettings size={12} color={theme.colors.accentForeground} />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: theme.colors.text }}>
+                Behavior
+              </h3>
+            </div>
+            
+            {/* Emphasis Mode */}
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'flex-start', 
+              gap: '12px', 
+              padding: '10px',
+              backgroundColor: theme.colors.modal.background,
+              border: `1px solid ${theme.colors.border}`,
+              borderRadius: theme.radius.md,
+              marginBottom: '8px'
+            }}>
+              <input
+                type="checkbox"
+                id="emphasizeMode"
+                checked={localStyle.emphasizeMode || false}
+                onChange={(e) => updateStyle({ emphasizeMode: e.target.checked })}
+                style={{
+                  width: '16px',
+                  height: '16px',
+                  marginTop: '2px',
+                  accentColor: theme.colors.primary
+                }}
+              />
+              <div style={{ flex: 1 }}>
+                <label htmlFor="emphasizeMode" style={{
+                  fontSize: '11px',
+                  fontWeight: '500',
+                  color: theme.colors.text,
+                  cursor: 'pointer',
+                  display: 'block',
+                  marginBottom: '2px'
+                }}>
+                  Emphasis Mode
+                </label>
+                <div style={{
+                  fontSize: '10px',
+                  color: theme.colors.textSecondary,
+                  lineHeight: '1.3'
+                }}>
+                  {localStyle.emphasizeMode 
+                    ? 'Highlighted words will be emphasized (larger + color change)'
+                    : 'Highlighted words will have background highlighting'
+                  }
+                </div>
+              </div>
+            </div>
+
+            {/* Burn-in Subtitles */}
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'flex-start', 
+              gap: '12px', 
+              padding: '10px',
+              backgroundColor: theme.colors.modal.background,
+              border: `1px solid ${theme.colors.border}`,
+              borderRadius: theme.radius.md
+            }}>
+              <input
+                type="checkbox"
+                id="burnInSubtitles"
+                checked={localStyle.burnInSubtitles !== false}
+                onChange={(e) => updateStyle({ burnInSubtitles: e.target.checked })}
+                style={{
+                  width: '16px',
+                  height: '16px',
+                  marginTop: '2px',
+                  accentColor: theme.colors.primary
+                }}
+              />
+              <div style={{ flex: 1 }}>
+                <label htmlFor="burnInSubtitles" style={{
+                  fontSize: '11px',
+                  fontWeight: '500',
+                  color: theme.colors.text,
+                  cursor: 'pointer',
+                  display: 'block',
+                  marginBottom: '2px'
+                }}>
+                  Burn-in Subtitles
+                </label>
+                <div style={{
+                  fontSize: '10px',
+                  color: theme.colors.textSecondary,
+                  lineHeight: '1.3'
+                }}>
+                  {localStyle.burnInSubtitles !== false
+                    ? 'Subtitles will be permanently embedded in the exported video'
+                    : 'Subtitles will not appear in the exported video (SRT file only)'
+                  }
+                </div>
+              </div>
+            </div>
+          </div>
+            </>
+          )}
+
+          {activeTab === 'presets' && (
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '200px',
+              textAlign: 'center',
+              color: theme.colors.textSecondary 
+            }}>
+              <div style={{ fontSize: '12px', fontWeight: '500' }}>Presets Coming Soon</div>
+              <div style={{ fontSize: '10px', marginTop: '4px' }}>Use Custom Controls for now</div>
+            </div>
+          )}
 
           {/* Action Buttons */}
           <div style={{
