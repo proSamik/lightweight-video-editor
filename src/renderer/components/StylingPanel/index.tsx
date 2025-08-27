@@ -249,13 +249,28 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
                 Frames: {selectedFrame.startTime.toFixed(2)}s - {selectedFrame.endTime.toFixed(2)}s
               </p>
             </div>
-            <Button
-              variant="primary"
-              size="sm"
+            <button
               onClick={() => setIsTimelineModalOpen(true)}
+              style={{
+                padding: '6px 8px',
+                backgroundColor: theme.colors.primary,
+                color: theme.colors.primaryForeground,
+                border: 'none',
+                borderRadius: borderRadius.md,
+                cursor: 'pointer',
+                fontSize: '11px',
+                fontWeight: '500',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = theme.colors.primaryHover || theme.colors.primary;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = theme.colors.primary;
+              }}
             >
               Apply to Selected Timeline 
-            </Button>
+            </button>
           </HStack>
           
           {/* Tab Navigation */}
