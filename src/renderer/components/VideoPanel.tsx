@@ -967,6 +967,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
 
     if (!replacementAudioPath || !replacementAudio) {
       // No replacement audio - use original video audio
+      videoAudio.muted = false;
       videoAudio.volume = 1;
       return;
     }
