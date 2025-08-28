@@ -281,6 +281,7 @@ const TabbedRightPanel: React.FC<TabbedRightPanelProps> = ({
             videoPath={videoPath}
             audioPath={audioPath}
             clips={clips}
+            onNavigateToTab={(tab) => setActiveTab(tab)}
           />
         )}
       </div>
