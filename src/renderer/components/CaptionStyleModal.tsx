@@ -45,14 +45,16 @@ const CaptionStyleModal: React.FC<CaptionStyleModalProps> = ({
   // Update temp style when caption changes, but ONLY if no modal is open
   useEffect(() => {
     if (!openModalState && caption) {
-      // Ensure all opacity fields have default values
+      // Preserve exact opacity values from caption style, don't default to 100
       const styleWithDefaults = {
         ...caption.style,
-        textColorOpacity: caption.style.textColorOpacity ?? 100,
-        highlighterColorOpacity: caption.style.highlighterColorOpacity ?? 100,
-        backgroundColorOpacity: caption.style.backgroundColorOpacity ?? 100,
-        strokeColorOpacity: caption.style.strokeColorOpacity ?? 100,
+        // Only set to 100 if the value is actually undefined, preserve 0 values
+        textColorOpacity: caption.style.textColorOpacity !== undefined ? caption.style.textColorOpacity : 100,
+        highlighterColorOpacity: caption.style.highlighterColorOpacity !== undefined ? caption.style.highlighterColorOpacity : 100,
+        backgroundColorOpacity: caption.style.backgroundColorOpacity !== undefined ? caption.style.backgroundColorOpacity : 100,
+        strokeColorOpacity: caption.style.strokeColorOpacity !== undefined ? caption.style.strokeColorOpacity : 100,
       };
+      
       setTempStyle(styleWithDefaults);
       // Clear any leftover snapshot
       setOriginalStyleSnapshot(null);
@@ -844,7 +846,8 @@ const CaptionStyleModal: React.FC<CaptionStyleModalProps> = ({
           {/* Color Modals with Opacity */}
           {['textColor', 'highlighterColor', 'backgroundColor', 'strokeColor'].map((colorType) => {
             const opacityKey = `${colorType}Opacity` as keyof SubtitleStyle;
-            const currentOpacity = (tempStyle as any)[opacityKey] || 100;
+            const currentOpacity = (tempStyle as any)[opacityKey] !== undefined ? (tempStyle as any)[opacityKey] : 100;
+            
             
             return (
               <Modal 
