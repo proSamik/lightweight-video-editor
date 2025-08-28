@@ -14,19 +14,29 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
 }) => {
   const { theme } = useTheme();
   const [openModalState, setOpenModalState] = useState<string | null>(null);
-  const [tempStyle, setTempStyle] = useState<SubtitleStyle>(style);
+  const [tempStyle, setTempStyle] = useState<SubtitleStyle>({
+    ...style,
+    textColorOpacity: style.textColorOpacity ?? 100,
+    highlighterColorOpacity: style.highlighterColorOpacity ?? 100,
+    backgroundColorOpacity: style.backgroundColorOpacity ?? 100,
+    strokeColorOpacity: style.strokeColorOpacity ?? 100,
+  });
   const [originalStyleSnapshot, setOriginalStyleSnapshot] = useState<SubtitleStyle | null>(null);
 
   // Update temp style when main style changes, but ONLY if no modal is open
   useEffect(() => {
-    console.log('useEffect triggered:', { openModalState, style });
     if (!openModalState) {
-      console.log('useEffect updating tempStyle to:', style);
-      setTempStyle({ ...style });
+      // Ensure all opacity fields have default values
+      const styleWithDefaults = {
+        ...style,
+        textColorOpacity: style.textColorOpacity ?? 100,
+        highlighterColorOpacity: style.highlighterColorOpacity ?? 100,
+        backgroundColorOpacity: style.backgroundColorOpacity ?? 100,
+        strokeColorOpacity: style.strokeColorOpacity ?? 100,
+      };
+      setTempStyle(styleWithDefaults);
       // Clear any leftover snapshot
       setOriginalStyleSnapshot(null);
-    } else {
-      console.log('useEffect skipped - modal is open');
     }
   }, [style, openModalState]);
 
@@ -174,17 +184,22 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
 
   // Helper functions for modal interactions
   const openModalWithState = (modalName: string) => {
-    console.log('openModalWithState:', { modalName, currentStyle: style });
     // Take snapshot of current style when modal opens
-    setOriginalStyleSnapshot({ ...style });
-    setTempStyle({ ...style });
+    const styleWithDefaults = {
+      ...style,
+      textColorOpacity: style.textColorOpacity ?? 100,
+      highlighterColorOpacity: style.highlighterColorOpacity ?? 100,
+      backgroundColorOpacity: style.backgroundColorOpacity ?? 100,
+      strokeColorOpacity: style.strokeColorOpacity ?? 100,
+    };
+    setOriginalStyleSnapshot({ ...styleWithDefaults });
+    setTempStyle({ ...styleWithDefaults });
     setOpenModalState(modalName);
   };
 
   const handleCancel = () => {
     // Revert to snapshot taken when modal was opened
     if (originalStyleSnapshot) {
-      console.log('handleCancel - reverting to originalStyleSnapshot:', originalStyleSnapshot);
       onStyleUpdate(originalStyleSnapshot);
       setTempStyle({ ...originalStyleSnapshot });
     }
@@ -194,7 +209,6 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
 
   const handleApply = () => {
     // Changes are already applied via live preview - just close modal and cleanup
-    console.log('handleApply - keeping current style (already applied via live preview)');
     setOriginalStyleSnapshot(null); // Clean up memory
     setOpenModalState(null);
   };
@@ -202,7 +216,6 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
   // Update temp style WITH live preview - apply changes immediately for preview
   const updateTempStyle = (updates: Partial<SubtitleStyle>) => {
     const newTempStyle = { ...tempStyle, ...updates };
-    console.log('updateTempStyle:', { updates, newTempStyle });
     setTempStyle(newTempStyle);
     // Apply changes immediately for live preview
     onStyleUpdate(newTempStyle);
@@ -833,50 +846,221 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
           </div>
         </Modal>
 
-        {/* Color Modals */}
-        {['textColor', 'highlighterColor', 'backgroundColor', 'strokeColor'].map((colorType) => (
-          <Modal 
-            key={colorType}
-            isOpen={openModalState === colorType} 
-            onClose={handleCancel} 
-            title={colorType.replace('Color', '').replace(/([A-Z])/g, ' $1').replace(/^\w/, c => c.toUpperCase()) + ' Color'}
-          >
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
-              {Object.values(ColorOption).map((color) => (
-                <button
-                  key={color}
-                  onClick={() => updateTempStyle({ [colorType]: color })}
-                  style={{
-                    width: '40px',
-                    height: '40px',
-                    backgroundColor: color === 'transparent' ? 'transparent' : color,
-                    border: color === 'transparent' 
-                      ? '2px dashed #ccc' 
-                      : `3px solid ${(tempStyle as any)[colorType] === color ? theme.colors.primary : '#ddd'}`,
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    position: 'relative',
-                    boxShadow: color !== 'transparent' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
-                  }}
-                >
-                  {color === 'transparent' && (
+        {/* Color Modals with Opacity */}
+        {['textColor', 'highlighterColor', 'backgroundColor', 'strokeColor'].map((colorType) => {
+          const opacityKey = `${colorType}Opacity` as keyof SubtitleStyle;
+          const currentOpacity = (tempStyle as any)[opacityKey] || 100;
+          
+          return (
+            <Modal 
+              key={colorType}
+              isOpen={openModalState === colorType} 
+              onClose={handleCancel} 
+              title={colorType.replace('Color', '').replace(/([A-Z])/g, ' $1').replace(/^\w/, c => c.toUpperCase()) + ' Color'}
+            >
+              <div style={{ marginBottom: '20px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '16px' }}>
+                  {Object.values(ColorOption).map((color) => (
+                    <button
+                      key={color}
+                      onClick={() => updateTempStyle({ [colorType]: color })}
+                      style={{
+                        width: '40px',
+                        height: '40px',
+                        backgroundColor: color === 'transparent' ? 'transparent' : color,
+                        border: color === 'transparent' 
+                          ? '2px dashed #ccc' 
+                          : `3px solid ${(tempStyle as any)[colorType] === color ? theme.colors.primary : '#ddd'}`,
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        position: 'relative',
+                        boxShadow: color !== 'transparent' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
+                      }}
+                    >
+                      {color === 'transparent' && (
+                        <div style={{
+                          position: 'absolute',
+                          top: '50%',
+                          left: '50%',
+                          transform: 'translate(-50%, -50%)',
+                          fontSize: '8px',
+                          color: '#666',
+                          fontWeight: '500'
+                        }}>
+                          None
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Opacity Slider */}
+                <div>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '8px'
+                  }}>
+                    <label style={{
+                      fontSize: '12px',
+                      fontWeight: '500',
+                      color: theme.colors.text
+                    }}>
+                      Opacity
+                    </label>
+                    <span style={{
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      color: theme.colors.primary
+                    }}>
+                      {currentOpacity}%
+                    </span>
+                  </div>
+                  <div style={{
+                    padding: '12px',
+                    backgroundColor: '#ffffff',
+                    borderRadius: '8px',
+                    border: `1px solid ${theme.colors.border}`
+                  }}>
+                    {/* Custom draggable slider */}
+                    <div style={{ position: 'relative', height: '30px' }}>
+                      {/* Track background */}
+                      <div style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: 0,
+                        right: 0,
+                        height: '4px',
+                        backgroundColor: theme.colors.border,
+                        borderRadius: '2px',
+                        transform: 'translateY(-50%)'
+                      }} />
+                      
+                      {/* Active track */}
+                      <div style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: 0,
+                        width: `${currentOpacity}%`,
+                        height: '4px',
+                        backgroundColor: theme.colors.primary,
+                        borderRadius: '2px',
+                        transform: 'translateY(-50%)'
+                      }} />
+                      
+                      {/* Clickable track for direct positioning */}
+                      <div 
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          height: '30px',
+                          cursor: 'pointer'
+                        }}
+                        onClick={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const clickX = e.clientX - rect.left;
+                          const percentage = Math.max(0, Math.min(100, Math.round((clickX / rect.width) * 100)));
+                          // Create explicit update object instead of computed property
+                          const opacityUpdate: Partial<SubtitleStyle> = {};
+                          if (colorType === 'textColor') {
+                            opacityUpdate.textColorOpacity = percentage;
+                          } else if (colorType === 'highlighterColor') {
+                            opacityUpdate.highlighterColorOpacity = percentage;
+                          } else if (colorType === 'backgroundColor') {
+                            opacityUpdate.backgroundColorOpacity = percentage;
+                          } else if (colorType === 'strokeColor') {
+                            opacityUpdate.strokeColorOpacity = percentage;
+                          }
+                          
+                          updateTempStyle(opacityUpdate);
+                        }}
+                      />
+                      
+                      {/* Draggable thumb */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '50%',
+                          left: `${currentOpacity}%`,
+                          width: '16px',
+                          height: '16px',
+                          backgroundColor: theme.colors.primary,
+                          borderRadius: '50%',
+                          border: '2px solid #ffffff',
+                          transform: 'translate(-50%, -50%)',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                          cursor: 'grab',
+                          zIndex: 5,
+                          transition: 'transform 0.1s ease'
+                        }}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          
+                          const thumb = e.currentTarget as HTMLElement;
+                          thumb.style.cursor = 'grabbing';
+                          
+                          const container = thumb.parentElement;
+                          if (!container) return;
+                          
+                          const containerRect = container.getBoundingClientRect();
+                          
+                          const handleMouseMove = (moveEvent: MouseEvent) => {
+                            const mouseX = moveEvent.clientX - containerRect.left;
+                            const percentage = Math.max(0, Math.min(100, Math.round((mouseX / containerRect.width) * 100)));
+                            
+                            // Create explicit update object instead of computed property
+                            const opacityUpdate: Partial<SubtitleStyle> = {};
+                            if (colorType === 'textColor') {
+                              opacityUpdate.textColorOpacity = percentage;
+                            } else if (colorType === 'highlighterColor') {
+                              opacityUpdate.highlighterColorOpacity = percentage;
+                            } else if (colorType === 'backgroundColor') {
+                              opacityUpdate.backgroundColorOpacity = percentage;
+                            } else if (colorType === 'strokeColor') {
+                              opacityUpdate.strokeColorOpacity = percentage;
+                            }
+                            
+                            updateTempStyle(opacityUpdate);
+                          };
+                          
+                          const handleMouseUp = () => {
+                            thumb.style.cursor = 'grab';
+                            document.removeEventListener('mousemove', handleMouseMove);
+                            document.removeEventListener('mouseup', handleMouseUp);
+                          };
+                          
+                          document.addEventListener('mousemove', handleMouseMove);
+                          document.addEventListener('mouseup', handleMouseUp);
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1.1)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1)';
+                        }}
+                      />
+                    </div>
                     <div style={{
-                      position: 'absolute',
-                      top: '50%',
-                      left: '50%',
-                      transform: 'translate(-50%, -50%)',
-                      fontSize: '8px',
-                      color: '#666',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      marginTop: '4px',
+                      fontSize: '10px',
+                      color: theme.colors.textSecondary,
                       fontWeight: '500'
                     }}>
-                      None
+                      <span>0</span>
+                      <span>100</span>
                     </div>
-                  )}
-                </button>
-              ))}
-            </div>
-          </Modal>
-        ))}
+                  </div>
+                </div>
+              </div>
+            </Modal>
+          );
+        })}
 
         {/* Position Modal */}
         <Modal 

@@ -24,9 +24,13 @@ const CaptionStyleModal: React.FC<CaptionStyleModalProps> = ({
     font: 'Poppins',
     fontSize: 85,
     textColor: '#ffffff',
+    textColorOpacity: 100,
     highlighterColor: '#00ff00',
+    highlighterColorOpacity: 100,
     backgroundColor: '#000000',
+    backgroundColorOpacity: 100,
     strokeColor: '#000000',
+    strokeColorOpacity: 100,
     strokeWidth: 0,
     textTransform: 'none',
     position: { x: 50, y: 50, z: 0 },
@@ -44,9 +48,13 @@ const CaptionStyleModal: React.FC<CaptionStyleModalProps> = ({
         font: caption.style.font || 'Poppins',
         fontSize: caption.style.fontSize ?? 85,
         textColor: caption.style.textColor || '#ffffff',
+        textColorOpacity: caption.style.textColorOpacity ?? 100,
         highlighterColor: caption.style.highlighterColor || '#00ff00',
+        highlighterColorOpacity: caption.style.highlighterColorOpacity ?? 100,
         backgroundColor: caption.style.backgroundColor || '#000000',
+        backgroundColorOpacity: caption.style.backgroundColorOpacity ?? 100,
         strokeColor: caption.style.strokeColor || '#000000',
+        strokeColorOpacity: caption.style.strokeColorOpacity ?? 100,
         strokeWidth: caption.style.strokeWidth ?? 0,
         textTransform: caption.style.textTransform || 'none',
         position: caption.style.position || { x: 50, y: 50, z: 0 },
@@ -649,7 +657,7 @@ const CaptionStyleModal: React.FC<CaptionStyleModalProps> = ({
             </div>
             
             {/* Text Color */}
-            <div style={{ marginBottom: '12px' }}>
+            <div style={{ marginBottom: '16px' }}>
               <label style={{
                 fontSize: '12px',
                 fontWeight: '500',
@@ -659,140 +667,145 @@ const CaptionStyleModal: React.FC<CaptionStyleModalProps> = ({
               }}>
                 Text Color
               </label>
-              <input
-                type="color"
-                value={localStyle.textColor || '#ffffff'}
-                onChange={(e) => updateStyle({ textColor: e.target.value })}
-                style={{
-                  width: '100%',
-                  height: '30px',
-                  border: `1px solid ${theme.colors.border}`,
-                  borderRadius: theme.radius.md,
-                  cursor: 'pointer'
-                }}
-              />
-            </div>
-
-            {/* Highlight Color */}
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{
-                fontSize: '14px',
-                fontWeight: '500',
-                color: theme.colors.text,
-                marginBottom: '8px',
-                display: 'block'
-              }}>
-                Highlight Color
-              </label>
-              <input
-                type="color"
-                value={localStyle.highlighterColor || '#ffff00'}
-                onChange={(e) => updateStyle({ highlighterColor: e.target.value })}
-                style={{
-                  width: '100%',
-                  height: '40px',
-                  border: `1px solid ${theme.colors.border}`,
-                  borderRadius: theme.radius.md,
-                  cursor: 'pointer'
-                }}
-              />
-            </div>
-
-            {/* Background Color */}
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{
-                fontSize: '14px',
-                fontWeight: '500',
-                color: theme.colors.text,
-                marginBottom: '8px',
-                display: 'block'
-              }}>
-                Background Color
-              </label>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <div style={{ marginBottom: '12px' }}>
                 <input
                   type="color"
-                  value={localStyle.backgroundColor === 'transparent' ? '#000000' : (localStyle.backgroundColor || '#80000000')}
-                  onChange={(e) => updateStyle({ backgroundColor: e.target.value })}
+                  value={localStyle.textColor || '#ffffff'}
+                  onChange={(e) => updateStyle({ textColor: e.target.value })}
                   style={{
-                    flex: 1,
-                    height: '40px',
+                    width: '100%',
+                    height: '30px',
                     border: `1px solid ${theme.colors.border}`,
                     borderRadius: theme.radius.md,
                     cursor: 'pointer'
                   }}
                 />
-                <button
-                  onClick={() => updateStyle({ backgroundColor: 'transparent' })}
+              </div>
+              
+              {/* Opacity Slider */}
+              <div>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '6px'
+                }}>
+                  <span style={{ fontSize: '10px', color: theme.colors.text }}>Opacity</span>
+                  <span style={{ fontSize: '10px', fontWeight: '600', color: theme.colors.primary }}>
+                    {localStyle.textColorOpacity || 100}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={localStyle.textColorOpacity || 100}
+                  onChange={(e) => updateStyle({ textColorOpacity: parseInt(e.target.value) })}
                   style={{
-                    padding: '8px 16px',
-                    backgroundColor: localStyle.backgroundColor === 'transparent' 
-                      ? theme.colors.primary 
-                      : theme.colors.surface,
-                    color: localStyle.backgroundColor === 'transparent' 
-                      ? theme.colors.primaryForeground 
-                      : theme.colors.text,
-                    border: `1px solid ${localStyle.backgroundColor === 'transparent' 
-                      ? theme.colors.primary 
-                      : theme.colors.border}`,
-                    borderRadius: theme.radius.md,
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    fontWeight: '500',
-                    transition: 'all 0.2s ease'
+                    width: '100%',
+                    height: '4px',
+                    borderRadius: '2px',
+                    background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${localStyle.textColorOpacity || 100}%, ${theme.colors.border} ${localStyle.textColorOpacity || 100}%, ${theme.colors.border} 100%)`,
+                    outline: 'none',
+                    cursor: 'pointer'
                   }}
-                  onMouseEnter={(e) => {
-                    if (localStyle.backgroundColor !== 'transparent') {
-                      e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (localStyle.backgroundColor !== 'transparent') {
-                      e.currentTarget.style.backgroundColor = theme.colors.surface;
-                    }
-                  }}
-                >
-                  Transparent
-                </button>
+                />
               </div>
             </div>
 
-            {/* Stroke Controls */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            {/* Highlight Color */}
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{
+                fontSize: '12px',
+                fontWeight: '500',
+                color: theme.colors.text,
+                marginBottom: '6px',
+                display: 'block'
+              }}>
+                Highlight Color
+              </label>
+              <div style={{ marginBottom: '12px' }}>
+                <input
+                  type="color"
+                  value={localStyle.highlighterColor || '#ffff00'}
+                  onChange={(e) => updateStyle({ highlighterColor: e.target.value })}
+                  style={{
+                    width: '100%',
+                    height: '30px',
+                    border: `1px solid ${theme.colors.border}`,
+                    borderRadius: theme.radius.md,
+                    cursor: 'pointer'
+                  }}
+                />
+              </div>
+              
+              {/* Opacity Slider */}
               <div>
-                <label style={{
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  color: theme.colors.text,
-                  marginBottom: '8px',
-                  display: 'block'
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '6px'
                 }}>
-                  Stroke Color
-                </label>
+                  <span style={{ fontSize: '10px', color: theme.colors.text }}>Opacity</span>
+                  <span style={{ fontSize: '10px', fontWeight: '600', color: theme.colors.primary }}>
+                    {localStyle.highlighterColorOpacity || 100}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={localStyle.highlighterColorOpacity || 100}
+                  onChange={(e) => updateStyle({ highlighterColorOpacity: parseInt(e.target.value) })}
+                  style={{
+                    width: '100%',
+                    height: '4px',
+                    borderRadius: '2px',
+                    background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${localStyle.highlighterColorOpacity || 100}%, ${theme.colors.border} ${localStyle.highlighterColorOpacity || 100}%, ${theme.colors.border} 100%)`,
+                    outline: 'none',
+                    cursor: 'pointer'
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Background Color */}
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{
+                fontSize: '12px',
+                fontWeight: '500',
+                color: theme.colors.text,
+                marginBottom: '6px',
+                display: 'block'
+              }}>
+                Background Color
+              </label>
+              <div style={{ marginBottom: '12px' }}>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <input
                     type="color"
-                    value={localStyle.strokeColor || '#000000'}
-                    onChange={(e) => updateStyle({ strokeColor: e.target.value })}
+                    value={localStyle.backgroundColor === 'transparent' ? '#000000' : (localStyle.backgroundColor || '#80000000')}
+                    onChange={(e) => updateStyle({ backgroundColor: e.target.value })}
                     style={{
                       flex: 1,
-                      height: '40px',
+                      height: '30px',
                       border: `1px solid ${theme.colors.border}`,
                       borderRadius: theme.radius.md,
                       cursor: 'pointer'
                     }}
                   />
                   <button
-                    onClick={() => updateStyle({ strokeColor: 'transparent' })}
+                    onClick={() => updateStyle({ backgroundColor: 'transparent' })}
                     style={{
-                      padding: '8px 12px',
-                      backgroundColor: (localStyle.strokeColor || '#000000') === 'transparent' 
+                      padding: '6px 12px',
+                      backgroundColor: localStyle.backgroundColor === 'transparent' 
                         ? theme.colors.primary 
                         : theme.colors.surface,
-                      color: (localStyle.strokeColor || '#000000') === 'transparent' 
+                      color: localStyle.backgroundColor === 'transparent' 
                         ? theme.colors.primaryForeground 
                         : theme.colors.text,
-                      border: `1px solid ${(localStyle.strokeColor || '#000000') === 'transparent' 
+                      border: `1px solid ${localStyle.backgroundColor === 'transparent' 
                         ? theme.colors.primary 
                         : theme.colors.border}`,
                       borderRadius: theme.radius.md,
@@ -802,12 +815,12 @@ const CaptionStyleModal: React.FC<CaptionStyleModalProps> = ({
                       transition: 'all 0.2s ease'
                     }}
                     onMouseEnter={(e) => {
-                      if ((localStyle.strokeColor || '#000000') !== 'transparent') {
+                      if (localStyle.backgroundColor !== 'transparent') {
                         e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
                       }
                     }}
                     onMouseLeave={(e) => {
-                      if ((localStyle.strokeColor || '#000000') !== 'transparent') {
+                      if (localStyle.backgroundColor !== 'transparent') {
                         e.currentTarget.style.backgroundColor = theme.colors.surface;
                       }
                     }}
@@ -815,6 +828,133 @@ const CaptionStyleModal: React.FC<CaptionStyleModalProps> = ({
                     Transparent
                   </button>
                 </div>
+              </div>
+              
+              {/* Opacity Slider */}
+              {localStyle.backgroundColor !== 'transparent' && (
+                <div>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '6px'
+                  }}>
+                    <span style={{ fontSize: '10px', color: theme.colors.text }}>Opacity</span>
+                    <span style={{ fontSize: '10px', fontWeight: '600', color: theme.colors.primary }}>
+                      {localStyle.backgroundColorOpacity || 100}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={localStyle.backgroundColorOpacity || 100}
+                    onChange={(e) => updateStyle({ backgroundColorOpacity: parseInt(e.target.value) })}
+                    style={{
+                      width: '100%',
+                      height: '4px',
+                      borderRadius: '2px',
+                      background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${localStyle.backgroundColorOpacity || 100}%, ${theme.colors.border} ${localStyle.backgroundColorOpacity || 100}%, ${theme.colors.border} 100%)`,
+                      outline: 'none',
+                      cursor: 'pointer'
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Stroke Controls */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div>
+                <label style={{
+                  fontSize: '12px',
+                  fontWeight: '500',
+                  color: theme.colors.text,
+                  marginBottom: '6px',
+                  display: 'block'
+                }}>
+                  Stroke Color
+                </label>
+                <div style={{ marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <input
+                      type="color"
+                      value={localStyle.strokeColor || '#000000'}
+                      onChange={(e) => updateStyle({ strokeColor: e.target.value })}
+                      style={{
+                        flex: 1,
+                        height: '30px',
+                        border: `1px solid ${theme.colors.border}`,
+                        borderRadius: theme.radius.md,
+                        cursor: 'pointer'
+                      }}
+                    />
+                    <button
+                      onClick={() => updateStyle({ strokeColor: 'transparent' })}
+                      style={{
+                        padding: '6px 8px',
+                        backgroundColor: (localStyle.strokeColor || '#000000') === 'transparent' 
+                          ? theme.colors.primary 
+                          : theme.colors.surface,
+                        color: (localStyle.strokeColor || '#000000') === 'transparent' 
+                          ? theme.colors.primaryForeground 
+                          : theme.colors.text,
+                        border: `1px solid ${(localStyle.strokeColor || '#000000') === 'transparent' 
+                          ? theme.colors.primary 
+                          : theme.colors.border}`,
+                        borderRadius: theme.radius.md,
+                        cursor: 'pointer',
+                        fontSize: '9px',
+                        fontWeight: '500',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        if ((localStyle.strokeColor || '#000000') !== 'transparent') {
+                          e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if ((localStyle.strokeColor || '#000000') !== 'transparent') {
+                          e.currentTarget.style.backgroundColor = theme.colors.surface;
+                        }
+                      }}
+                    >
+                      Trans
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Opacity Slider */}
+                {(localStyle.strokeColor || '#000000') !== 'transparent' && (
+                  <div>
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '4px'
+                    }}>
+                      <span style={{ fontSize: '9px', color: theme.colors.text }}>Opacity</span>
+                      <span style={{ fontSize: '9px', fontWeight: '600', color: theme.colors.primary }}>
+                        {localStyle.strokeColorOpacity || 100}%
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={localStyle.strokeColorOpacity || 100}
+                      onChange={(e) => updateStyle({ strokeColorOpacity: parseInt(e.target.value) })}
+                      style={{
+                        width: '100%',
+                        height: '3px',
+                        borderRadius: '2px',
+                        background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${localStyle.strokeColorOpacity || 100}%, ${theme.colors.border} ${localStyle.strokeColorOpacity || 100}%, ${theme.colors.border} 100%)`,
+                        outline: 'none',
+                        cursor: 'pointer'
+                      }}
+                    />
+                  </div>
+                )}
               </div>
               <div>
                 <label style={{

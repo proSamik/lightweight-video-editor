@@ -5,6 +5,7 @@ import { PresetSelector } from './StylingPanel/PresetSelector';
 import { StyleControls } from './StylingPanel/StyleControls';
 import AISubtitlesPanel from './AISubtitlesPanel';
 import TranscriptionModal from './TranscriptionModal';
+import TimelineApplyModal from './TimelineApplyModal';
 import { Palette, Brain, Settings } from 'lucide-react';
 
 interface TabbedRightPanelProps {
@@ -43,6 +44,7 @@ const TabbedRightPanel: React.FC<TabbedRightPanelProps> = ({
 }) => {
   const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState<TabType>('presets');
+  const [isTimelineModalOpen, setIsTimelineModalOpen] = useState(false);
   
   // Get the selected frame directly from AI subtitle data
   const selectedFrame = React.useMemo(() => {
@@ -61,10 +63,14 @@ const TabbedRightPanel: React.FC<TabbedRightPanelProps> = ({
         font: mergedStyle.font || 'Poppins',
         fontSize: mergedStyle.fontSize ?? 85,
         textColor: mergedStyle.textColor || '#ffffff',
+        textColorOpacity: mergedStyle.textColorOpacity ?? 100,
         highlighterColor: mergedStyle.highlighterColor || '#00ff00',
+        highlighterColorOpacity: mergedStyle.highlighterColorOpacity ?? 100,
         backgroundColor: mergedStyle.backgroundColor ?? '#000000',
-        position: mergedStyle.position || { x: 50, y: 80 },
+        backgroundColorOpacity: mergedStyle.backgroundColorOpacity ?? 100,
         strokeColor: mergedStyle.strokeColor,
+        strokeColorOpacity: mergedStyle.strokeColorOpacity ?? 100,
+        position: mergedStyle.position || { x: 50, y: 80 },
         strokeWidth: mergedStyle.strokeWidth,
         textTransform: mergedStyle.textTransform,
         scale: mergedStyle.scale,
@@ -92,39 +98,47 @@ const TabbedRightPanel: React.FC<TabbedRightPanelProps> = ({
     }
   }, [selectedFrame, handleStyleUpdate]);
 
-  // Handle timeline apply
-  const handleTimelineApply = React.useCallback(() => {
-    // For now, just apply current style to selected frame
-    // In the future, this could open a modal for time range selection
-    if (selectedFrame && aiSubtitleData && onAISubtitleUpdate) {
-      // Apply style to all frames in the time range
-      const updatedFrames = aiSubtitleData.frames.map(frame => {
-        const mergedStyle = { ...frame.style, ...selectedFrame.style };
-        const safeStyle = {
-          font: mergedStyle.font || 'Poppins',
-          fontSize: mergedStyle.fontSize ?? 85,
-          textColor: mergedStyle.textColor || '#ffffff',
-          highlighterColor: mergedStyle.highlighterColor || '#00ff00',
-          backgroundColor: mergedStyle.backgroundColor ?? '#000000',
-          position: mergedStyle.position || { x: 50, y: 80 },
-          strokeColor: mergedStyle.strokeColor,
-          strokeWidth: mergedStyle.strokeWidth,
-          textTransform: mergedStyle.textTransform,
-          scale: mergedStyle.scale,
-          emphasizeMode: mergedStyle.emphasizeMode,
-          renderMode: mergedStyle.renderMode,
-          textAlign: mergedStyle.textAlign,
-          burnInSubtitles: mergedStyle.burnInSubtitles,
-        };
-        return { ...frame, style: safeStyle };
-      });
 
-      onAISubtitleUpdate({
-        ...aiSubtitleData,
-        frames: updatedFrames,
-        lastModified: Date.now()
-      });
-    }
+  // Handle timeline apply modal
+  const handleTimelineApply = React.useCallback((startTime: number, endTime: number) => {
+    if (!selectedFrame || !aiSubtitleData || !onAISubtitleUpdate) return;
+    
+    // Apply current frame's style to all frames within the time range
+    const updatedFrames = aiSubtitleData.frames.map(frame => {
+      // Check if frame overlaps with the selected time range (convert to seconds)
+      const frameOverlaps = (frame.startTime < endTime / 1000) && (frame.endTime > startTime / 1000);
+      
+      if (!frameOverlaps) return frame;
+      
+      const mergedStyle = { ...frame.style, ...selectedFrame.style };
+      const safeStyle = {
+        font: mergedStyle.font || 'Poppins',
+        fontSize: mergedStyle.fontSize ?? 85,
+        textColor: mergedStyle.textColor || '#ffffff',
+        textColorOpacity: mergedStyle.textColorOpacity ?? 100,
+        highlighterColor: mergedStyle.highlighterColor || '#00ff00',
+        highlighterColorOpacity: mergedStyle.highlighterColorOpacity ?? 100,
+        backgroundColor: mergedStyle.backgroundColor ?? '#000000',
+        backgroundColorOpacity: mergedStyle.backgroundColorOpacity ?? 100,
+        strokeColor: mergedStyle.strokeColor,
+        strokeColorOpacity: mergedStyle.strokeColorOpacity ?? 100,
+        position: mergedStyle.position || { x: 50, y: 80 },
+        strokeWidth: mergedStyle.strokeWidth,
+        textTransform: mergedStyle.textTransform,
+        scale: mergedStyle.scale,
+        emphasizeMode: mergedStyle.emphasizeMode,
+        renderMode: mergedStyle.renderMode,
+        textAlign: mergedStyle.textAlign,
+        burnInSubtitles: mergedStyle.burnInSubtitles,
+      };
+      return { ...frame, style: safeStyle };
+    });
+
+    onAISubtitleUpdate({
+      ...aiSubtitleData,
+      frames: updatedFrames,
+      lastModified: Date.now()
+    });
   }, [selectedFrame, aiSubtitleData, onAISubtitleUpdate]);
 
   const tabStyle = (isActive: boolean) => ({
@@ -207,7 +221,7 @@ const TabbedRightPanel: React.FC<TabbedRightPanelProps> = ({
               backgroundColor: theme.colors.surface
             }}>
               <button
-                onClick={handleTimelineApply}
+                onClick={() => selectedFrame && setIsTimelineModalOpen(true)}
                 disabled={!selectedFrame}
                 style={{
                   width: '100%',
@@ -250,7 +264,7 @@ const TabbedRightPanel: React.FC<TabbedRightPanelProps> = ({
               backgroundColor: theme.colors.surface
             }}>
               <button
-                onClick={handleTimelineApply}
+                onClick={() => selectedFrame && setIsTimelineModalOpen(true)}
                 disabled={!selectedFrame}
                 style={{
                   width: '100%',
@@ -285,6 +299,42 @@ const TabbedRightPanel: React.FC<TabbedRightPanelProps> = ({
           />
         )}
       </div>
+
+      {/* Timeline Apply Modal */}
+      {selectedFrame && aiSubtitleData && (
+        <TimelineApplyModal
+          isOpen={isTimelineModalOpen}
+          onClose={() => setIsTimelineModalOpen(false)}
+          onApply={handleTimelineApply}
+          currentStyle={selectedFrame.style || {
+            font: 'Poppins',
+            fontSize: 85,
+            textColor: '#ffffff',
+            textColorOpacity: 100,
+            highlighterColor: '#00ff00',
+            highlighterColorOpacity: 100,
+            backgroundColor: '#000000',
+            backgroundColorOpacity: 100,
+            strokeColor: undefined,
+            strokeColorOpacity: 100,
+            position: { x: 50, y: 80 },
+            strokeWidth: undefined,
+            textTransform: undefined,
+            scale: undefined,
+            emphasizeMode: undefined,
+            renderMode: undefined,
+            textAlign: undefined,
+            burnInSubtitles: undefined,
+          }}
+          captions={aiSubtitleData.frames.map(frame => ({
+            id: frame.id,
+            startTime: frame.startTime * 1000, // Convert to milliseconds
+            endTime: frame.endTime * 1000 // Convert to milliseconds
+          }))}
+          currentTime={currentTime}
+          selectedSegmentId={selectedFrameId}
+        />
+      )}
     </div>
   );
 };

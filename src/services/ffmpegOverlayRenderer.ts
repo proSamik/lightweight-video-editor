@@ -2950,9 +2950,9 @@ if (!isMainThread && workerData?.isWorker) {
     const scale = caption.style?.scale || 1;
     const fontSize = baseFontSize * scale;
     const fontFamily = mapFontNameInWorker(caption.style?.font || 'Arial');
-    const textColor = parseColorInWorker(caption.style?.textColor || '#ffffff');
-    const backgroundColor = parseColorInWorker(caption.style?.backgroundColor || 'transparent');
-    const strokeColor = parseColorInWorker(caption.style?.strokeColor || 'transparent');
+    const textColor = parseColorInWorker(caption.style?.textColor || '#ffffff', caption.style?.textColorOpacity);
+    const backgroundColor = parseColorInWorker(caption.style?.backgroundColor || 'transparent', caption.style?.backgroundColorOpacity);
+    const strokeColor = parseColorInWorker(caption.style?.strokeColor || 'transparent', caption.style?.strokeColorOpacity);
     const strokeWidth = caption.style?.strokeWidth || 0;
     
     // Apply text transformation
@@ -3039,10 +3039,10 @@ if (!isMainThread && workerData?.isWorker) {
     const scale = caption.style?.scale || 1;
     const fontSize = baseFontSize * scale;
     const fontFamily = mapFontNameInWorker(caption.style?.font || 'Arial');
-    const textColor = parseColorInWorker(caption.style?.textColor || '#ffffff');
-    const highlighterColor = parseColorInWorker(caption.style?.highlighterColor || '#ffff00');
-    const backgroundColor = parseColorInWorker(caption.style?.backgroundColor || 'transparent');
-    const strokeColor = parseColorInWorker(caption.style?.strokeColor || 'transparent');
+    const textColor = parseColorInWorker(caption.style?.textColor || '#ffffff', caption.style?.textColorOpacity);
+    const highlighterColor = parseColorInWorker(caption.style?.highlighterColor || '#ffff00', caption.style?.highlighterColorOpacity);
+    const backgroundColor = parseColorInWorker(caption.style?.backgroundColor || 'transparent', caption.style?.backgroundColorOpacity);
+    const strokeColor = parseColorInWorker(caption.style?.strokeColor || 'transparent', caption.style?.strokeColorOpacity);
     const strokeWidth = caption.style?.strokeWidth || 0;
     const textTransform = caption.style?.textTransform || 'none';
     
@@ -3189,9 +3189,9 @@ if (!isMainThread && workerData?.isWorker) {
     const scale = caption.style?.scale || 1;
     const fontSize = baseFontSize * scale;
     const fontFamily = mapFontNameInWorker(caption.style?.font || 'Arial');
-    const textColor = parseColorInWorker(caption.style?.textColor || '#ffffff');
-    const highlighterColor = parseColorInWorker(caption.style?.highlighterColor || '#ffff00');
-    const backgroundColor = parseColorInWorker(caption.style?.backgroundColor || 'transparent');
+    const textColor = parseColorInWorker(caption.style?.textColor || '#ffffff', caption.style?.textColorOpacity);
+    const highlighterColor = parseColorInWorker(caption.style?.highlighterColor || '#ffff00', caption.style?.highlighterColorOpacity);
+    const backgroundColor = parseColorInWorker(caption.style?.backgroundColor || 'transparent', caption.style?.backgroundColorOpacity);
     
     // Set font
     ctx.font = `bold ${fontSize}px ${fontFamily}`;
@@ -3312,7 +3312,7 @@ if (!isMainThread && workerData?.isWorker) {
     }
   }
   
-  function parseColorInWorker(color: string): { r: number; g: number; b: number; a: number } {
+  function parseColorInWorker(color: string, opacity?: number): { r: number; g: number; b: number; a: number } {
     if (color === 'transparent') {
       return { r: 0, g: 0, b: 0, a: 0 };
     }
@@ -3321,9 +3321,12 @@ if (!isMainThread && workerData?.isWorker) {
     const r = parseInt(hex.substr(0, 2), 16);
     const g = parseInt(hex.substr(2, 2), 16);
     const b = parseInt(hex.substr(4, 2), 16);
-    const a = hex.length === 8 ? parseInt(hex.substr(6, 2), 16) / 255 : 1;
+    const baseAlpha = hex.length === 8 ? parseInt(hex.substr(6, 2), 16) / 255 : 1;
     
-    return { r, g, b, a };
+    // Apply opacity if provided (convert percentage to decimal)
+    const finalAlpha = opacity !== undefined ? (baseAlpha * (opacity / 100)) : baseAlpha;
+    
+    return { r, g, b, a: finalAlpha };
   }
   
   function applyTextTransformInWorker(text: string, transform?: string): string {

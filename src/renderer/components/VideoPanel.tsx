@@ -1670,9 +1670,9 @@ function renderSimpleTextOnCanvas(
     scaleFactor,
     captionText: text.substring(0, 20)
   });
-  const textColor = parseColor(caption.style?.textColor || '#ffffff');
-  const backgroundColor = parseColor(caption.style?.backgroundColor || '#80000000');
-  const strokeColor = parseColor(caption.style?.strokeColor || '#000000');
+  const textColor = parseColor(caption.style?.textColor || '#ffffff', caption.style?.textColorOpacity);
+  const backgroundColor = parseColor(caption.style?.backgroundColor || '#80000000', caption.style?.backgroundColorOpacity);
+  const strokeColor = parseColor(caption.style?.strokeColor || '#000000', caption.style?.strokeColorOpacity);
   const strokeWidth = caption.style?.strokeWidth || 0;
   
   // Set font with actual font from caption style (matching export system exactly)
@@ -1742,10 +1742,10 @@ function renderKaraokeTextOnCanvas(
   const baseFontSize = caption.style?.fontSize || 85;
   const scale = caption.style?.scale || 1;
   const fontSize = baseFontSize * scale;
-  const textColor = parseColor(caption.style?.textColor || '#ffffff');
-  const highlighterColor = parseColor(caption.style?.highlighterColor || '#ffff00');
-  const backgroundColor = parseColor(caption.style?.backgroundColor || '#80000000');
-  const strokeColor = parseColor(caption.style?.strokeColor || '#000000');
+  const textColor = parseColor(caption.style?.textColor || '#ffffff', caption.style?.textColorOpacity);
+  const highlighterColor = parseColor(caption.style?.highlighterColor || '#ffff00', caption.style?.highlighterColorOpacity);
+  const backgroundColor = parseColor(caption.style?.backgroundColor || '#80000000', caption.style?.backgroundColorOpacity);
+  const strokeColor = parseColor(caption.style?.strokeColor || '#000000', caption.style?.strokeColorOpacity);
   const strokeWidth = caption.style?.strokeWidth || 0;
   
   // Set font with actual font from caption style (matching VideoPanel exactly)
@@ -1917,10 +1917,10 @@ function renderProgressiveTextOnCanvas(
   const baseFontSize = caption.style?.fontSize || 85;
   const scale = caption.style?.scale || 1;
   const fontSize = baseFontSize * scale;
-  const textColor = parseColor(caption.style?.textColor || '#ffffff');
-  const highlighterColor = parseColor(caption.style?.highlighterColor || '#ffff00');
-  const backgroundColor = parseColor(caption.style?.backgroundColor || '#80000000');
-  const strokeColor = parseColor(caption.style?.strokeColor || '#000000');
+  const textColor = parseColor(caption.style?.textColor || '#ffffff', caption.style?.textColorOpacity);
+  const highlighterColor = parseColor(caption.style?.highlighterColor || '#ffff00', caption.style?.highlighterColorOpacity);
+  const backgroundColor = parseColor(caption.style?.backgroundColor || '#80000000', caption.style?.backgroundColorOpacity);
+  const strokeColor = parseColor(caption.style?.strokeColor || '#000000', caption.style?.strokeColorOpacity);
   const strokeWidth = caption.style?.strokeWidth || 0;
   
   // Set font with actual font from caption style
@@ -2040,10 +2040,13 @@ function renderProgressiveTextOnCanvas(
 }
 
 // Color parsing function (matching CanvasVideoRenderer)
-function parseColor(colorStr: string): { r: number, g: number, b: number, a: number } {
+function parseColor(colorStr: string, opacity?: number): { r: number, g: number, b: number, a: number } {
   if (colorStr === 'transparent') {
     return { r: 0, g: 0, b: 0, a: 0 };
   }
+  
+  let baseAlpha = 1;
+  let r = 255, g = 255, b = 255;
   
   // Handle hex colors
   if (colorStr.startsWith('#')) {
@@ -2051,22 +2054,23 @@ function parseColor(colorStr: string): { r: number, g: number, b: number, a: num
     
     if (hex.length === 8) {
       // 8-character hex with alpha
-      const alpha = parseInt(hex.substring(0, 2), 16) / 255;
-      const r = parseInt(hex.substring(2, 4), 16);
-      const g = parseInt(hex.substring(4, 6), 16);
-      const b = parseInt(hex.substring(6, 8), 16);
-      return { r, g, b, a: alpha };
+      baseAlpha = parseInt(hex.substring(0, 2), 16) / 255;
+      r = parseInt(hex.substring(2, 4), 16);
+      g = parseInt(hex.substring(4, 6), 16);
+      b = parseInt(hex.substring(6, 8), 16);
     } else if (hex.length === 6) {
       // 6-character hex without alpha
-      const r = parseInt(hex.substring(0, 2), 16);
-      const g = parseInt(hex.substring(2, 4), 16);
-      const b = parseInt(hex.substring(4, 6), 16);
-      return { r, g, b, a: 1 };
+      r = parseInt(hex.substring(0, 2), 16);
+      g = parseInt(hex.substring(2, 4), 16);
+      b = parseInt(hex.substring(4, 6), 16);
+      baseAlpha = 1;
     }
   }
   
-  // Default to white
-  return { r: 255, g: 255, b: 255, a: 1 };
+  // Apply opacity if provided (convert percentage to decimal)
+  const finalAlpha = opacity !== undefined ? (baseAlpha * (opacity / 100)) : baseAlpha;
+  
+  return { r, g, b, a: finalAlpha };
 }
 
 // Expose rendering functions globally for PresetPreview
