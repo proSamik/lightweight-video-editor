@@ -30,40 +30,6 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
     }
   }, [style, openModalState]);
 
-  // Custom slider thumb styles - exact copy from TranscriptionSettings.tsx
-  const sliderThumbStyles = `
-    input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: ${theme.colors.primary};
-      cursor: pointer;
-      border: none;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    }
-    
-    input[type="range"]::-moz-range-thumb {
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: ${theme.colors.primary};
-      cursor: pointer;
-      border: none;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    }
-    
-    input[type="range"]::-ms-thumb {
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: ${theme.colors.primary};
-      cursor: pointer;
-      border: none;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    }
-  `;
 
   // Modal Component - positioned within styling panel
   const Modal: React.FC<{ 
@@ -244,7 +210,6 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
 
   return (
     <>
-      <style>{sliderThumbStyles}</style>
       <div style={{ padding: '12px', overflow: 'hidden', backgroundColor: theme.colors.surface, position: 'relative' }}>
         
         {/* Burn-in Subtitles Toggle - Top */}
@@ -561,25 +526,104 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
               borderRadius: '8px',
               border: `1px solid ${theme.colors.border}`
             }}>
-              <input
-                type="range"
-                min="16"
-                max="200"
-                step="1"
-                value={tempStyle.fontSize}
-                onChange={(e) => updateTempStyle({ fontSize: parseInt(e.target.value) })}
-                style={{
-                  width: '100%',
+              {/* Custom draggable slider */}
+              <div style={{ position: 'relative', height: '40px' }}>
+                {/* Track background */}
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: 0,
+                  right: 0,
                   height: '6px',
+                  backgroundColor: theme.colors.border,
                   borderRadius: '3px',
-                  background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${((tempStyle.fontSize - 16) / (200 - 16)) * 100}%, ${theme.colors.border} ${((tempStyle.fontSize - 16) / (200 - 16)) * 100}%, ${theme.colors.border} 100%)`,
-                  outline: 'none',
-                  appearance: 'none',
-                  cursor: 'pointer',
-                  WebkitAppearance: 'none',
-                  MozAppearance: 'none'
-                }}
-              />
+                  transform: 'translateY(-50%)'
+                }} />
+                
+                {/* Active track */}
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: 0,
+                  width: `${((tempStyle.fontSize - 16) / (200 - 16)) * 100}%`,
+                  height: '6px',
+                  backgroundColor: theme.colors.primary,
+                  borderRadius: '3px',
+                  transform: 'translateY(-50%)'
+                }} />
+                
+                {/* Clickable track for direct positioning */}
+                <div 
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: '40px',
+                    cursor: 'pointer'
+                  }}
+                  onClick={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const clickX = e.clientX - rect.left;
+                    const percentage = Math.max(0, Math.min(1, clickX / rect.width));
+                    const newValue = Math.round(16 + percentage * (200 - 16));
+                    updateTempStyle({ fontSize: newValue });
+                  }}
+                />
+                
+                {/* Draggable thumb */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: `${((tempStyle.fontSize - 16) / (200 - 16)) * 100}%`,
+                    width: '20px',
+                    height: '20px',
+                    backgroundColor: theme.colors.primary,
+                    borderRadius: '50%',
+                    border: '3px solid #ffffff',
+                    transform: 'translate(-50%, -50%)',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                    cursor: 'grab',
+                    zIndex: 5,
+                    transition: 'transform 0.1s ease'
+                  }}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    const thumb = e.currentTarget as HTMLElement;
+                    thumb.style.cursor = 'grabbing';
+                    
+                    const container = thumb.parentElement;
+                    if (!container) return;
+                    
+                    const containerRect = container.getBoundingClientRect();
+                    
+                    const handleMouseMove = (moveEvent: MouseEvent) => {
+                      const mouseX = moveEvent.clientX - containerRect.left;
+                      const percentage = Math.max(0, Math.min(1, mouseX / containerRect.width));
+                      const newValue = Math.round(16 + percentage * (200 - 16));
+                      updateTempStyle({ fontSize: newValue });
+                    };
+                    
+                    const handleMouseUp = () => {
+                      thumb.style.cursor = 'grab';
+                      document.removeEventListener('mousemove', handleMouseMove);
+                      document.removeEventListener('mouseup', handleMouseUp);
+                    };
+                    
+                    document.addEventListener('mousemove', handleMouseMove);
+                    document.addEventListener('mouseup', handleMouseUp);
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1)';
+                  }}
+                />
+              </div>
               <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -743,27 +787,106 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
                   borderRadius: theme.radius.lg,
                   border: `1px solid ${theme.colors.border}`
                 }}>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="1"
-                    value={tempStyle.position?.x || 50}
-                    onChange={(e) => updateTempStyle({
-                      position: { ...(tempStyle.position || { x: 50, y: 80, z: 0 }), x: parseInt(e.target.value) }
-                    })}
-                    style={{
-                      width: '100%',
+                  {/* Custom draggable slider */}
+                  <div style={{ position: 'relative', height: '40px' }}>
+                    {/* Track background */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: 0,
+                      right: 0,
                       height: '6px',
+                      backgroundColor: theme.colors.border,
                       borderRadius: '3px',
-                      background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${(tempStyle.position?.x || 50)}%, ${theme.colors.border} ${(tempStyle.position?.x || 50)}%, ${theme.colors.border} 100%)`,
-                      outline: 'none',
-                      appearance: 'none',
-                      cursor: 'pointer',
-                      WebkitAppearance: 'none',
-                      MozAppearance: 'none'
-                    }}
-                  />
+                      transform: 'translateY(-50%)'
+                    }} />
+                    
+                    {/* Active track */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: 0,
+                      width: `${(tempStyle.position?.x || 50)}%`,
+                      height: '6px',
+                      backgroundColor: theme.colors.primary,
+                      borderRadius: '3px',
+                      transform: 'translateY(-50%)'
+                    }} />
+                    
+                    {/* Clickable track */}
+                    <div 
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        height: '40px',
+                        cursor: 'pointer'
+                      }}
+                      onClick={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const clickX = e.clientX - rect.left;
+                        const percentage = Math.max(0, Math.min(100, (clickX / rect.width) * 100));
+                        updateTempStyle({
+                          position: { ...(tempStyle.position || { x: 50, y: 80, z: 0 }), x: Math.round(percentage) }
+                        });
+                      }}
+                    />
+                    
+                    {/* Draggable thumb */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: `${(tempStyle.position?.x || 50)}%`,
+                        width: '20px',
+                        height: '20px',
+                        backgroundColor: theme.colors.primary,
+                        borderRadius: '50%',
+                        border: '3px solid #ffffff',
+                        transform: 'translate(-50%, -50%)',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                        cursor: 'grab',
+                        zIndex: 5,
+                        transition: 'transform 0.1s ease'
+                      }}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        const thumb = e.currentTarget as HTMLElement;
+                        thumb.style.cursor = 'grabbing';
+                        
+                        const container = thumb.parentElement;
+                        if (!container) return;
+                        
+                        const containerRect = container.getBoundingClientRect();
+                        
+                        const handleMouseMove = (moveEvent: MouseEvent) => {
+                          const mouseX = moveEvent.clientX - containerRect.left;
+                          const percentage = Math.max(0, Math.min(100, (mouseX / containerRect.width) * 100));
+                          updateTempStyle({
+                            position: { ...(tempStyle.position || { x: 50, y: 80, z: 0 }), x: Math.round(percentage) }
+                          });
+                        };
+                        
+                        const handleMouseUp = () => {
+                          thumb.style.cursor = 'grab';
+                          document.removeEventListener('mousemove', handleMouseMove);
+                          document.removeEventListener('mouseup', handleMouseUp);
+                        };
+                        
+                        document.addEventListener('mousemove', handleMouseMove);
+                        document.addEventListener('mouseup', handleMouseUp);
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1.1)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1)';
+                      }}
+                    />
+                  </div>
                   <div style={{
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -805,27 +928,106 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
                   borderRadius: theme.radius.lg,
                   border: `1px solid ${theme.colors.border}`
                 }}>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="1"
-                    value={tempStyle.position?.y || 80}
-                    onChange={(e) => updateTempStyle({
-                      position: { ...(tempStyle.position || { x: 50, y: 80, z: 0 }), y: parseInt(e.target.value) }
-                    })}
-                    style={{
-                      width: '100%',
+                  {/* Custom draggable slider */}
+                  <div style={{ position: 'relative', height: '40px' }}>
+                    {/* Track background */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: 0,
+                      right: 0,
                       height: '6px',
+                      backgroundColor: theme.colors.border,
                       borderRadius: '3px',
-                      background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${(tempStyle.position?.y || 80)}%, ${theme.colors.border} ${(tempStyle.position?.y || 80)}%, ${theme.colors.border} 100%)`,
-                      outline: 'none',
-                      appearance: 'none',
-                      cursor: 'pointer',
-                      WebkitAppearance: 'none',
-                      MozAppearance: 'none'
-                    }}
-                  />
+                      transform: 'translateY(-50%)'
+                    }} />
+                    
+                    {/* Active track */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: 0,
+                      width: `${(tempStyle.position?.y || 80)}%`,
+                      height: '6px',
+                      backgroundColor: theme.colors.primary,
+                      borderRadius: '3px',
+                      transform: 'translateY(-50%)'
+                    }} />
+                    
+                    {/* Clickable track */}
+                    <div 
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        height: '40px',
+                        cursor: 'pointer'
+                      }}
+                      onClick={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const clickX = e.clientX - rect.left;
+                        const percentage = Math.max(0, Math.min(100, (clickX / rect.width) * 100));
+                        updateTempStyle({
+                          position: { ...(tempStyle.position || { x: 50, y: 80, z: 0 }), y: Math.round(percentage) }
+                        });
+                      }}
+                    />
+                    
+                    {/* Draggable thumb */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: `${(tempStyle.position?.y || 80)}%`,
+                        width: '20px',
+                        height: '20px',
+                        backgroundColor: theme.colors.primary,
+                        borderRadius: '50%',
+                        border: '3px solid #ffffff',
+                        transform: 'translate(-50%, -50%)',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                        cursor: 'grab',
+                        zIndex: 5,
+                        transition: 'transform 0.1s ease'
+                      }}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        const thumb = e.currentTarget as HTMLElement;
+                        thumb.style.cursor = 'grabbing';
+                        
+                        const container = thumb.parentElement;
+                        if (!container) return;
+                        
+                        const containerRect = container.getBoundingClientRect();
+                        
+                        const handleMouseMove = (moveEvent: MouseEvent) => {
+                          const mouseX = moveEvent.clientX - containerRect.left;
+                          const percentage = Math.max(0, Math.min(100, (mouseX / containerRect.width) * 100));
+                          updateTempStyle({
+                            position: { ...(tempStyle.position || { x: 50, y: 80, z: 0 }), y: Math.round(percentage) }
+                          });
+                        };
+                        
+                        const handleMouseUp = () => {
+                          thumb.style.cursor = 'grab';
+                          document.removeEventListener('mousemove', handleMouseMove);
+                          document.removeEventListener('mouseup', handleMouseUp);
+                        };
+                        
+                        document.addEventListener('mousemove', handleMouseMove);
+                        document.addEventListener('mouseup', handleMouseUp);
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1.1)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1)';
+                      }}
+                    />
+                  </div>
                   <div style={{
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -878,27 +1080,108 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
                 borderRadius: theme.radius.lg,
                 border: `1px solid ${theme.colors.border}`
               }}>
-                <input
-                  type="range"
-                  min="0"
-                  max="360"
-                  step="1"
-                  value={tempStyle.position?.z || 0}
-                  onChange={(e) => updateTempStyle({
-                    position: { ...(tempStyle.position || { x: 50, y: 80, z: 0 }), z: parseInt(e.target.value) }
-                  })}
-                  style={{
-                    width: '100%',
+                {/* Custom draggable slider */}
+                <div style={{ position: 'relative', height: '40px' }}>
+                  {/* Track background */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: 0,
+                    right: 0,
                     height: '6px',
+                    backgroundColor: theme.colors.border,
                     borderRadius: '3px',
-                    background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${((tempStyle.position?.z || 0) / 360) * 100}%, ${theme.colors.border} ${((tempStyle.position?.z || 0) / 360) * 100}%, ${theme.colors.border} 100%)`,
-                    outline: 'none',
-                    appearance: 'none',
-                    cursor: 'pointer',
-                    WebkitAppearance: 'none',
-                    MozAppearance: 'none'
-                  }}
-                />
+                    transform: 'translateY(-50%)'
+                  }} />
+                  
+                  {/* Active track */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: 0,
+                    width: `${((tempStyle.position?.z || 0) / 360) * 100}%`,
+                    height: '6px',
+                    backgroundColor: theme.colors.primary,
+                    borderRadius: '3px',
+                    transform: 'translateY(-50%)'
+                  }} />
+                  
+                  {/* Clickable track */}
+                  <div 
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: '40px',
+                      cursor: 'pointer'
+                    }}
+                    onClick={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const clickX = e.clientX - rect.left;
+                      const percentage = Math.max(0, Math.min(1, clickX / rect.width));
+                      const newValue = Math.round(percentage * 360);
+                      updateTempStyle({
+                        position: { ...(tempStyle.position || { x: 50, y: 80, z: 0 }), z: newValue }
+                      });
+                    }}
+                  />
+                  
+                  {/* Draggable thumb */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: `${((tempStyle.position?.z || 0) / 360) * 100}%`,
+                      width: '20px',
+                      height: '20px',
+                      backgroundColor: theme.colors.primary,
+                      borderRadius: '50%',
+                      border: '3px solid #ffffff',
+                      transform: 'translate(-50%, -50%)',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                      cursor: 'grab',
+                      zIndex: 5,
+                      transition: 'transform 0.1s ease'
+                    }}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      
+                      const thumb = e.currentTarget as HTMLElement;
+                      thumb.style.cursor = 'grabbing';
+                      
+                      const container = thumb.parentElement;
+                      if (!container) return;
+                      
+                      const containerRect = container.getBoundingClientRect();
+                      
+                      const handleMouseMove = (moveEvent: MouseEvent) => {
+                        const mouseX = moveEvent.clientX - containerRect.left;
+                        const percentage = Math.max(0, Math.min(1, mouseX / containerRect.width));
+                        const newValue = Math.round(percentage * 360);
+                        updateTempStyle({
+                          position: { ...(tempStyle.position || { x: 50, y: 80, z: 0 }), z: newValue }
+                        });
+                      };
+                      
+                      const handleMouseUp = () => {
+                        thumb.style.cursor = 'grab';
+                        document.removeEventListener('mousemove', handleMouseMove);
+                        document.removeEventListener('mouseup', handleMouseUp);
+                      };
+                      
+                      document.addEventListener('mousemove', handleMouseMove);
+                      document.addEventListener('mouseup', handleMouseUp);
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1)';
+                    }}
+                  />
+                </div>
                 <div style={{
                   display: 'flex',
                   justifyContent: 'space-between',
@@ -950,25 +1233,104 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
                 borderRadius: theme.radius.lg,
                 border: `1px solid ${theme.colors.border}`
               }}>
-                <input
-                  type="range"
-                  min="0"
-                  max="10"
-                  step="1"
-                  value={tempStyle.strokeWidth || 0}
-                  onChange={(e) => updateTempStyle({ strokeWidth: parseInt(e.target.value) })}
-                  style={{
-                    width: '100%',
+                {/* Custom draggable slider */}
+                <div style={{ position: 'relative', height: '40px' }}>
+                  {/* Track background */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: 0,
+                    right: 0,
                     height: '6px',
+                    backgroundColor: theme.colors.border,
                     borderRadius: '3px',
-                    background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${((tempStyle.strokeWidth || 0) / 10) * 100}%, ${theme.colors.border} ${((tempStyle.strokeWidth || 0) / 10) * 100}%, ${theme.colors.border} 100%)`,
-                    outline: 'none',
-                    appearance: 'none',
-                    cursor: 'pointer',
-                    WebkitAppearance: 'none',
-                    MozAppearance: 'none'
-                  }}
-                />
+                    transform: 'translateY(-50%)'
+                  }} />
+                  
+                  {/* Active track */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: 0,
+                    width: `${((tempStyle.strokeWidth || 0) / 10) * 100}%`,
+                    height: '6px',
+                    backgroundColor: theme.colors.primary,
+                    borderRadius: '3px',
+                    transform: 'translateY(-50%)'
+                  }} />
+                  
+                  {/* Clickable track */}
+                  <div 
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: '40px',
+                      cursor: 'pointer'
+                    }}
+                    onClick={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const clickX = e.clientX - rect.left;
+                      const percentage = Math.max(0, Math.min(1, clickX / rect.width));
+                      const newValue = Math.round(percentage * 10);
+                      updateTempStyle({ strokeWidth: newValue });
+                    }}
+                  />
+                  
+                  {/* Draggable thumb */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: `${((tempStyle.strokeWidth || 0) / 10) * 100}%`,
+                      width: '20px',
+                      height: '20px',
+                      backgroundColor: theme.colors.primary,
+                      borderRadius: '50%',
+                      border: '3px solid #ffffff',
+                      transform: 'translate(-50%, -50%)',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                      cursor: 'grab',
+                      zIndex: 5,
+                      transition: 'transform 0.1s ease'
+                    }}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      
+                      const thumb = e.currentTarget as HTMLElement;
+                      thumb.style.cursor = 'grabbing';
+                      
+                      const container = thumb.parentElement;
+                      if (!container) return;
+                      
+                      const containerRect = container.getBoundingClientRect();
+                      
+                      const handleMouseMove = (moveEvent: MouseEvent) => {
+                        const mouseX = moveEvent.clientX - containerRect.left;
+                        const percentage = Math.max(0, Math.min(1, mouseX / containerRect.width));
+                        const newValue = Math.round(percentage * 10);
+                        updateTempStyle({ strokeWidth: newValue });
+                      };
+                      
+                      const handleMouseUp = () => {
+                        thumb.style.cursor = 'grab';
+                        document.removeEventListener('mousemove', handleMouseMove);
+                        document.removeEventListener('mouseup', handleMouseUp);
+                      };
+                      
+                      document.addEventListener('mousemove', handleMouseMove);
+                      document.addEventListener('mouseup', handleMouseUp);
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1)';
+                    }}
+                  />
+                </div>
                 <div style={{
                   display: 'flex',
                   justifyContent: 'space-between',
