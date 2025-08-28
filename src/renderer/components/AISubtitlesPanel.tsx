@@ -1405,9 +1405,10 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
             style={{
               marginBottom: '4px',
               padding: '6px 8px',
-              backgroundColor: theme.colors.surface,
+              // Match Advanced Style rows look
+              backgroundColor: '#e3f2fd',
               borderRadius: '4px',
-              border: `1px solid ${selectedFrameId === frame.id ? theme.colors.primary : theme.colors.border}`,
+              border: `2px solid ${theme.colors.primary}`,
               cursor: 'pointer',
               transition: 'all 0.15s ease',
               lineHeight: 1.3
