@@ -45,8 +45,8 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
       );
   }, [categoryFilters, searchTerm]);
 
-  // Pagination for 3 cards per page (single row layout)
-  const presetsPerPage = 3;
+  // Pagination for 6 cards per page (single row layout)
+  const presetsPerPage = 6;
   const totalPages = Math.ceil(filteredPresets.length / presetsPerPage);
   const currentPresets = filteredPresets.slice(currentPage * presetsPerPage, (currentPage + 1) * presetsPerPage);
 
@@ -91,18 +91,21 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
     
     // Dynamic font size based on render mode and text length
     const getPreviewFontSize = () => {
-      const containerWidth = 280; // approximate card width
+      const containerWidth = 320; // card width with padding
       const textLength = text.length;
       const isProgressive = preset.style.renderMode === 'progressive';
       
       let baseSize;
       if (isProgressive) {
-        baseSize = Math.min(20, containerWidth / (Math.max(text.split(' ').length, 6) * 4));
+        // For progressive mode, size based on number of words
+        const wordCount = text.split(' ').length;
+        baseSize = Math.min(16, Math.max(10, 120 / wordCount));
       } else {
-        baseSize = Math.min(18, containerWidth / (textLength * 0.6));
+        // For horizontal mode, size based on text length
+        baseSize = Math.min(14, Math.max(8, 280 / (textLength * 0.4)));
       }
       
-      return Math.max(10, Math.min(24, baseSize));
+      return baseSize;
     };
     
     const fontSize = getPreviewFontSize();
@@ -121,7 +124,7 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
         <div style={{
           width: '100%',
           height: '100%',
-          backgroundColor: theme.colors.background,
+          backgroundColor: '#ffffff',
           border: isSelected 
             ? `2px solid ${theme.colors.primary}` 
             : `1px solid ${theme.colors.border}`,
@@ -132,7 +135,7 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
           overflow: 'hidden',
           transition: 'all 0.2s ease',
           position: 'relative',
-          padding: '8px'
+          padding: '12px'
         }}
         onMouseEnter={(e) => {
           if (!isSelected) {
@@ -155,9 +158,10 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
             alignItems: 'center',
             justifyContent: 'center',
             flexDirection: isProgressive ? 'column' : 'row',
-            flexWrap: isProgressive ? 'nowrap' : 'wrap',
-            gap: isProgressive ? '2px' : '4px',
-            overflow: 'hidden'
+            flexWrap: 'nowrap',
+            gap: isProgressive ? '1px' : '3px',
+            overflow: 'hidden',
+            position: 'relative'
           }}>
             {isProgressive ? (
               // Progressive mode - show words vertically one by one
@@ -196,11 +200,12 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
               // Horizontal mode - show all words in a line with current word highlighted
               <div style={{
                 display: 'flex',
-                flexWrap: 'wrap',
+                flexWrap: 'nowrap',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '4px',
-                maxWidth: '100%'
+                gap: '3px',
+                maxWidth: '100%',
+                overflow: 'hidden'
               }}>
                 {words.map((word, index) => {
                   const isCurrentWord = index === currentWordIndex;
@@ -228,7 +233,8 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
                         transition: 'all 0.3s ease',
                         transform: isCurrentWord ? 
                           (preset.style.emphasizeMode ? 'scale(1.05)' : 'scale(1)') : 'scale(1)',
-                        whiteSpace: 'nowrap'
+                        whiteSpace: 'nowrap',
+                        maxWidth: 'fit-content'
                       }}
                     >
                       {word}
