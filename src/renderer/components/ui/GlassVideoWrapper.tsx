@@ -58,7 +58,7 @@ const GlassVideoWrapper: React.FC<GlassVideoWrapperProps> = ({
         pointerEvents: 'none'
       }} />
 
-      {/* Video Container with Device-like Border */}
+      {/* Video Container with Clean Device-like Border */}
       <div style={{
         position: 'relative',
         width: aspectRatio === '9:16' ? 'auto' : '100%',
@@ -67,49 +67,31 @@ const GlassVideoWrapper: React.FC<GlassVideoWrapperProps> = ({
         maxHeight: '100%',
         aspectRatio: aspectRatio === '9:16' ? '9/16' : '16/9',
         zIndex: 1,
-        // Outer border (gray/white like mobile device) - perfectly even
-        background: `linear-gradient(145deg, 
-          rgba(255, 255, 255, 0.95) 0%, 
-          rgba(248, 250, 252, 0.9) 50%, 
-          rgba(229, 231, 235, 0.85) 100%
-        )`,
-        borderRadius: '24px',
+        // Clean device border - white/light gray like modern phones
+        background: '#f8fafc',
+        border: '8px solid #e2e8f0',
+        borderRadius: '20px',
         boxShadow: `
-          0 32px 64px rgba(0, 0, 0, 0.12),
-          0 8px 32px rgba(59, 130, 246, 0.08),
-          inset 0 1px 0 rgba(255, 255, 255, 0.4)
+          0 20px 25px -5px rgba(0, 0, 0, 0.1),
+          0 10px 10px -5px rgba(0, 0, 0, 0.04),
+          inset 0 1px 0 rgba(255, 255, 255, 0.8)
         `,
-        backdropFilter: 'blur(20px)',
-        boxSizing: 'border-box'
+        boxSizing: 'border-box',
+        padding: '4px'
       }}>
-        {/* Inner container with white border and rounded corners */}
+        {/* Content container */}
         <div style={{
           position: 'relative',
           width: '100%',
           height: '100%',
-          background: '#ffffff',
-          borderRadius: '16px',
-          boxShadow: `
-            inset 0 2px 4px rgba(0, 0, 0, 0.1),
-            inset 0 -2px 4px rgba(0, 0, 0, 0.05)
-          `,
+          borderRadius: '12px',
           overflow: 'hidden',
-          boxSizing: 'border-box'
+          backgroundColor: '#000000',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
         }}>
-          {/* Content container with final border radius */}
-          <div style={{
-            position: 'relative',
-            width: '100%',
-            height: '100%',
-            borderRadius: '12px',
-            overflow: 'hidden',
-            backgroundColor: 'transparent',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            {children}
-          </div>
+          {children}
         </div>
       </div>
     </div>

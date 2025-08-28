@@ -1372,7 +1372,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
           style={{
             width: '100%',
             height: '100%',
-            objectFit: 'contain',
+            objectFit: 'cover',
             display: videoLoadError ? 'none' : 'block'
           }}
           onTimeUpdate={() => {
