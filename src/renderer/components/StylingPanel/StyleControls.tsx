@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { FiType, FiMove, FiAlignLeft, FiAlignCenter, FiAlignRight } from 'react-icons/fi';
+import { FiType, FiMove, FiAlignLeft, FiAlignCenter, FiAlignRight, FiSettings } from 'react-icons/fi';
 import { SubtitleStyle, FontOption, ColorOption } from '../../../types';
 
 interface StyleControlsProps {
@@ -13,14 +13,14 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
   onStyleUpdate,
 }) => {
   const { theme } = useTheme();
-  const [openModal, setOpenModal] = useState<string | null>(null);
+  const [openModalState, setOpenModalState] = useState<string | null>(null);
   const [tempStyle, setTempStyle] = useState<SubtitleStyle>(style);
   const [originalStyleSnapshot, setOriginalStyleSnapshot] = useState<SubtitleStyle | null>(null);
 
   // Update temp style when main style changes, but ONLY if no modal is open
   useEffect(() => {
-    console.log('useEffect triggered:', { openModal, style });
-    if (!openModal) {
+    console.log('useEffect triggered:', { openModalState, style });
+    if (!openModalState) {
       console.log('useEffect updating tempStyle to:', style);
       setTempStyle({ ...style });
       // Clear any leftover snapshot
@@ -28,7 +28,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
     } else {
       console.log('useEffect skipped - modal is open');
     }
-  }, [style, openModal]);
+  }, [style, openModalState]);
 
   // Custom slider thumb styles - exact copy from TranscriptionSettings.tsx
   const sliderThumbStyles = `
@@ -70,10 +70,8 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
     isOpen: boolean; 
     onClose: () => void; 
     title: string; 
-    children: React.ReactNode; 
-    showApply?: boolean; 
-    onApply?: () => void;
-  }> = ({ isOpen, onClose, title, children, showApply = false, onApply }) => {
+    children: React.ReactNode;
+  }> = ({ isOpen, onClose, title, children }) => {
     if (!isOpen) return null;
     
     return (
@@ -91,7 +89,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
         borderRadius: '8px'
       }}>
         <div style={{
-          backgroundColor: theme.colors.surface,
+          backgroundColor: '#ffffff',
           borderRadius: '12px',
           padding: '20px',
           maxWidth: '350px',
@@ -124,49 +122,53 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
             </button>
           </div>
           {children}
-          {showApply && (
-            <div style={{
-              display: 'flex',
-              gap: '8px',
-              marginTop: '16px',
-              justifyContent: 'flex-end'
-            }}>
-              <button
-                onClick={onClose}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: theme.colors.background,
-                  color: theme.colors.text,
-                  border: `1px solid ${theme.colors.border}`,
-                  borderRadius: '6px',
-                  fontSize: '11px',
-                  cursor: 'pointer'
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  onApply?.();
-                  // Do NOT call onClose() here - onApply will handle closing
-                }}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: theme.colors.primary,
-                  color: theme.colors.primaryForeground,
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '11px',
-                  cursor: 'pointer'
-                }}
-              >
-                Apply
-              </button>
-            </div>
-          )}
+          
+          {/* Apply/Cancel Buttons */}
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            marginTop: '16px',
+            justifyContent: 'flex-end',
+            borderTop: `1px solid ${theme.colors.border}`,
+            paddingTop: '12px'
+          }}>
+            <button
+              onClick={handleCancel}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: 'transparent',
+                color: theme.colors.text,
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: '6px',
+                fontSize: '11px',
+                cursor: 'pointer'
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleApply}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: theme.colors.primary,
+                color: theme.colors.primaryForeground,
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '11px',
+                cursor: 'pointer'
+              }}
+            >
+              Apply
+            </button>
+          </div>
         </div>
       </div>
     );
+  };
+
+  // Modal closing and opening handlers  
+  const openModal = (modalName: string) => {
+    openModalWithState(modalName);
   };
 
   // Compact Button Component
@@ -210,7 +212,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
     // Take snapshot of current style when modal opens
     setOriginalStyleSnapshot({ ...style });
     setTempStyle({ ...style });
-    setOpenModal(modalName);
+    setOpenModalState(modalName);
   };
 
   const handleCancel = () => {
@@ -221,14 +223,14 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
       setTempStyle({ ...originalStyleSnapshot });
     }
     setOriginalStyleSnapshot(null); // Clean up memory
-    setOpenModal(null);
+    setOpenModalState(null);
   };
 
   const handleApply = () => {
     // Changes are already applied via live preview - just close modal and cleanup
     console.log('handleApply - keeping current style (already applied via live preview)');
     setOriginalStyleSnapshot(null); // Clean up memory
-    setOpenModal(null);
+    setOpenModalState(null);
   };
 
   // Update temp style WITH live preview - apply changes immediately for preview
@@ -376,24 +378,24 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
               icon={<FiType size={14} />}
               label="Font"
               value={style.font}
-              onClick={() => openModalWithState('font')}
+              onClick={() => openModal('font')}
             />
             <CompactButton
               label="Size"
               value={`${style.fontSize}px`}
-              onClick={() => openModalWithState('fontSize')}
+              onClick={() => openModal('fontSize')}
             />
             <CompactButton
               label="Transform"
               value={style.textTransform || 'none'}
-              onClick={() => openModalWithState('textTransform')}
+              onClick={() => openModal('textTransform')}
             />
             <CompactButton
               icon={style.textAlign === 'left' ? <FiAlignLeft size={14} /> : 
                     style.textAlign === 'right' ? <FiAlignRight size={14} /> : 
                     <FiAlignCenter size={14} />}
               label="Align"
-              onClick={() => openModalWithState('textAlign')}
+              onClick={() => openModal('textAlign')}
             />
           </div>
         </div>
@@ -422,10 +424,11 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
                 height: '14px', 
                 backgroundColor: style.textColor, 
                 borderRadius: '3px',
-                border: '1px solid rgba(255,255,255,0.3)'
+                border: '2px solid #ddd',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
               }} />}
               label="Text"
-              onClick={() => openModalWithState('textColor')}
+              onClick={() => openModal('textColor')}
             />
             <CompactButton
               icon={<div style={{ 
@@ -433,10 +436,11 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
                 height: '14px', 
                 backgroundColor: style.highlighterColor, 
                 borderRadius: '3px',
-                border: '1px solid rgba(255,255,255,0.3)'
+                border: '2px solid #ddd',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
               }} />}
               label="Highlight"
-              onClick={() => openModalWithState('highlighterColor')}
+              onClick={() => openModal('highlighterColor')}
             />
             <CompactButton
               icon={<div style={{ 
@@ -444,10 +448,11 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
                 height: '14px', 
                 backgroundColor: style.backgroundColor, 
                 borderRadius: '3px',
-                border: '1px solid rgba(255,255,255,0.3)'
+                border: '2px solid #ddd',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
               }} />}
               label="Background"
-              onClick={() => openModalWithState('backgroundColor')}
+              onClick={() => openModal('backgroundColor')}
             />
             <CompactButton
               icon={<div style={{ 
@@ -455,10 +460,11 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
                 height: '14px', 
                 backgroundColor: style.strokeColor, 
                 borderRadius: '3px',
-                border: '1px solid rgba(255,255,255,0.3)'
+                border: '2px solid #ddd',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
               }} />}
               label="Stroke"
-              onClick={() => openModalWithState('strokeColor')}
+              onClick={() => openModal('strokeColor')}
             />
           </div>
         </div>
@@ -485,17 +491,17 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
               icon={<FiMove size={14} />}
               label="X, Y"
               value={`${(style.position?.x || 50).toFixed(1)}, ${(style.position?.y || 80).toFixed(1)}`}
-              onClick={() => openModalWithState('position')}
+              onClick={() => openModal('position')}
             />
             <CompactButton
               label="Rotation"
               value={`${style.position?.z || 0}°`}
-              onClick={() => openModalWithState('rotation')}
+              onClick={() => openModal('rotation')}
             />
             <CompactButton
               label="Stroke Width"
               value={`${style.strokeWidth || 0}px`}
-              onClick={() => openModalWithState('strokeWidth')}
+              onClick={() => openModal('strokeWidth')}
             />
           </div>
         </div>
@@ -504,11 +510,9 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
 
         {/* Font Modal */}
         <Modal 
-          isOpen={openModal === 'font'} 
+          isOpen={openModalState === 'font'} 
           onClose={handleCancel} 
           title="Font Family"
-          showApply={true}
-          onApply={handleApply}
         >
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
             {Object.values(FontOption).map((font) => (
@@ -535,11 +539,9 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
 
         {/* Font Size Modal */}
         <Modal 
-          isOpen={openModal === 'fontSize'} 
+          isOpen={openModalState === 'fontSize'} 
           onClose={handleCancel} 
           title="Font Size"
-          showApply={true}
-          onApply={handleApply}
         >
           <div style={{ marginBottom: '16px' }}>
             <div style={{
@@ -553,32 +555,51 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
                 {tempStyle.fontSize}px
               </span>
             </div>
-            <input
-              type="range"
-              min="16"
-              max="200"
-              value={tempStyle.fontSize}
-              onChange={(e) => updateTempStyle({ fontSize: parseInt(e.target.value) })}
-              style={{
-                width: '100%',
-                height: '6px',
-                borderRadius: '3px',
-                background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${((tempStyle.fontSize - 16) / (200 - 16)) * 100}%, ${theme.colors.border} ${((tempStyle.fontSize - 16) / (200 - 16)) * 100}%, ${theme.colors.border} 100%)`,
-                outline: 'none',
-                appearance: 'none',
-                cursor: 'pointer'
-              }}
-            />
+            <div style={{
+              padding: '12px',
+              backgroundColor: '#ffffff',
+              borderRadius: '8px',
+              border: `1px solid ${theme.colors.border}`
+            }}>
+              <input
+                type="range"
+                min="16"
+                max="200"
+                step="1"
+                value={tempStyle.fontSize}
+                onChange={(e) => updateTempStyle({ fontSize: parseInt(e.target.value) })}
+                style={{
+                  width: '100%',
+                  height: '6px',
+                  borderRadius: '3px',
+                  background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${((tempStyle.fontSize - 16) / (200 - 16)) * 100}%, ${theme.colors.border} ${((tempStyle.fontSize - 16) / (200 - 16)) * 100}%, ${theme.colors.border} 100%)`,
+                  outline: 'none',
+                  appearance: 'none',
+                  cursor: 'pointer',
+                  WebkitAppearance: 'none',
+                  MozAppearance: 'none'
+                }}
+              />
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                marginTop: '8px',
+                fontSize: '10px',
+                color: theme.colors.textSecondary,
+                fontWeight: '500'
+              }}>
+                <span>16</span>
+                <span>200</span>
+              </div>
+            </div>
           </div>
         </Modal>
 
         {/* Text Transform Modal */}
         <Modal 
-          isOpen={openModal === 'textTransform'} 
+          isOpen={openModalState === 'textTransform'} 
           onClose={handleCancel} 
           title="Text Transform"
-          showApply={true}
-          onApply={handleApply}
         >
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
             {['none', 'capitalize', 'uppercase', 'lowercase'].map((transform) => (
@@ -605,11 +626,9 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
 
         {/* Text Align Modal */}
         <Modal 
-          isOpen={openModal === 'textAlign'} 
+          isOpen={openModalState === 'textAlign'} 
           onClose={handleCancel} 
           title="Text Alignment"
-          showApply={true}
-          onApply={handleApply}
         >
           <div style={{ display: 'flex', gap: '8px' }}>
             {[
@@ -647,11 +666,9 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
         {['textColor', 'highlighterColor', 'backgroundColor', 'strokeColor'].map((colorType) => (
           <Modal 
             key={colorType}
-            isOpen={openModal === colorType} 
+            isOpen={openModalState === colorType} 
             onClose={handleCancel} 
             title={colorType.replace('Color', '').replace(/([A-Z])/g, ' $1').replace(/^\w/, c => c.toUpperCase()) + ' Color'}
-            showApply={true}
-            onApply={handleApply}
           >
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
               {Object.values(ColorOption).map((color) => (
@@ -662,11 +679,13 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
                     width: '40px',
                     height: '40px',
                     backgroundColor: color === 'transparent' ? 'transparent' : color,
-                    border: color === 'transparent' ? '2px dashed #ccc' : '2px solid transparent',
+                    border: color === 'transparent' 
+                      ? '2px dashed #ccc' 
+                      : `3px solid ${(tempStyle as any)[colorType] === color ? theme.colors.primary : '#ddd'}`,
                     borderRadius: '6px',
                     cursor: 'pointer',
                     position: 'relative',
-                    outline: (tempStyle as any)[colorType] === color ? `2px solid ${theme.colors.primary}` : 'none'
+                    boxShadow: color !== 'transparent' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
                   }}
                 >
                   {color === 'transparent' && (
@@ -690,155 +709,279 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
 
         {/* Position Modal */}
         <Modal 
-          isOpen={openModal === 'position'} 
+          isOpen={openModalState === 'position'} 
           onClose={handleCancel} 
           title="Position"
-          showApply={true}
-          onApply={handleApply}
         >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '8px'
-              }}>
-                <span style={{ fontSize: '12px', color: theme.colors.text }}>X Position</span>
-                <span style={{ fontSize: '12px', fontWeight: '600', color: theme.colors.primary }}>
-                  {tempStyle.position?.x || 50}%
-                </span>
+          <div style={{ padding: '20px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '8px'
+                }}>
+                  <label style={{
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    color: theme.colors.text
+                  }}>
+                    X Position
+                  </label>
+                  <span style={{
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: theme.colors.text
+                  }}>
+                    {tempStyle.position?.x || 50}%
+                  </span>
+                </div>
+                <div style={{
+                  padding: '12px',
+                  backgroundColor: theme.colors.modal.background,
+                  borderRadius: theme.radius.lg,
+                  border: `1px solid ${theme.colors.border}`
+                }}>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={tempStyle.position?.x || 50}
+                    onChange={(e) => updateTempStyle({
+                      position: { ...(tempStyle.position || { x: 50, y: 80, z: 0 }), x: parseInt(e.target.value) }
+                    })}
+                    style={{
+                      width: '100%',
+                      height: '6px',
+                      borderRadius: '3px',
+                      background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${(tempStyle.position?.x || 50)}%, ${theme.colors.border} ${(tempStyle.position?.x || 50)}%, ${theme.colors.border} 100%)`,
+                      outline: 'none',
+                      appearance: 'none',
+                      cursor: 'pointer',
+                      WebkitAppearance: 'none',
+                      MozAppearance: 'none'
+                    }}
+                  />
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    marginTop: '8px',
+                    fontSize: '12px',
+                    color: theme.colors.textSecondary,
+                    fontWeight: '500'
+                  }}>
+                    <span>0</span>
+                    <span>100</span>
+                  </div>
+                </div>
               </div>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={tempStyle.position?.x || 50}
-                onChange={(e) => updateTempStyle({
-                  position: { ...(tempStyle.position || { x: 50, y: 80, z: 0 }), x: parseInt(e.target.value) }
-                })}
-                style={{
-                  width: '100%',
-                  height: '6px',
-                  borderRadius: '3px',
-                  background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${(tempStyle.position?.x || 50)}%, ${theme.colors.border} ${(tempStyle.position?.x || 50)}%, ${theme.colors.border} 100%)`,
-                  outline: 'none',
-                  appearance: 'none',
-                  cursor: 'pointer'
-                }}
-              />
-            </div>
-            <div>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '8px'
-              }}>
-                <span style={{ fontSize: '12px', color: theme.colors.text }}>Y Position</span>
-                <span style={{ fontSize: '12px', fontWeight: '600', color: theme.colors.primary }}>
-                  {tempStyle.position?.y || 80}%
-                </span>
+              <div>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '8px'
+                }}>
+                  <label style={{
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    color: theme.colors.text
+                  }}>
+                    Y Position
+                  </label>
+                  <span style={{
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: theme.colors.text
+                  }}>
+                    {tempStyle.position?.y || 80}%
+                  </span>
+                </div>
+                <div style={{
+                  padding: '12px',
+                  backgroundColor: theme.colors.modal.background,
+                  borderRadius: theme.radius.lg,
+                  border: `1px solid ${theme.colors.border}`
+                }}>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={tempStyle.position?.y || 80}
+                    onChange={(e) => updateTempStyle({
+                      position: { ...(tempStyle.position || { x: 50, y: 80, z: 0 }), y: parseInt(e.target.value) }
+                    })}
+                    style={{
+                      width: '100%',
+                      height: '6px',
+                      borderRadius: '3px',
+                      background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${(tempStyle.position?.y || 80)}%, ${theme.colors.border} ${(tempStyle.position?.y || 80)}%, ${theme.colors.border} 100%)`,
+                      outline: 'none',
+                      appearance: 'none',
+                      cursor: 'pointer',
+                      WebkitAppearance: 'none',
+                      MozAppearance: 'none'
+                    }}
+                  />
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    marginTop: '8px',
+                    fontSize: '12px',
+                    color: theme.colors.textSecondary,
+                    fontWeight: '500'
+                  }}>
+                    <span>0</span>
+                    <span>100</span>
+                  </div>
+                </div>
               </div>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={tempStyle.position?.y || 80}
-                onChange={(e) => updateTempStyle({
-                  position: { ...(tempStyle.position || { x: 50, y: 80, z: 0 }), y: parseInt(e.target.value) }
-                })}
-                style={{
-                  width: '100%',
-                  height: '6px',
-                  borderRadius: '3px',
-                  background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${(tempStyle.position?.y || 80)}%, ${theme.colors.border} ${(tempStyle.position?.y || 80)}%, ${theme.colors.border} 100%)`,
-                  outline: 'none',
-                  appearance: 'none',
-                  cursor: 'pointer'
-                }}
-              />
             </div>
           </div>
         </Modal>
 
         {/* Rotation Modal */}
-        <Modal 
-          isOpen={openModal === 'rotation'} 
-          onClose={handleCancel} 
+        <Modal
+          isOpen={openModalState === 'rotation'}
+          onClose={handleCancel}
           title="Z-Axis Rotation"
-          showApply={true}
-          onApply={handleApply}
         >
-          <div>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '8px'
-            }}>
-              <span style={{ fontSize: '12px', color: theme.colors.text }}>Rotation</span>
-              <span style={{ fontSize: '12px', fontWeight: '600', color: theme.colors.primary }}>
-                {tempStyle.position?.z || 0}°
-              </span>
+          <div style={{ padding: '20px' }}>
+            <div>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '8px'
+              }}>
+                <label style={{
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  color: theme.colors.text
+                }}>
+                  Rotation
+                </label>
+                <span style={{
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: theme.colors.text
+                }}>
+                  {tempStyle.position?.z || 0}°
+                </span>
+              </div>
+              <div style={{
+                padding: '12px',
+                backgroundColor: theme.colors.modal.background,
+                borderRadius: theme.radius.lg,
+                border: `1px solid ${theme.colors.border}`
+              }}>
+                <input
+                  type="range"
+                  min="0"
+                  max="360"
+                  step="1"
+                  value={tempStyle.position?.z || 0}
+                  onChange={(e) => updateTempStyle({
+                    position: { ...(tempStyle.position || { x: 50, y: 80, z: 0 }), z: parseInt(e.target.value) }
+                  })}
+                  style={{
+                    width: '100%',
+                    height: '6px',
+                    borderRadius: '3px',
+                    background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${((tempStyle.position?.z || 0) / 360) * 100}%, ${theme.colors.border} ${((tempStyle.position?.z || 0) / 360) * 100}%, ${theme.colors.border} 100%)`,
+                    outline: 'none',
+                    appearance: 'none',
+                    cursor: 'pointer',
+                    WebkitAppearance: 'none',
+                    MozAppearance: 'none'
+                  }}
+                />
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  marginTop: '8px',
+                  fontSize: '12px',
+                  color: theme.colors.textSecondary,
+                  fontWeight: '500'
+                }}>
+                  <span>0°</span>
+                  <span>360°</span>
+                </div>
+              </div>
             </div>
-            <input
-              type="range"
-              min="0"
-              max="360"
-              value={tempStyle.position?.z || 0}
-              onChange={(e) => updateTempStyle({
-                position: { ...(tempStyle.position || { x: 50, y: 80, z: 0 }), z: parseInt(e.target.value) }
-              })}
-              style={{
-                width: '100%',
-                height: '6px',
-                borderRadius: '3px',
-                background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${((tempStyle.position?.z || 0) / 360) * 100}%, ${theme.colors.border} ${((tempStyle.position?.z || 0) / 360) * 100}%, ${theme.colors.border} 100%)`,
-                outline: 'none',
-                appearance: 'none',
-                cursor: 'pointer'
-              }}
-            />
           </div>
         </Modal>
 
         {/* Stroke Width Modal */}
-        <Modal 
-          isOpen={openModal === 'strokeWidth'} 
-          onClose={handleCancel} 
+        <Modal
+          isOpen={openModalState === 'strokeWidth'}
+          onClose={handleCancel}
           title="Stroke Width"
-          showApply={true}
-          onApply={handleApply}
         >
-          <div>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '8px'
-            }}>
-              <span style={{ fontSize: '12px', color: theme.colors.text }}>Width</span>
-              <span style={{ fontSize: '12px', fontWeight: '600', color: theme.colors.primary }}>
-                {tempStyle.strokeWidth || 0}px
-              </span>
+          <div style={{ padding: '20px' }}>
+            <div>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '8px'
+              }}>
+                <label style={{
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  color: theme.colors.text
+                }}>
+                  Width
+                </label>
+                <span style={{
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: theme.colors.text
+                }}>
+                  {tempStyle.strokeWidth || 0}px
+                </span>
+              </div>
+              <div style={{
+                padding: '12px',
+                backgroundColor: theme.colors.modal.background,
+                borderRadius: theme.radius.lg,
+                border: `1px solid ${theme.colors.border}`
+              }}>
+                <input
+                  type="range"
+                  min="0"
+                  max="10"
+                  step="1"
+                  value={tempStyle.strokeWidth || 0}
+                  onChange={(e) => updateTempStyle({ strokeWidth: parseInt(e.target.value) })}
+                  style={{
+                    width: '100%',
+                    height: '6px',
+                    borderRadius: '3px',
+                    background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${((tempStyle.strokeWidth || 0) / 10) * 100}%, ${theme.colors.border} ${((tempStyle.strokeWidth || 0) / 10) * 100}%, ${theme.colors.border} 100%)`,
+                    outline: 'none',
+                    appearance: 'none',
+                    cursor: 'pointer',
+                    WebkitAppearance: 'none',
+                    MozAppearance: 'none'
+                  }}
+                />
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  marginTop: '8px',
+                  fontSize: '12px',
+                  color: theme.colors.textSecondary,
+                  fontWeight: '500'
+                }}>
+                  <span>0</span>
+                  <span>10</span>
+                </div>
+              </div>
             </div>
-            <input
-              type="range"
-              min="0"
-              max="10"
-              value={tempStyle.strokeWidth || 0}
-              onChange={(e) => updateTempStyle({ strokeWidth: parseInt(e.target.value) })}
-              style={{
-                width: '100%',
-                height: '6px',
-                borderRadius: '3px',
-                background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${((tempStyle.strokeWidth || 0) / 10) * 100}%, ${theme.colors.border} ${((tempStyle.strokeWidth || 0) / 10) * 100}%, ${theme.colors.border} 100%)`,
-                outline: 'none',
-                appearance: 'none',
-                cursor: 'pointer'
-              }}
-            />
           </div>
         </Modal>
 
