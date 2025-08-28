@@ -119,10 +119,10 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
       <div 
         style={{ 
           position: 'relative',
-          width: '100%',
+          width: 'calc(100% - 16px)', // Reduce width to fit container
           height: '120px',
           cursor: 'pointer',
-          margin: '0 4px' // Add horizontal margin to prevent overlap
+          margin: '0 8px' // Increased margin for better containment
         }}
         onClick={onClick}
       >
@@ -419,12 +419,17 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
 
       {/* Presets List - Single Row Layout */}
       {currentPresets.length > 0 && (
-        <div>
+        <div style={{
+          width: '100%',
+          overflow: 'hidden', // Prevent any overflow
+          paddingRight: '8px' // Add right padding for containment
+        }}>
           <div style={{
             display: 'flex',
             flexDirection: 'column',
             gap: '20px',
-            width: '100%'
+            width: '100%',
+            maxWidth: '100%' // Ensure cards don't exceed container
           }}>
             {currentPresets.map((preset) => (
               <LivePresetPreview
