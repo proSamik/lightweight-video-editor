@@ -1352,7 +1352,10 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
         background: `linear-gradient(135deg, ${theme.colors.primary}20 0%, ${theme.colors.primary}10 50%, ${theme.colors.primary}05 100%)`,
         padding: '1px',
         border: `1px solid ${theme.colors.border}`,
-        borderRadius: '2px'
+        borderRadius: '2px',
+        position: 'relative',
+        minHeight: 0,
+        overflow: 'hidden'
       }}
     >
       <GlassVideoWrapper aspectRatio={aspectRatio}>
@@ -1361,10 +1364,6 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
           position: 'relative',
           width: '100%',
           height: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          minHeight: '300px',
           overflow: 'hidden'
         }}>
         <video

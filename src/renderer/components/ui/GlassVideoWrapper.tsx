@@ -18,22 +18,24 @@ const GlassVideoWrapper: React.FC<GlassVideoWrapperProps> = ({
 
   return (
     <div style={{
-      flex: 1,
+      position: 'relative',
+      width: '100%',
+      height: '100%',
+      background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%)',
+      backdropFilter: 'blur(16px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
+      zIndex: 0,
+      padding: '20px',
       minHeight: 0,
-      position: 'relative',
-      // Transparent background with glass blur
-      background: `linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 50%, transparent 100%)`,
-      backdropFilter: 'blur(12px)',
-      padding: '20px'
+      boxSizing: 'border-box'
     }}>
       {/* Floating background decorations */}
       <div style={{
         position: 'absolute',
-        top: '10%',
-        left: '10%',
+        top: '20%',
+        left: '15%',
         width: '120px',
         height: '120px',
         background: `linear-gradient(135deg, ${theme.colors.primary}15, transparent)`,
@@ -45,7 +47,7 @@ const GlassVideoWrapper: React.FC<GlassVideoWrapperProps> = ({
       
       <div style={{
         position: 'absolute',
-        bottom: '15%',
+        bottom: '20%',
         right: '15%',
         width: '80px',
         height: '80px',
@@ -59,26 +61,27 @@ const GlassVideoWrapper: React.FC<GlassVideoWrapperProps> = ({
       {/* Video Container with Device-like Border */}
       <div style={{
         position: 'relative',
-        width: '100%',
-        maxWidth: aspectRatio === '9:16' ? '350px' : '800px',
-        maxHeight: aspectRatio === '9:16' ? '75vh' : '60vh',
+        width: aspectRatio === '9:16' ? 'auto' : '100%',
+        height: aspectRatio === '9:16' ? '100%' : 'auto',
+        maxWidth: '100%',
+        maxHeight: '100%',
         aspectRatio: aspectRatio === '9:16' ? '9/16' : '16/9',
         zIndex: 1,
-        // Outer border (gray/white like mobile device)
+        // Outer border (gray/white like mobile device) - perfectly even
         background: `linear-gradient(145deg, 
-          rgba(255, 255, 255, 0.9) 0%, 
-          rgba(248, 250, 252, 0.85) 50%, 
-          rgba(229, 231, 235, 0.8) 100%
+          rgba(255, 255, 255, 0.95) 0%, 
+          rgba(248, 250, 252, 0.9) 50%, 
+          rgba(229, 231, 235, 0.85) 100%
         )`,
         borderRadius: '24px',
-        padding: '8px',
+        padding: '8px', // Even padding
         boxShadow: `
-          0 32px 64px rgba(0, 0, 0, 0.15),
-          0 8px 32px rgba(0, 0, 0, 0.08),
-          inset 0 1px 0 rgba(255, 255, 255, 0.6),
-          inset 0 -1px 0 rgba(0, 0, 0, 0.1)
+          0 32px 64px rgba(0, 0, 0, 0.12),
+          0 8px 32px rgba(59, 130, 246, 0.08),
+          inset 0 1px 0 rgba(255, 255, 255, 0.4)
         `,
-        backdropFilter: 'blur(20px)'
+        backdropFilter: 'blur(20px)',
+        boxSizing: 'border-box'
       }}>
         {/* Inner container with white border and rounded corners */}
         <div style={{
@@ -87,22 +90,22 @@ const GlassVideoWrapper: React.FC<GlassVideoWrapperProps> = ({
           height: '100%',
           background: '#ffffff',
           borderRadius: '16px',
-          padding: '6px', // Increased and made uniform
+          padding: '4px', // Even padding on all sides
           boxShadow: `
             inset 0 2px 4px rgba(0, 0, 0, 0.1),
             inset 0 -2px 4px rgba(0, 0, 0, 0.05)
           `,
           overflow: 'hidden',
-          display: 'flex' // Added flex to ensure proper sizing
+          boxSizing: 'border-box'
         }}>
           {/* Content container with final border radius */}
           <div style={{
             position: 'relative',
             width: '100%',
-            height: '100%', // Added explicit height
-            borderRadius: '10px',
+            height: '100%',
+            borderRadius: '12px',
             overflow: 'hidden',
-            backgroundColor: '#000000',
+            backgroundColor: 'transparent',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center'
