@@ -594,7 +594,7 @@ export class FFmpegOverlayRenderer {
     return new Promise((resolve, reject) => {
       // Create concat file
       const concatFile = path.join(path.dirname(outputPath), 'chunks_concat.txt');
-      const concatContent = chunkPaths.map(file => `file '${path.resolve(file)}'`).join('\n');
+      const concatContent = chunkPaths.map(file => `file '${path.resolve(file).replace(/'/g, "'\"'\"'")}'`).join('\n');
       
       fs.writeFileSync(concatFile, concatContent);
       
@@ -1093,14 +1093,14 @@ export class FFmpegOverlayRenderer {
         if (overlay.startTime > currentTime) {
           const gapDurationMs = overlay.startTime - currentTime;
           const gapDurationSec = gapDurationMs / 1000; // Convert to seconds for FFmpeg
-          concatContent += `file '${transparentImagePath}'\n`;
+          concatContent += `file '${transparentImagePath.replace(/'/g, "'\"'\"'")}'\n`;
           concatContent += `duration ${gapDurationSec}\n`;
         }
         
         // Add the overlay segment
         const overlayDurationMs = overlay.endTime - overlay.startTime;
         const overlayDurationSec = overlayDurationMs / 1000; // Convert to seconds for FFmpeg
-        concatContent += `file '${overlay.file}'\n`;
+        concatContent += `file '${overlay.file.replace(/'/g, "'\"'\"'")}'\n`;
         concatContent += `duration ${overlayDurationSec}\n`;
         
         currentTime = overlay.endTime;
@@ -1110,14 +1110,14 @@ export class FFmpegOverlayRenderer {
       if (currentTime < videoDurationMs) {
         const finalGapDurationMs = videoDurationMs - currentTime;
         const finalGapDurationSec = finalGapDurationMs / 1000; // Convert to seconds for FFmpeg
-        concatContent += `file '${transparentImagePath}'\n`;
+        concatContent += `file '${transparentImagePath.replace(/'/g, "'\"'\"'")}'\n`;
         concatContent += `duration ${finalGapDurationSec}\n`;
       }
       
       // FFmpeg concat demuxer needs the last file repeated for the last duration
       if (concatContent) {
         // Add the final frame
-        concatContent += `file '${transparentImagePath}'\n`;
+        concatContent += `file '${transparentImagePath.replace(/'/g, "'\"'\"'")}'\n`;
       }
       
       fs.writeFileSync(concatFile, concatContent);
@@ -2087,7 +2087,7 @@ export class FFmpegOverlayRenderer {
     return new Promise((resolve, reject) => {
       // Create concat file
       const concatFile = path.join(path.dirname(outputPath), 'concat.txt');
-      const concatContent = chunkFiles.map(file => `file '${file}'`).join('\n');
+      const concatContent = chunkFiles.map(file => `file '${file.replace(/'/g, "'\"'\"'")}'`).join('\n');
       
       fs.writeFileSync(concatFile, concatContent);
       
