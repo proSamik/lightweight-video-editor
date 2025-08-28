@@ -3,6 +3,7 @@ import { VideoFile, AISubtitleData, SubtitleFrame, VideoClip } from '../../types
 import { useTheme } from '../contexts/ThemeContext';
 import { Video, AlertTriangle } from 'lucide-react';
 import CaptionStyleModal from './CaptionStyleModal';
+import GlassVideoWrapper from './ui/GlassVideoWrapper';
 
 interface VideoPanelProps {
   videoFile: VideoFile | null;
@@ -1088,204 +1089,96 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   // No video file selected
   if (!videoFile) {
     return (
-      <div 
-        data-drop-zone="video"
-        className="video-drop-zone"
-        style={{
-          flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: isDragOver ? theme.colors.primarySubtle : theme.colors.backgroundSecondary,
-          margin: '20px',
-          borderRadius: theme.radius.lg,
-          border: isDragOver ? `2px dashed ${theme.colors.primary}` : `2px dashed ${theme.colors.primary}40`,
-          cursor: dependenciesReady ? 'pointer' : 'not-allowed',
-          opacity: dependenciesReady ? 1 : 0.6,
-          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          boxShadow: isDragOver ? theme.shadows.lg : theme.shadows.sm,
-          position: 'relative',
-          overflow: 'hidden'
-        }} 
-        onClick={dependenciesReady ? onVideoSelect : undefined}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-      >
-        {/* Subtle gradient background for depth */}
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: `linear-gradient(135deg, ${theme.colors.primarySubtle}40, ${theme.colors.backgroundSecondary})`,
-          opacity: 0.6
-        }} />
-        
-        <div style={{ 
-          textAlign: 'center', 
-          position: 'relative',
-          zIndex: 1,
-          padding: '40px'
-        }}>
-          {/* Video icon at the top */}
-          <div style={{ 
+      <GlassVideoWrapper>
+        <div 
+          data-drop-zone="video"
+          className="video-drop-zone"
+          style={{
+            width: '100%',
+            height: '100%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            width: '80px',
-            height: '80px',
-            borderRadius: '50%',
-            backgroundColor: theme.colors.primary + '20',
-            marginBottom: '24px',
-            boxShadow: `0 8px 24px ${theme.colors.primary}30`,
-            margin: '0 auto 24px auto', // Center the icon horizontally
-          }}>
-            <Video 
-              size={40} 
-              color={theme.colors.primary}
-              style={{
-                filter: `drop-shadow(0 4px 8px ${theme.colors.primary}40)`
-              }}
-            />
-          </div>
-          
-          <div style={{ 
-            fontSize: '20px', 
-            marginBottom: '12px',
-            color: theme.colors.text,
-            fontWeight: '600',
-            fontFamily: theme.typography.fontFamily
-          }}>
-{isCheckingDependencies 
-              ? 'Checking dependencies...' 
-              : dependenciesReady 
-                ? 'Drop a video file here or click to select'
-                : 'Dependencies not ready'}
-          </div>
-          
-          <div style={{ 
-            fontSize: '15px', 
-            color: theme.colors.textSecondary,
-            marginBottom: '20px'
-          }}>
-{isCheckingDependencies 
-              ? 'Please wait while we initialize...'
-              : dependenciesReady 
-                ? 'Supports MP4, MOV, AVI'
-                : 'Please install missing dependencies'}
-          </div>
-          
-          {/* Blue accent button for visual appeal */}
+            backgroundColor: isDragOver ? `${theme.colors.primary}15` : `rgba(255, 255, 255, 0.95)`,
+            borderRadius: '12px',
+            border: isDragOver ? `2px dashed ${theme.colors.primary}` : `2px dashed ${theme.colors.primary}40`,
+            cursor: dependenciesReady ? 'pointer' : 'not-allowed',
+            opacity: dependenciesReady ? 1 : 0.6,
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            position: 'relative',
+            overflow: 'hidden'
+          }} 
+          onClick={dependenciesReady ? onVideoSelect : undefined}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+        >
+          {/* Subtle gradient background for depth */}
           <div style={{
-            display: 'inline-block',
-            padding: '8px 16px',
-            backgroundColor: theme.colors.primary,
-            color: theme.colors.primaryForeground,
-            borderRadius: theme.radius.md,
-            fontSize: '14px',
-            fontWeight: '500',
-            boxShadow: theme.shadows.sm,
-            transition: 'all 0.2s ease'
-          }}>
-            Choose Video File
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Video file selected but doesn't exist
-  if (videoFile && videoFileExists === false) {
-    return (
-      <div 
-        style={{
-          flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: theme.colors.backgroundSecondary,
-          margin: '20px',
-          borderRadius: theme.radius.lg,
-          border: `2px solid ${theme.colors.error}40`,
-          position: 'relative',
-          overflow: 'hidden'
-        }}
-      >
-        {/* Error gradient background */}
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: `linear-gradient(135deg, ${theme.colors.error}20, ${theme.colors.backgroundSecondary})`,
-          opacity: 0.6
-        }} />
-        
-        <div style={{ 
-          textAlign: 'center', 
-          position: 'relative',
-          zIndex: 1,
-          padding: '40px'
-        }}>
-          {/* Warning icon */}
-          <div style={{ 
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '80px',
-            height: '80px',
-            borderRadius: '50%',
-            backgroundColor: theme.colors.error + '20',
-            marginBottom: '24px',
-            boxShadow: `0 8px 24px ${theme.colors.error}30`,
-            margin: '0 auto 24px auto',
-          }}>
-            <AlertTriangle 
-              size={40} 
-              color={theme.colors.error}
-              style={{
-                filter: `drop-shadow(0 4px 8px ${theme.colors.error}40)`
-              }}
-            />
-          </div>
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: `linear-gradient(135deg, ${theme.colors.primary}10, rgba(255, 255, 255, 0.3))`,
+            opacity: 0.4
+          }} />
           
           <div style={{ 
-            fontSize: '20px', 
-            marginBottom: '12px',
-            color: theme.colors.text,
-            fontWeight: '600',
-            fontFamily: theme.typography.fontFamily
+            textAlign: 'center', 
+            position: 'relative',
+            zIndex: 1,
+            padding: '40px'
           }}>
-            Video file not found
-          </div>
-          
-          <div style={{ 
-            fontSize: '15px', 
-            color: theme.colors.textSecondary,
-            marginBottom: '20px',
-            maxWidth: '400px',
-            lineHeight: '1.5'
-          }}>
-            The video file "{videoFile.name}" could not be found at:
-            <br />
-            <span style={{ 
-              fontFamily: 'monospace', 
-              backgroundColor: theme.colors.background,
-              padding: '4px 8px',
-              borderRadius: '4px',
-              display: 'inline-block',
-              marginTop: '8px',
-              wordBreak: 'break-all'
+            {/* Video icon at the top */}
+            <div style={{ 
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '80px',
+              height: '80px',
+              borderRadius: '50%',
+              backgroundColor: theme.colors.primary + '20',
+              marginBottom: '24px',
+              boxShadow: `0 8px 24px ${theme.colors.primary}30`,
+              margin: '0 auto 24px auto', // Center the icon horizontally
             }}>
-              {videoFile.path}
-            </span>
-          </div>
-          
-          {/* Select new video button */}
-          <div 
-            style={{
+              <Video 
+                size={40} 
+                color={theme.colors.primary}
+                style={{
+                  filter: `drop-shadow(0 4px 8px ${theme.colors.primary}40)`
+                }}
+              />
+            </div>
+            
+            <div style={{ 
+              fontSize: '20px', 
+              marginBottom: '12px',
+              color: theme.colors.text,
+              fontWeight: '600',
+              fontFamily: theme.typography.fontFamily
+            }}>
+{isCheckingDependencies 
+                ? 'Checking dependencies...' 
+                : dependenciesReady 
+                  ? 'Drop a video file here or click to select'
+                  : 'Dependencies not ready'}
+            </div>
+            
+            <div style={{ 
+              fontSize: '15px', 
+              color: theme.colors.textSecondary,
+              marginBottom: '20px'
+            }}>
+{isCheckingDependencies 
+                ? 'Please wait while we initialize...'
+                : dependenciesReady 
+                  ? 'Supports MP4, MOV, AVI'
+                  : 'Please install missing dependencies'}
+            </div>
+            
+            {/* Blue accent button for visual appeal */}
+            <div style={{
               display: 'inline-block',
               padding: '8px 16px',
               backgroundColor: theme.colors.primary,
@@ -1294,42 +1187,160 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
               fontSize: '14px',
               fontWeight: '500',
               boxShadow: theme.shadows.sm,
-              transition: 'all 0.2s ease',
-              cursor: 'pointer'
-            }}
-            onClick={onVideoSelect}
-          >
-            Select New Video File
+              transition: 'all 0.2s ease'
+            }}>
+              Choose Video File
+            </div>
           </div>
         </div>
-      </div>
+      </GlassVideoWrapper>
+    );
+  }
+
+  // Video file selected but doesn't exist
+  if (videoFile && videoFileExists === false) {
+    return (
+      <GlassVideoWrapper>
+        <div 
+          style={{
+            width: '100%',
+            height: '400px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'transparent',
+            borderRadius: '12px',
+            border: `2px solid ${theme.colors.error}40`,
+            position: 'relative',
+            overflow: 'hidden'
+          }}
+        >
+          {/* Error gradient background */}
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: `linear-gradient(135deg, ${theme.colors.error}20, transparent)`,
+            opacity: 0.6
+          }} />
+          
+          <div style={{ 
+            textAlign: 'center', 
+            position: 'relative',
+            zIndex: 1,
+            padding: '40px'
+          }}>
+            {/* Warning icon */}
+            <div style={{ 
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '80px',
+              height: '80px',
+              borderRadius: '50%',
+              backgroundColor: theme.colors.error + '20',
+              marginBottom: '24px',
+              boxShadow: `0 8px 24px ${theme.colors.error}30`,
+              margin: '0 auto 24px auto',
+            }}>
+              <AlertTriangle 
+                size={40} 
+                color={theme.colors.error}
+                style={{
+                  filter: `drop-shadow(0 4px 8px ${theme.colors.error}40)`
+                }}
+              />
+            </div>
+            
+            <div style={{ 
+              fontSize: '20px', 
+              marginBottom: '12px',
+              color: theme.colors.text,
+              fontWeight: '600',
+              fontFamily: theme.typography.fontFamily
+            }}>
+              Video file not found
+            </div>
+            
+            <div style={{ 
+              fontSize: '15px', 
+              color: theme.colors.textSecondary,
+              marginBottom: '20px',
+              maxWidth: '400px',
+              lineHeight: '1.5'
+            }}>
+              The video file "{videoFile.name}" could not be found at:
+              <br />
+              <span style={{ 
+                fontFamily: 'monospace', 
+                backgroundColor: theme.colors.background,
+                padding: '4px 8px',
+                borderRadius: '4px',
+                display: 'inline-block',
+                marginTop: '8px',
+                wordBreak: 'break-all'
+              }}>
+                {videoFile.path}
+              </span>
+            </div>
+            
+            {/* Select new video button */}
+            <div 
+              style={{
+                display: 'inline-block',
+                padding: '8px 16px',
+                backgroundColor: theme.colors.primary,
+                color: theme.colors.primaryForeground,
+                borderRadius: theme.radius.md,
+                fontSize: '14px',
+                fontWeight: '500',
+                boxShadow: theme.shadows.sm,
+                transition: 'all 0.2s ease',
+                cursor: 'pointer'
+              }}
+              onClick={onVideoSelect}
+            >
+              Select New Video File
+            </div>
+          </div>
+        </div>
+      </GlassVideoWrapper>
     );
   }
 
   // Loading state while checking file existence
   if (videoFile && videoFileExists === null) {
     return (
-      <div 
-        style={{
-          flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: theme.colors.backgroundSecondary,
-          margin: '20px',
-          borderRadius: theme.radius.lg,
-          border: `1px solid ${theme.colors.border}`,
-        }}
-      >
-        <div style={{ 
-          textAlign: 'center',
-          color: theme.colors.textSecondary
-        }}>
-          Checking video file...
+      <GlassVideoWrapper>
+        <div 
+          style={{
+            width: '100%',
+            height: '400px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'transparent',
+            borderRadius: '12px',
+            border: `1px solid ${theme.colors.border}`,
+          }}
+        >
+          <div style={{ 
+            textAlign: 'center',
+            color: theme.colors.textSecondary
+          }}>
+            Checking video file...
+          </div>
         </div>
-      </div>
+      </GlassVideoWrapper>
     );
   }
+
+  // Determine aspect ratio for wrapper
+  const aspectRatio = videoFile && videoFile.width && videoFile.height 
+    ? videoFile.height / videoFile.width > 1.5 ? '9:16' : '16:9'
+    : '16:9';
 
   return (
     <div 
@@ -1338,34 +1349,30 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
         flex: 1, 
         display: 'flex',
         flexDirection: 'column',
-        backgroundColor: theme.colors.background,
+        background: `linear-gradient(135deg, ${theme.colors.primary}20 0%, ${theme.colors.primary}10 50%, ${theme.colors.primary}05 100%)`,
         padding: '1px',
         border: `1px solid ${theme.colors.border}`,
         borderRadius: '2px'
       }}
     >
-
-
-      {/* Video Container with Canvas Overlay */}
-      <div style={{ 
-        flex: 1,
-        position: 'relative',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: 0,
-        maxHeight: 'calc(100vh - 300px)', // Constrain to viewport height minus space for UI
-        overflow: 'hidden',
-        padding: '10px'
-      }}>
+      <GlassVideoWrapper aspectRatio={aspectRatio}>
+        {/* Video Container with Canvas Overlay */}
+        <div style={{ 
+          position: 'relative',
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '300px',
+          overflow: 'hidden'
+        }}>
         <video
           ref={videoRef}
           src={`file://${videoFile.path}`}
           style={{
-            maxWidth: '100%',
-            maxHeight: '100%',
-            width: 'auto',
-            height: 'auto',
+            width: '100%',
+            height: '100%',
             objectFit: 'contain',
             display: videoLoadError ? 'none' : 'block'
           }}
@@ -1425,11 +1432,10 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
           ref={canvasRef}
           style={{
             position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            maxWidth: '100%',
-            maxHeight: '100%',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
             objectFit: 'contain',
             pointerEvents: (() => {
               const originalTimeMs = currentTime;
@@ -1552,9 +1558,8 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
           }}
           position={modalPosition}
         />
-      </div>
-
-
+        </div>
+      </GlassVideoWrapper>
     </div>
   );
 };
