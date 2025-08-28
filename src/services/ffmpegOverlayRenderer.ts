@@ -2966,6 +2966,15 @@ if (!isMainThread && workerData?.isWorker) {
     // Calculate position
     const x = (canvasWidth * caption.style.position.x) / 100;
     const y = (canvasHeight * caption.style.position.y) / 100;
+    const rotation = (caption.style.position.z || 0) * (Math.PI / 180); // Convert degrees to radians
+    
+    // Apply rotation if specified
+    if (rotation !== 0) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(rotation);
+      ctx.translate(-x, -y);
+    }
     
     // Measure text for background box
     const textMetrics = ctx.measureText(displayText);
@@ -3008,6 +3017,11 @@ if (!isMainThread && workerData?.isWorker) {
     ctx.shadowBlur = 0;
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
+    
+    // Restore canvas state if rotation was applied
+    if (rotation !== 0) {
+      ctx.restore();
+    }
   }
   
   /**
@@ -3039,6 +3053,15 @@ if (!isMainThread && workerData?.isWorker) {
     
     const x = (canvasWidth * caption.style.position.x) / 100;
     const y = (canvasHeight * caption.style.position.y) / 100;
+    const rotation = (caption.style.position.z || 0) * (Math.PI / 180); // Convert degrees to radians
+    
+    // Apply rotation if specified
+    if (rotation !== 0) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(rotation);
+      ctx.translate(-x, -y);
+    }
     
     // Calculate total width for single line
     const wordSpacing = 12 * scale;
@@ -3144,6 +3167,11 @@ if (!isMainThread && workerData?.isWorker) {
     ctx.shadowBlur = 0;
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
+    
+    // Restore canvas state if rotation was applied
+    if (rotation !== 0) {
+      ctx.restore();
+    }
   }
   
   /**
@@ -3172,6 +3200,15 @@ if (!isMainThread && workerData?.isWorker) {
     
     const x = (canvasWidth * caption.style.position.x) / 100;
     const y = (canvasHeight * caption.style.position.y) / 100;
+    const rotation = (caption.style.position.z || 0) * (Math.PI / 180); // Convert degrees to radians
+    
+    // Apply rotation if specified
+    if (rotation !== 0) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(rotation);
+      ctx.translate(-x, -y);
+    }
     
     // Show words progressively up to the highlighted word
     const visibleWords = words.slice(0, highlightedWordIndex + 1);
@@ -3237,6 +3274,11 @@ if (!isMainThread && workerData?.isWorker) {
       ctx.shadowBlur = 0;
       ctx.shadowOffsetX = 0;
       ctx.shadowOffsetY = 0;
+    }
+    
+    // Restore canvas state if rotation was applied
+    if (rotation !== 0) {
+      ctx.restore();
     }
   }
   
