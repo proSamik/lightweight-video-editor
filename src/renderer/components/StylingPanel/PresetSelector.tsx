@@ -119,10 +119,11 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
       <div 
         style={{ 
           position: 'relative',
-          width: 'calc(100% - 16px)', // Reduce width to fit container
+          // Make card a bit narrower so hover scale never overflows the right edge
+          width: 'calc(100% - 24px)',
           height: '120px',
           cursor: 'pointer',
-          margin: '0 8px' // Increased margin for better containment
+          margin: '0 12px'
         }}
         onClick={onClick}
       >
