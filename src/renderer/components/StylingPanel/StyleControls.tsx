@@ -272,7 +272,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
             color: theme.colors.primary, 
             marginBottom: '12px' 
           }}>
-            Render Mode
+            Animation Style
           </div>
           <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
             <button
