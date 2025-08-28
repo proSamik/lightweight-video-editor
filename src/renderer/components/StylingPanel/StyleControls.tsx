@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { FiType, FiMove, FiAlignLeft, FiAlignCenter, FiAlignRight, FiSettings } from 'react-icons/fi';
+import { FiType, FiAlignLeft, FiAlignCenter, FiAlignRight } from 'react-icons/fi';
 import { SubtitleStyle, FontOption, ColorOption } from '../../../types';
 
 interface StyleControlsProps {
@@ -339,29 +339,106 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
             Typography
           </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <CompactButton
-              icon={<FiType size={14} />}
-              label="Font"
-              value={style.font}
+            <button
               onClick={() => openModal('font')}
-            />
-            <CompactButton
-              label="Size"
-              value={`${style.fontSize}px`}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                padding: '12px 16px',
+                backgroundColor: '#ffffff',
+                color: theme.colors.text,
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '10px',
+                fontWeight: '500',
+                gap: '4px',
+                minWidth: '85px',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '4px',
+                fontWeight: '600' 
+              }}>
+                <FiType size={14} />
+                <span>{style.font}</span>
+              </div>
+              <div>Font</div>
+            </button>
+            <button
               onClick={() => openModal('fontSize')}
-            />
-            <CompactButton
-              label="Transform"
-              value={style.textTransform || 'none'}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                padding: '12px 16px',
+                backgroundColor: '#ffffff',
+                color: theme.colors.text,
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '10px',
+                fontWeight: '500',
+                gap: '4px',
+                minWidth: '85px',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <div style={{ fontWeight: '600' }}>{style.fontSize}px</div>
+              <div>Size</div>
+            </button>
+            <button
               onClick={() => openModal('textTransform')}
-            />
-            <CompactButton
-              icon={style.textAlign === 'left' ? <FiAlignLeft size={14} /> : 
-                    style.textAlign === 'right' ? <FiAlignRight size={14} /> : 
-                    <FiAlignCenter size={14} />}
-              label="Align"
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                padding: '12px 16px',
+                backgroundColor: '#ffffff',
+                color: theme.colors.text,
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '10px',
+                fontWeight: '500',
+                gap: '4px',
+                minWidth: '85px',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <div style={{ fontWeight: '600' }}>{style.textTransform || 'none'}</div>
+              <div>Transform</div>
+            </button>
+            <button
               onClick={() => openModal('textAlign')}
-            />
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                padding: '12px 16px',
+                backgroundColor: '#ffffff',
+                color: theme.colors.text,
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '10px',
+                fontWeight: '500',
+                gap: '4px',
+                minWidth: '85px',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <div style={{ fontWeight: '600' }}>
+                {style.textAlign === 'left' ? <FiAlignLeft size={14} /> : 
+                 style.textAlign === 'right' ? <FiAlignRight size={14} /> : 
+                 <FiAlignCenter size={14} />}
+              </div>
+              <div>Align</div>
+            </button>
           </div>
         </div>
 
@@ -452,22 +529,72 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
             Position
           </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <CompactButton
-              icon={<FiMove size={14} />}
-              label="X, Y"
-              value={`${(style.position?.x || 50).toFixed(1)}, ${(style.position?.y || 80).toFixed(1)}`}
+            <button
               onClick={() => openModal('position')}
-            />
-            <CompactButton
-              label="Rotation"
-              value={`${style.position?.z || 0}°`}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                padding: '12px 16px',
+                backgroundColor: '#ffffff',
+                color: theme.colors.text,
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '10px',
+                fontWeight: '500',
+                gap: '4px',
+                minWidth: '85px',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <div style={{ fontWeight: '600' }}>{(style.position?.x || 50).toFixed(1)}, {(style.position?.y || 80).toFixed(1)}</div>
+              <div>Position</div>
+            </button>
+            <button
               onClick={() => openModal('rotation')}
-            />
-            <CompactButton
-              label="Stroke Width"
-              value={`${style.strokeWidth || 0}px`}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                padding: '12px 16px',
+                backgroundColor: '#ffffff',
+                color: theme.colors.text,
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '10px',
+                fontWeight: '500',
+                gap: '4px',
+                minWidth: '85px',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <div style={{ fontWeight: '600' }}>{style.position?.z || 0}°</div>
+              <div>Rotation</div>
+            </button>
+            <button
               onClick={() => openModal('strokeWidth')}
-            />
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                padding: '12px 16px',
+                backgroundColor: '#ffffff',
+                color: theme.colors.text,
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '10px',
+                fontWeight: '500',
+                gap: '4px',
+                minWidth: '85px',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <div style={{ fontWeight: '600' }}>{style.strokeWidth || 0}px</div>
+              <div>Stroke Width</div>
+            </button>
           </div>
         </div>
 
