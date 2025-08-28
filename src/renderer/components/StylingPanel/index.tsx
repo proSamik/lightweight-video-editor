@@ -297,7 +297,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
                 transition: 'all 0.2s ease'
               }}
             >
-              Presets
+              Style Presets
             </button>
             <button
               onClick={() => setActiveTab('custom')}
@@ -314,7 +314,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
                 transition: 'all 0.2s ease'
               }}
             >
-              Custom Controls
+              Advance Style Controls
             </button>
           </div>
         </div>
