@@ -91,21 +91,25 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
     
     // Dynamic font size based on render mode and text length
     const getPreviewFontSize = () => {
-      const containerWidth = 320; // card width with padding
+      const containerWidth = 340; // available width minus padding
+      const containerHeight = 108; // available height minus padding
       const textLength = text.length;
+      const wordCount = text.split(' ').length;
       const isProgressive = preset.style.renderMode === 'progressive';
       
       let baseSize;
       if (isProgressive) {
-        // For progressive mode, size based on number of words
-        const wordCount = text.split(' ').length;
-        baseSize = Math.min(16, Math.max(10, 120 / wordCount));
+        // For progressive mode, size based on container height and word count
+        const maxLinesVisible = Math.min(wordCount, 4); // max 4 lines visible
+        baseSize = Math.min(20, Math.max(12, (containerHeight / maxLinesVisible) * 0.7));
       } else {
-        // For horizontal mode, size based on text length
-        baseSize = Math.min(14, Math.max(8, 280 / (textLength * 0.4)));
+        // For horizontal mode, size to fit container width
+        const avgCharWidth = 0.6; // approximate character width ratio
+        const estimatedWidth = textLength * avgCharWidth;
+        baseSize = Math.min(18, Math.max(10, (containerWidth / estimatedWidth) * 16));
       }
       
-      return baseSize;
+      return Math.round(baseSize);
     };
     
     const fontSize = getPreviewFontSize();
@@ -117,7 +121,8 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
           position: 'relative',
           width: '100%',
           height: '120px',
-          cursor: 'pointer'
+          cursor: 'pointer',
+          margin: '0 4px' // Add horizontal margin to prevent overlap
         }}
         onClick={onClick}
       >
@@ -135,12 +140,12 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
           overflow: 'hidden',
           transition: 'all 0.2s ease',
           position: 'relative',
-          padding: '12px'
+          padding: '6px' // Reduced padding for bigger text
         }}
         onMouseEnter={(e) => {
           if (!isSelected) {
             e.currentTarget.style.borderColor = theme.colors.primary;
-            e.currentTarget.style.transform = 'scale(1.02)';
+            e.currentTarget.style.transform = 'scale(1.01)'; // Reduced scale to prevent overlap
           }
         }}
         onMouseLeave={(e) => {
@@ -159,9 +164,10 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
             justifyContent: 'center',
             flexDirection: isProgressive ? 'column' : 'row',
             flexWrap: 'nowrap',
-            gap: isProgressive ? '1px' : '3px',
+            gap: isProgressive ? '1px' : '2px',
             overflow: 'hidden',
-            position: 'relative'
+            position: 'relative',
+            maxWidth: '100%' // Ensure content doesn't overflow
           }}>
             {isProgressive ? (
               // Progressive mode - show words vertically one by one
@@ -203,9 +209,10 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
                 flexWrap: 'nowrap',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '3px',
-                maxWidth: '100%',
-                overflow: 'hidden'
+                gap: '2px',
+                width: '100%',
+                overflow: 'hidden',
+                maxWidth: '100%'
               }}>
                 {words.map((word, index) => {
                   const isCurrentWord = index === currentWordIndex;
@@ -416,7 +423,7 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
           <div style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: '20px',
+            gap: '24px',
             width: '100%'
           }}>
             {currentPresets.map((preset) => (
