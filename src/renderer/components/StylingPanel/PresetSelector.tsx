@@ -129,10 +129,8 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
         <div style={{
           width: '100%',
           height: '100%',
-          backgroundColor: '#ffffff',
-          border: isSelected 
-            ? `2px solid ${theme.colors.primary}` 
-            : `1px solid ${theme.colors.border}`,
+          backgroundColor: '#e3f2fd',
+          border: `2px solid ${theme.colors.primary}`,
           borderRadius: '8px',
           display: 'flex',
           alignItems: 'center',
@@ -143,16 +141,13 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
           padding: '6px' // Reduced padding for bigger text
         }}
         onMouseEnter={(e) => {
-          if (!isSelected) {
-            e.currentTarget.style.borderColor = theme.colors.primary;
-            e.currentTarget.style.transform = 'scale(1.01)'; // Reduced scale to prevent overlap
-          }
+          // Keep primary border color consistent and subtle hover scale
+          e.currentTarget.style.borderColor = theme.colors.primary;
+          e.currentTarget.style.transform = 'scale(1.01)'; // Reduced scale to prevent overlap
         }}
         onMouseLeave={(e) => {
-          if (!isSelected) {
-            e.currentTarget.style.borderColor = theme.colors.border;
-            e.currentTarget.style.transform = 'scale(1)';
-          }
+          e.currentTarget.style.borderColor = theme.colors.primary;
+          e.currentTarget.style.transform = 'scale(1)';
         }}
         >
           {/* Live Text Preview */}
