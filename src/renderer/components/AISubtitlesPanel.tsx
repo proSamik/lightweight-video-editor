@@ -7,7 +7,7 @@ import {
   WordEditState,
   VideoClip,
 } from '../../types';
-import { Copy, Edit3, Hash, FileX, ChevronUp, ChevronDown, HelpCircle, Scissors } from 'lucide-react';
+import { Copy, Edit3, Hash, FileX, ChevronUp, ChevronDown, HelpCircle, Scissors, Palette, Settings } from 'lucide-react';
 import CompactSearchReplace from './CompactSearchReplace';
 import { formatTimeHHMMSS } from '../../utils/timeFormatting';
 import { LiquidModal } from './ui';
@@ -25,6 +25,8 @@ interface AISubtitlesPanelProps {
   audioPath?: string | null;
   // New: Clip editing support
   clips?: VideoClip[];
+  // Navigate to styling tabs from frame row controls
+  onNavigateToTab?: (tab: 'presets' | 'advanced') => void;
 }
 
 interface WordContextMenu {
@@ -49,6 +51,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
   videoPath,
   audioPath,
   clips = [],
+  onNavigateToTab,
 }) => {
   const { theme } = useTheme();
   
@@ -1438,7 +1441,7 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
                 )}
               </div>
               
-              {/* Merge Controls */}
+              {/* Row Controls: Up, Down, Presets, Advanced */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 {/* Merge Up Button - Always visible and enabled when there's a frame above */}
                 <button
@@ -1518,6 +1521,73 @@ const AISubtitlesPanel: React.FC<AISubtitlesPanelProps> = ({
                   title="Merge with frame below"
                 >
                   <ChevronDown size={16} />
+                </button>
+
+                {/* Navigate to Style Presets */}
+                <button
+                  onClick={() => {
+                    // Ensure the style panel opens for this frame
+                    if (onFrameSelect) onFrameSelect(frame.id);
+                    if (onNavigateToTab) onNavigateToTab('presets');
+                  }}
+                  style={{
+                    padding: '4px',
+                    backgroundColor: 'transparent',
+                    color: theme.colors.textSecondary,
+                    border: `1px solid ${theme.colors.border}`,
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = theme.colors.background;
+                    e.currentTarget.style.color = theme.colors.primary;
+                    e.currentTarget.style.borderColor = theme.colors.primary;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = theme.colors.textSecondary;
+                    e.currentTarget.style.borderColor = theme.colors.border;
+                  }}
+                  title="Go to Style Presets"
+                >
+                  <Palette size={16} />
+                </button>
+
+                {/* Navigate to Advanced Styles */}
+                <button
+                  onClick={() => {
+                    if (onFrameSelect) onFrameSelect(frame.id);
+                    if (onNavigateToTab) onNavigateToTab('advanced');
+                  }}
+                  style={{
+                    padding: '4px',
+                    backgroundColor: 'transparent',
+                    color: theme.colors.textSecondary,
+                    border: `1px solid ${theme.colors.border}`,
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = theme.colors.background;
+                    e.currentTarget.style.color = theme.colors.primary;
+                    e.currentTarget.style.borderColor = theme.colors.primary;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = theme.colors.textSecondary;
+                    e.currentTarget.style.borderColor = theme.colors.border;
+                  }}
+                  title="Go to Advanced Styles"
+                >
+                  <Settings size={16} />
                 </button>
               </div>
             </div>
