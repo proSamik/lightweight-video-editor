@@ -164,7 +164,7 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
             justifyContent: 'center',
             flexDirection: isProgressive ? 'column' : 'row',
             flexWrap: 'nowrap',
-            gap: isProgressive ? '1px' : '2px',
+            gap: isProgressive ? '2px' : '6px',
             overflow: 'hidden',
             position: 'relative',
             maxWidth: '100%' // Ensure content doesn't overflow
@@ -209,7 +209,7 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
                 flexWrap: 'nowrap',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '2px',
+                gap: '6px',
                 width: '100%',
                 overflow: 'hidden',
                 maxWidth: '100%'
@@ -297,7 +297,7 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
         {/* Preset Name */}
         <div style={{
           position: 'absolute',
-          bottom: '-16px',
+          bottom: '-12px',
           left: '50%',
           transform: 'translateX(-50%)',
           fontSize: '10px',
@@ -423,7 +423,7 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
           <div style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: '24px',
+            gap: '20px',
             width: '100%'
           }}>
             {currentPresets.map((preset) => (
