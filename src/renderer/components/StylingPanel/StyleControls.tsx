@@ -15,6 +15,63 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
   const { theme } = useTheme();
   const [openModal, setOpenModal] = useState<string | null>(null);
 
+  // Custom slider thumb styles for proper dragging
+  const sliderThumbStyles = `
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: ${theme.colors.primary};
+      cursor: pointer;
+      border: 2px solid #ffffff;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    }
+    
+    input[type="range"]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: ${theme.colors.primary};
+      cursor: pointer;
+      border: 2px solid #ffffff;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+      -moz-appearance: none;
+    }
+    
+    input[type="range"]::-ms-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: ${theme.colors.primary};
+      cursor: pointer;
+      border: 2px solid #ffffff;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    }
+
+    input[type="range"]::-webkit-slider-track {
+      height: 8px;
+      border-radius: 4px;
+      background: transparent;
+    }
+    
+    input[type="range"]::-moz-range-track {
+      height: 8px;
+      border-radius: 4px;
+      background: transparent;
+      border: none;
+    }
+    
+    input[type="range"]::-ms-track {
+      height: 8px;
+      border-radius: 4px;
+      background: transparent;
+      border: none;
+      color: transparent;
+    }
+  `;
+
   // Modal Component
   const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode }> = ({ 
     isOpen, onClose, title, children 
@@ -95,7 +152,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
         fontSize: '10px',
         fontWeight: '500',
         gap: '4px',
-        minWidth: '60px',
+        minWidth: '70px',
         transition: 'all 0.2s ease'
       }}
     >
@@ -108,15 +165,18 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
   );
 
   return (
-    <div style={{ padding: '12px', overflow: 'hidden', backgroundColor: theme.colors.surface }}>
-      
-      {/* Burn-in Subtitles Toggle - Top */}
+    <>
+      <style>{sliderThumbStyles}</style>
+      <div style={{ padding: '12px', overflow: 'hidden', backgroundColor: theme.colors.surface }}>
+        
+        {/* Burn-in Subtitles Toggle - Top */}
       <div style={{ 
         marginBottom: '16px',
-        padding: '8px 12px',
+        padding: '12px 16px',
         backgroundColor: theme.colors.background,
         borderRadius: '8px',
-        border: `1px solid ${theme.colors.border}`
+        border: `2px solid ${theme.colors.border}`,
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
       }}>
         <label style={{ 
           display: 'flex', 
@@ -142,7 +202,14 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
       </div>
 
       {/* Render Mode & Emphasis */}
-      <div style={{ marginBottom: '16px' }}>
+      <div style={{ 
+        marginBottom: '16px',
+        padding: '12px 16px',
+        backgroundColor: theme.colors.background,
+        borderRadius: '8px',
+        border: `2px solid ${theme.colors.border}`,
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
+      }}>
         <div style={{ 
           fontSize: '11px', 
           fontWeight: '600', 
@@ -212,7 +279,14 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
       </div>
 
       {/* Typography Row */}
-      <div style={{ marginBottom: '16px' }}>
+      <div style={{ 
+        marginBottom: '16px',
+        padding: '12px 16px',
+        backgroundColor: theme.colors.background,
+        borderRadius: '8px',
+        border: `2px solid ${theme.colors.border}`,
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
+      }}>
         <div style={{ 
           fontSize: '11px', 
           fontWeight: '600', 
@@ -249,7 +323,14 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
       </div>
 
       {/* Colors Row */}
-      <div style={{ marginBottom: '16px' }}>
+      <div style={{ 
+        marginBottom: '16px',
+        padding: '12px 16px',
+        backgroundColor: theme.colors.background,
+        borderRadius: '8px',
+        border: `2px solid ${theme.colors.border}`,
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
+      }}>
         <div style={{ 
           fontSize: '11px', 
           fontWeight: '600', 
@@ -307,7 +388,14 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
       </div>
 
       {/* Position Row */}
-      <div style={{ marginBottom: '16px' }}>
+      <div style={{ 
+        marginBottom: '16px',
+        padding: '12px 16px',
+        backgroundColor: theme.colors.background,
+        borderRadius: '8px',
+        border: `2px solid ${theme.colors.border}`,
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)'
+      }}>
         <div style={{ 
           fontSize: '11px', 
           fontWeight: '600', 
@@ -320,7 +408,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
           <CompactButton
             icon={<FiMove size={12} />}
             label="X, Y"
-            value={`${style.position?.x || 50}, ${style.position?.y || 80}`}
+            value={`${(style.position?.x || 50).toFixed(1)}, ${(style.position?.y || 80).toFixed(1)}`}
             onClick={() => setOpenModal('position')}
           />
           <CompactButton
@@ -386,11 +474,12 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
             onChange={(e) => onStyleUpdate({ fontSize: parseInt(e.target.value) })}
             style={{
               width: '100%',
-              height: '6px',
-              borderRadius: '3px',
+              height: '8px',
+              borderRadius: '4px',
               background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${((style.fontSize - 16) / (200 - 16)) * 100}%, ${theme.colors.border} ${((style.fontSize - 16) / (200 - 16)) * 100}%, ${theme.colors.border} 100%)`,
               outline: 'none',
-              appearance: 'none',
+              WebkitAppearance: 'none',
+              MozAppearance: 'none',
               cursor: 'pointer'
             }}
           />
@@ -533,11 +622,12 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
               })}
               style={{
                 width: '100%',
-                height: '6px',
-                borderRadius: '3px',
+                height: '8px',
+                borderRadius: '4px',
                 background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${(style.position?.x || 50)}%, ${theme.colors.border} ${(style.position?.x || 50)}%, ${theme.colors.border} 100%)`,
                 outline: 'none',
-                appearance: 'none',
+                WebkitAppearance: 'none',
+                MozAppearance: 'none',
                 cursor: 'pointer'
               }}
             />
@@ -564,11 +654,12 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
               })}
               style={{
                 width: '100%',
-                height: '6px',
-                borderRadius: '3px',
+                height: '8px',
+                borderRadius: '4px',
                 background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${(style.position?.y || 80)}%, ${theme.colors.border} ${(style.position?.y || 80)}%, ${theme.colors.border} 100%)`,
                 outline: 'none',
-                appearance: 'none',
+                WebkitAppearance: 'none',
+                MozAppearance: 'none',
                 cursor: 'pointer'
               }}
             />
@@ -600,11 +691,12 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
             })}
             style={{
               width: '100%',
-              height: '6px',
-              borderRadius: '3px',
+              height: '8px',
+              borderRadius: '4px',
               background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${((style.position?.z || 0) / 360) * 100}%, ${theme.colors.border} ${((style.position?.z || 0) / 360) * 100}%, ${theme.colors.border} 100%)`,
               outline: 'none',
-              appearance: 'none',
+              WebkitAppearance: 'none',
+              MozAppearance: 'none',
               cursor: 'pointer'
             }}
           />
@@ -633,17 +725,19 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
             onChange={(e) => onStyleUpdate({ strokeWidth: parseInt(e.target.value) })}
             style={{
               width: '100%',
-              height: '6px',
-              borderRadius: '3px',
+              height: '8px',
+              borderRadius: '4px',
               background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${((style.strokeWidth || 0) / 10) * 100}%, ${theme.colors.border} ${((style.strokeWidth || 0) / 10) * 100}%, ${theme.colors.border} 100%)`,
               outline: 'none',
-              appearance: 'none',
+              WebkitAppearance: 'none',
+              MozAppearance: 'none',
               cursor: 'pointer'
             }}
           />
         </div>
       </Modal>
 
-    </div>
+      </div>
+    </>
   );
 };
