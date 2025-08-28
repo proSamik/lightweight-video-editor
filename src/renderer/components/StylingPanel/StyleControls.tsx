@@ -439,6 +439,28 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
               </div>
               <div>Align</div>
             </button>
+            <button
+              onClick={() => openModal('strokeWidth')}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                padding: '12px 16px',
+                backgroundColor: '#ffffff',
+                color: theme.colors.text,
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '10px',
+                fontWeight: '500',
+                gap: '4px',
+                minWidth: '85px',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <div style={{ fontWeight: '600' }}>{style.strokeWidth || 0}px</div>
+              <div>Stroke Width</div>
+            </button>
           </div>
         </div>
 
@@ -572,28 +594,6 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
             >
               <div style={{ fontWeight: '600' }}>{style.position?.z || 0}°</div>
               <div>Rotation</div>
-            </button>
-            <button
-              onClick={() => openModal('strokeWidth')}
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                padding: '12px 16px',
-                backgroundColor: '#ffffff',
-                color: theme.colors.text,
-                border: `1px solid ${theme.colors.border}`,
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '10px',
-                fontWeight: '500',
-                gap: '4px',
-                minWidth: '85px',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <div style={{ fontWeight: '600' }}>{style.strokeWidth || 0}px</div>
-              <div>Stroke Width</div>
             </button>
           </div>
         </div>
