@@ -34,7 +34,6 @@ interface StylingPanelProps {
 }
 
 const StylingPanel: React.FC<StylingPanelProps> = ({
-  onTimeSeek,
   transcriptionStatus,
   aiSubtitleData,
   selectedFrameId,
@@ -64,10 +63,14 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
         font: mergedStyle.font || 'Poppins',
         fontSize: mergedStyle.fontSize ?? 85,
         textColor: mergedStyle.textColor || '#ffffff',
+        textColorOpacity: mergedStyle.textColorOpacity ?? 100,
         highlighterColor: mergedStyle.highlighterColor || '#00ff00',
+        highlighterColorOpacity: mergedStyle.highlighterColorOpacity ?? 100,
         backgroundColor: mergedStyle.backgroundColor ?? '#000000',
-        position: mergedStyle.position || { x: 50, y: 80 },
+        backgroundColorOpacity: mergedStyle.backgroundColorOpacity ?? 100,
         strokeColor: mergedStyle.strokeColor,
+        strokeColorOpacity: mergedStyle.strokeColorOpacity ?? 100,
+        position: mergedStyle.position || { x: 50, y: 80 },
         strokeWidth: mergedStyle.strokeWidth,
         textTransform: mergedStyle.textTransform,
         scale: mergedStyle.scale,
@@ -110,10 +113,14 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
           font: mergedStyle.font || 'Poppins',
           fontSize: mergedStyle.fontSize ?? 85,
           textColor: mergedStyle.textColor || '#ffffff',
+          textColorOpacity: mergedStyle.textColorOpacity ?? 100,
           highlighterColor: mergedStyle.highlighterColor || '#00ff00',
+          highlighterColorOpacity: mergedStyle.highlighterColorOpacity ?? 100,
           backgroundColor: mergedStyle.backgroundColor ?? '#000000',
-          position: mergedStyle.position || { x: 50, y: 80 },
+          backgroundColorOpacity: mergedStyle.backgroundColorOpacity ?? 100,
           strokeColor: mergedStyle.strokeColor,
+          strokeColorOpacity: mergedStyle.strokeColorOpacity ?? 100,
+          position: mergedStyle.position || { x: 50, y: 80 },
           strokeWidth: mergedStyle.strokeWidth,
           textTransform: mergedStyle.textTransform,
           scale: mergedStyle.scale,
@@ -146,7 +153,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
   };
 
   const headerStyles: React.CSSProperties = {
-    padding: '12px 16px',
+    padding: '6px 8px',
     borderBottom: `1px solid ${theme.colors.border}`,
     backgroundColor: theme.colors.background,
   };
@@ -236,7 +243,7 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
             <div>
               <h3 style={{ 
                 margin: 0, 
-                fontSize: '16px', 
+                fontSize: '14px', 
                 fontWeight: '600',
                 color: theme.colors.text 
               }}>
@@ -247,16 +254,31 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
                 fontSize: '11px',
                 color: theme.colors.textSecondary
               }}>
-                Customize appearance for frame: {selectedFrame.startTime.toFixed(2)}s - {selectedFrame.endTime.toFixed(2)}s
+                Frames: {selectedFrame.startTime.toFixed(2)}s - {selectedFrame.endTime.toFixed(2)}s
               </p>
             </div>
-            <Button
-              variant="primary"
-              size="sm"
+            <button
               onClick={() => setIsTimelineModalOpen(true)}
+              style={{
+                padding: '6px 8px',
+                backgroundColor: theme.colors.primary,
+                color: theme.colors.primaryForeground,
+                border: 'none',
+                borderRadius: borderRadius.md,
+                cursor: 'pointer',
+                fontSize: '11px',
+                fontWeight: '500',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = theme.colors.primaryHover || theme.colors.primary;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = theme.colors.primary;
+              }}
             >
               Apply to Selected Timeline 
-            </Button>
+            </button>
           </HStack>
           
           {/* Tab Navigation */}
@@ -272,35 +294,35 @@ const StylingPanel: React.FC<StylingPanelProps> = ({
               onClick={() => setActiveTab('presets')}
               style={{
                 flex: 1,
-                padding: '12px 16px',
+                padding: '6px 8px',
                 backgroundColor: activeTab === 'presets' ? theme.colors.primary : 'transparent',
                 color: activeTab === 'presets' ? theme.colors.primaryForeground : theme.colors.text,
                 border: 'none',
                 borderRadius: borderRadius.md,
                 cursor: 'pointer',
-                fontSize: '14px',
+                fontSize: '11px',
                 fontWeight: '500',
                 transition: 'all 0.2s ease'
               }}
             >
-              Presets
+              Style Presets
             </button>
             <button
               onClick={() => setActiveTab('custom')}
               style={{
                 flex: 1,
-                padding: '12px 16px',
+                padding: '6px 8px',
                 backgroundColor: activeTab === 'custom' ? theme.colors.primary : 'transparent',
                 color: activeTab === 'custom' ? theme.colors.primaryForeground : theme.colors.text,
                 border: 'none',
                 borderRadius: borderRadius.md,
                 cursor: 'pointer',
-                fontSize: '14px',
+                fontSize: '11px',
                 fontWeight: '500',
                 transition: 'all 0.2s ease'
               }}
             >
-              Custom Controls
+              Advance Style Controls
             </button>
           </div>
         </div>

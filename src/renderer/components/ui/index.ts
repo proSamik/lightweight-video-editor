@@ -76,6 +76,7 @@ export type {
 } from './Modal';
 
 export { default as LiquidModal } from './LiquidModal';
+export { default as GlassVideoWrapper } from './GlassVideoWrapper';
 
 // =============================================================================
 // LAYOUT COMPONENTS

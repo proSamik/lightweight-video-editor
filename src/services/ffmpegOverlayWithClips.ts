@@ -1227,7 +1227,7 @@ export class FFmpegOverlayWithClips {
   private async concatenateVideoFiles(filePaths: string[], outputPath: string, useStreamCopy: boolean = true): Promise<void> {
     return new Promise((resolve, reject) => {
       const concatFile = path.join(path.dirname(outputPath), `concat_${Date.now()}.txt`);
-      const concatContent = filePaths.map(file => `file '${path.resolve(file)}'`).join('\n');
+      const concatContent = filePaths.map(file => `file '${path.resolve(file).replace(/'/g, "'\"'\"'")}'`).join('\n');
       
       fs.writeFileSync(concatFile, concatContent);
       

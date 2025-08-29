@@ -557,9 +557,13 @@ ipcMain.handle('render-video-with-clips-and-subtitles', async (event, videoPath:
         font: frame.style?.font || 'Arial',
         fontSize: frame.style?.fontSize ?? 85,
         textColor: frame.style?.textColor || '#ffffff',
+        textColorOpacity: frame.style?.textColorOpacity ?? 100,
         highlighterColor: frame.style?.highlighterColor || '#ffff00',
+        highlighterColorOpacity: frame.style?.highlighterColorOpacity ?? 100,
         backgroundColor: frame.style?.backgroundColor ?? 'transparent',
+        backgroundColorOpacity: frame.style?.backgroundColorOpacity ?? 100,
         strokeColor: frame.style?.strokeColor,
+        strokeColorOpacity: frame.style?.strokeColorOpacity ?? 100,
         strokeWidth: frame.style?.strokeWidth,
         textTransform: frame.style?.textTransform,
         position: {

@@ -139,9 +139,13 @@ export interface SubtitleStyle {
   font: string;
   fontSize: number;
   textColor: string;
+  textColorOpacity?: number;
   highlighterColor: string;
+  highlighterColorOpacity?: number;
   backgroundColor: string;
+  backgroundColorOpacity?: number;
   strokeColor?: string;
+  strokeColorOpacity?: number;
   strokeWidth?: number;
   textTransform?: 'none' | 'capitalize' | 'uppercase' | 'lowercase';
   position: {
