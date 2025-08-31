@@ -296,6 +296,19 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
     checkFileExists();
   }, [videoFile]);
 
+  // Pause video when videoFile changes (project switching)
+  useEffect(() => {
+    const video = videoRef.current;
+    if (video && !video.paused) {
+      video.pause();
+      // Notify parent that video has been paused
+      if (onPlayPause && isPlaying) {
+        onPlayPause();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoFile]); // Only depend on videoFile changes
+
   // Helper function to check if mouse click is on rendered caption text
   const isClickOnCaption = (mouseX: number, mouseY: number, caption: any): boolean => {
     const canvas = canvasRef.current;
