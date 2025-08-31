@@ -925,9 +925,9 @@ export class FFmpegOverlayWithClips {
       const codec = this.getVideoCodecForMac();
       const quality = exportSettings?.quality || 'high';
       
-      if (filterChain.filterComplex && filterChain.filterScriptPath) {
+      if (filterChain.filterComplex) {
         const outputOptions = [
-          '-filter_complex_script', filterChain.filterScriptPath,
+          '-filter_complex', filterChain.filterComplex,
           '-map', '[final]', // Map the final video output
           '-map', '0:a?', // Map audio stream if available (? makes it optional)
           '-c:v', codec,
