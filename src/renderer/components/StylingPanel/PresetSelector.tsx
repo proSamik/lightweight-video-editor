@@ -1,16 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { CaptionPreset, SubtitleStyle } from '../../../types';
 import { presetCategories } from '../../data/captionPresets';
 import { PresetPreview } from '../PresetPreview';
-import { FiSearch, FiGrid, FiCheck } from 'react-icons/fi';
+import { FiSearch, FiFilter } from 'react-icons/fi';
 
 interface PresetSelectorProps {
   selectedPresetId?: string;
   onPresetSelect: (preset: CaptionPreset) => void;
   onStyleUpdate: (style: Partial<SubtitleStyle>) => void;
   onApplyToAll?: (style: Partial<SubtitleStyle>) => void;
-  selectedFrameText?: string; // Add prop for the actual selected text
+  selectedFrameText?: string;
 }
 
 export const PresetSelector: React.FC<PresetSelectorProps> = ({
@@ -21,63 +21,295 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
   selectedFrameText
 }) => {
   const { theme } = useTheme();
-  const [selectedCategory, setSelectedCategory] = useState('modern');
   const [searchTerm, setSearchTerm] = useState('');
-  const [applyToAll, setApplyToAll] = useState(true);
   const [currentPage, setCurrentPage] = useState(0);
-
-  // Filter presets based on search term
-  const filteredCategories = presetCategories.map(category => ({
-    ...category,
-    presets: category.presets.filter(preset => 
-      preset.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      preset.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (preset.tags || []).some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
-    )
-  })).filter(category => category.presets.length > 0);
-
-  const selectedCategoryData = filteredCategories.find(cat => cat.id === selectedCategory) || filteredCategories[0];
   
-  // Pagination for single column list
-  const presetsPerPage = 3;
-  const totalPages = selectedCategoryData ? Math.ceil(selectedCategoryData.presets.length / presetsPerPage) : 0;
-  const currentPresets = selectedCategoryData ? selectedCategoryData.presets.slice(currentPage * presetsPerPage, (currentPage + 1) * presetsPerPage) : [];
+  // Filter state - all categories enabled by default
+  const [categoryFilters, setCategoryFilters] = useState(() => {
+    const initialFilters: Record<string, boolean> = {};
+    presetCategories.forEach(category => {
+      initialFilters[category.id] = true;
+    });
+    return initialFilters;
+  });
+
+  // Get all presets from enabled categories
+  const filteredPresets = useMemo(() => {
+    return presetCategories
+      .filter(category => categoryFilters[category.id])
+      .flatMap(category => category.presets)
+      .filter(preset => 
+        preset.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        preset.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (preset.tags || []).some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+      );
+  }, [categoryFilters, searchTerm]);
+
+  // Pagination for 6 cards per page (single row layout)
+  const presetsPerPage = 6;
+  const totalPages = Math.ceil(filteredPresets.length / presetsPerPage);
+  const currentPresets = filteredPresets.slice(currentPage * presetsPerPage, (currentPage + 1) * presetsPerPage);
 
   const handlePresetSelect = (preset: CaptionPreset) => {
     onPresetSelect(preset);
-    // Apply the preset style immediately
     const { animation, ...styleWithoutAnimation } = preset.style;
-    
-    if (applyToAll && onApplyToAll) {
-      onApplyToAll(styleWithoutAnimation);
-    } else {
-      onStyleUpdate(styleWithoutAnimation);
-    }
+    onStyleUpdate(styleWithoutAnimation);
   };
 
-  const categoryButtonStyles = (isSelected: boolean): React.CSSProperties => ({
-    padding: '10px 12px',
-    backgroundColor: isSelected ? theme.colors.primary : theme.colors.background,
-    color: isSelected ? theme.colors.primaryForeground : theme.colors.text,
-    border: `1px solid ${isSelected ? theme.colors.primary : theme.colors.border}`,
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontSize: '10px',
-    fontWeight: '500',
-    transition: 'all 0.2s ease',
-    whiteSpace: 'nowrap'
-  });
+  const toggleCategoryFilter = (categoryId: string) => {
+    setCategoryFilters(prev => ({
+      ...prev,
+      [categoryId]: !prev[categoryId]
+    }));
+    setCurrentPage(0); // Reset to first page when changing filters
+  };
 
-  const searchInputStyles: React.CSSProperties = {
-    width: '100%',
-    padding: '10px 12px',
-    backgroundColor: theme.colors.background,
-    border: `1px solid ${theme.colors.border}`,
-    borderRadius: '8px',
-    fontSize: '11px',
-    color: theme.colors.text,
-    outline: 'none',
-    transition: 'border-color 0.2s ease'
+  // Create a live preview component that mimics the actual video rendering
+  const LivePresetPreview: React.FC<{ preset: CaptionPreset; text: string; isSelected: boolean; onClick: () => void }> = ({ 
+    preset, 
+    text, 
+    isSelected, 
+    onClick 
+  }) => {
+    const words = text.split(' ');
+    const [currentWordIndex, setCurrentWordIndex] = React.useState(0);
+    const [animationActive, setAnimationActive] = React.useState(false);
+    
+    // Auto-cycle through words for preview
+    React.useEffect(() => {
+      if (!animationActive) {
+        const startDelay = setTimeout(() => setAnimationActive(true), 500);
+        return () => clearTimeout(startDelay);
+      }
+      
+      const interval = setInterval(() => {
+        setCurrentWordIndex(prev => (prev + 1) % words.length);
+      }, 800);
+      
+      return () => clearInterval(interval);
+    }, [words.length, animationActive]);
+    
+    // Dynamic font size based on render mode and text length
+    const getPreviewFontSize = () => {
+      const containerWidth = 340; // available width minus padding
+      const containerHeight = 108; // available height minus padding
+      const textLength = text.length;
+      const wordCount = text.split(' ').length;
+      const isProgressive = preset.style.renderMode === 'progressive';
+      
+      let baseSize;
+      if (isProgressive) {
+        // For progressive mode, size based on container height and word count
+        const maxLinesVisible = Math.min(wordCount, 4); // max 4 lines visible
+        baseSize = Math.min(20, Math.max(12, (containerHeight / maxLinesVisible) * 0.7));
+      } else {
+        // For horizontal mode, size to fit container width
+        const avgCharWidth = 0.6; // approximate character width ratio
+        const estimatedWidth = textLength * avgCharWidth;
+        baseSize = Math.min(18, Math.max(10, (containerWidth / estimatedWidth) * 16));
+      }
+      
+      return Math.round(baseSize);
+    };
+    
+    const fontSize = getPreviewFontSize();
+    const isProgressive = preset.style.renderMode === 'progressive';
+    
+    return (
+      <div 
+        style={{ 
+          position: 'relative',
+          // Make card a bit narrower so hover scale never overflows the right edge
+          width: 'calc(100% - 24px)',
+          height: '120px',
+          cursor: 'pointer',
+          margin: '0 12px'
+        }}
+        onClick={onClick}
+      >
+        <div style={{
+          width: '100%',
+          height: '100%',
+          backgroundColor: '#e3f2fd',
+          border: `2px solid ${theme.colors.primary}`,
+          borderRadius: '8px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+          transition: 'all 0.2s ease',
+          position: 'relative',
+          padding: '6px' // Reduced padding for bigger text
+        }}
+        onMouseEnter={(e) => {
+          // Keep primary border color consistent and subtle hover scale
+          e.currentTarget.style.borderColor = theme.colors.primary;
+          e.currentTarget.style.transform = 'scale(1.01)'; // Reduced scale to prevent overlap
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.borderColor = theme.colors.primary;
+          e.currentTarget.style.transform = 'scale(1)';
+        }}
+        >
+          {/* Live Text Preview */}
+          <div style={{
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: isProgressive ? 'column' : 'row',
+            flexWrap: 'nowrap',
+            gap: isProgressive ? '2px' : '6px',
+            overflow: 'hidden',
+            position: 'relative',
+            maxWidth: '100%' // Ensure content doesn't overflow
+          }}>
+            {isProgressive ? (
+              // Progressive mode - show words vertically one by one
+              words.slice(0, currentWordIndex + 1).map((word, index) => (
+                <div
+                  key={index}
+                  style={{
+                    fontFamily: preset.style.font || 'Poppins',
+                    fontSize: `${fontSize}px`,
+                    fontWeight: 'bold',
+                    color: index === currentWordIndex ? 
+                      (preset.style.emphasizeMode ? 
+                        preset.style.highlighterColor || '#00ff00' : 
+                        preset.style.textColor || '#ffffff'
+                      ) : 
+                      preset.style.textColor || '#ffffff',
+                    textTransform: preset.style.textTransform || 'none',
+                    textShadow: preset.style.strokeWidth ? 
+                      `0 0 ${preset.style.strokeWidth}px ${preset.style.strokeColor || '#000000'}` : 
+                      '1px 1px 2px rgba(0, 0, 0, 0.8)',
+                    lineHeight: '1.1',
+                    textAlign: 'center',
+                    backgroundColor: index === currentWordIndex && !preset.style.emphasizeMode ? 
+                      preset.style.highlighterColor || '#00ff00' : 'transparent',
+                    padding: index === currentWordIndex && !preset.style.emphasizeMode ? '2px 4px' : '0',
+                    borderRadius: '4px',
+                    transition: 'all 0.3s ease',
+                    transform: index === currentWordIndex ? 'scale(1.05)' : 'scale(1)',
+                    opacity: index <= currentWordIndex ? 1 : 0.3
+                  }}
+                >
+                  {word}
+                </div>
+              ))
+            ) : (
+              // Horizontal mode - show all words in a line with current word highlighted
+              <div style={{
+                display: 'flex',
+                flexWrap: 'nowrap',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                width: '100%',
+                overflow: 'hidden',
+                maxWidth: '100%'
+              }}>
+                {words.map((word, index) => {
+                  const isCurrentWord = index === currentWordIndex;
+                  return (
+                    <span
+                      key={index}
+                      style={{
+                        fontFamily: preset.style.font || 'Poppins',
+                        fontSize: `${fontSize}px`,
+                        fontWeight: 'bold',
+                        color: isCurrentWord ? 
+                          (preset.style.emphasizeMode ? 
+                            preset.style.highlighterColor || '#00ff00' : 
+                            preset.style.textColor || '#ffffff'
+                          ) : 
+                          preset.style.textColor || '#ffffff',
+                        textTransform: preset.style.textTransform || 'none',
+                        textShadow: preset.style.strokeWidth ? 
+                          `0 0 ${preset.style.strokeWidth}px ${preset.style.strokeColor || '#000000'}` : 
+                          '1px 1px 2px rgba(0, 0, 0, 0.8)',
+                        backgroundColor: isCurrentWord && !preset.style.emphasizeMode ? 
+                          preset.style.highlighterColor || '#00ff00' : 'transparent',
+                        padding: isCurrentWord && !preset.style.emphasizeMode ? '2px 4px' : '0',
+                        borderRadius: '4px',
+                        transition: 'all 0.3s ease',
+                        transform: isCurrentWord ? 
+                          (preset.style.emphasizeMode ? 'scale(1.05)' : 'scale(1)') : 'scale(1)',
+                        whiteSpace: 'nowrap',
+                        maxWidth: 'fit-content'
+                      }}
+                    >
+                      {word}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Selection Indicator */}
+          {isSelected && (
+            <div style={{
+              position: 'absolute',
+              top: '4px',
+              right: '4px',
+              width: '16px',
+              height: '16px',
+              backgroundColor: theme.colors.primary,
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <div style={{
+                width: '8px',
+                height: '8px',
+                backgroundColor: theme.colors.primaryForeground,
+                borderRadius: '50%'
+              }} />
+            </div>
+          )}
+
+          {/* Popularity Badge */}
+          {preset.popularity && preset.popularity > 80 && (
+            <div style={{
+              position: 'absolute',
+              top: '4px',
+              left: '4px',
+              backgroundColor: theme.colors.warning,
+              color: 'white',
+              padding: '2px 6px',
+              borderRadius: '4px',
+              fontSize: '8px',
+              fontWeight: '600',
+              textTransform: 'uppercase'
+            }}>
+              HOT
+            </div>
+          )}
+        </div>
+
+        {/* Preset Name */}
+        <div style={{
+          position: 'absolute',
+          bottom: '-12px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          fontSize: '10px',
+          color: theme.colors.textSecondary,
+          textAlign: 'center',
+          whiteSpace: 'nowrap',
+          pointerEvents: 'none',
+          fontWeight: '500',
+          maxWidth: '100%',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis'
+        }}>
+          {preset.name}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -89,41 +321,6 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
       backgroundColor: theme.colors.surface,
       overflow: 'hidden'
     }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-        <div style={{
-          width: '24px',
-          height: '24px',
-          backgroundColor: theme.colors.accent,
-          borderRadius: '6px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          <FiGrid size={12} color={theme.colors.accentForeground} />
-        </div>
-        <div>
-          <h3 style={{
-            margin: 0,
-            fontSize: '13px',
-            fontWeight: '600',
-            color: theme.colors.text,
-            letterSpacing: '0.01em'
-          }}>
-            Style Presets
-          </h3>
-        </div>
-      </div>
-      <p style={{
-        margin: '0 0 12px 0',
-        fontSize: '10px',
-        color: theme.colors.textSecondary,
-        lineHeight: '1.4'
-      }}>
-        Choose from trending animated caption styles or customize your own
-      </p>
-
-
       {/* Search */}
       <div style={{ position: 'relative' }}>
         <div style={{
@@ -142,15 +339,18 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
           value={searchTerm}
           onChange={(e) => {
             setSearchTerm(e.target.value);
-            setCurrentPage(0); // Reset to first page when searching
+            setCurrentPage(0);
           }}
           style={{
-            ...searchInputStyles,
-            paddingLeft: '40px',
-            fontSize: '11px',
+            width: '100%',
             padding: '10px 12px 10px 40px',
             backgroundColor: theme.colors.background,
-            borderRadius: '8px'
+            border: `1px solid ${theme.colors.border}`,
+            borderRadius: '8px',
+            fontSize: '11px',
+            color: theme.colors.text,
+            outline: 'none',
+            transition: 'border-color 0.2s ease'
           }}
           onFocus={(e) => {
             e.currentTarget.style.borderColor = theme.colors.primary;
@@ -161,114 +361,80 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
         />
       </div>
 
-      {/* Category Tabs */}
+      {/* Category Filters */}
+
       <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(2, 1fr)',
+        display: 'flex',
+        flexWrap: 'wrap',
         gap: '6px'
       }}>
-        {filteredCategories.map((category) => (
-          <button
+        {presetCategories.map((category) => (
+          <label
             key={category.id}
-            onClick={() => {
-              setSelectedCategory(category.id);
-              setCurrentPage(0); // Reset to first page when changing category
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 10px',
+              backgroundColor: categoryFilters[category.id] ? theme.colors.primary : theme.colors.background,
+              color: categoryFilters[category.id] ? theme.colors.primaryForeground : theme.colors.text,
+              border: `1px solid ${categoryFilters[category.id] ? theme.colors.primary : theme.colors.border}`,
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '10px',
+              fontWeight: '500',
+              transition: 'all 0.2s ease',
+              userSelect: 'none'
             }}
-            style={categoryButtonStyles(selectedCategory === category.id)}
             onMouseEnter={(e) => {
-              if (selectedCategory !== category.id) {
+              if (!categoryFilters[category.id]) {
                 e.currentTarget.style.backgroundColor = theme.colors.surfaceHover || theme.colors.background;
               }
             }}
             onMouseLeave={(e) => {
-              if (selectedCategory !== category.id) {
+              if (!categoryFilters[category.id]) {
                 e.currentTarget.style.backgroundColor = theme.colors.background;
               }
             }}
           >
+            <input
+              type="checkbox"
+              checked={categoryFilters[category.id]}
+              onChange={() => toggleCategoryFilter(category.id)}
+              style={{
+                width: '12px',
+                height: '12px',
+                accentColor: theme.colors.primary,
+                margin: 0
+              }}
+            />
             {category.name} ({category.presets.length})
-          </button>
+          </label>
         ))}
       </div>
 
-      {/* Category Description */}
-      {selectedCategoryData && (
+      {/* Presets List - Single Row Layout */}
+      {currentPresets.length > 0 && (
         <div style={{
-          padding: '10px 12px',
-          backgroundColor: theme.colors.background,
-          borderRadius: '8px',
-          border: `1px solid ${theme.colors.border}`
+          width: '100%',
+          overflow: 'hidden', // Prevent any overflow
+          paddingRight: '8px' // Add right padding for containment
         }}>
-          <p style={{
-            margin: 0,
-            fontSize: '10px',
-            color: theme.colors.textSecondary,
-            fontWeight: '500',
-            lineHeight: '1.4'
-          }}>
-            {selectedCategoryData.description}
-          </p>
-        </div>
-      )}
-
-      {/* Presets List - Single Column Layout */}
-      {selectedCategoryData && currentPresets.length > 0 && (
-        <div>
           <div style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: '12px',
-            alignItems: 'center' // Center the cards horizontally
+            gap: '20px',
+            width: '100%',
+            maxWidth: '100%' // Ensure cards don't exceed container
           }}>
             {currentPresets.map((preset) => (
-              <div key={preset.id} style={{ position: 'relative' }}>
-                <PresetPreview
-                  preset={preset}
-                  isSelected={selectedPresetId === preset.id}
-                  onClick={() => handlePresetSelect(preset)}
-                  size="medium"
-                  selectedFrameText={selectedFrameText}
-                />
-                
-                {/* Preset Info Overlay */}
-                <div style={{
-                  position: 'absolute',
-                  bottom: '40px',
-                  left: '8px',
-                  right: '8px',
-                  backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                  color: 'white',
-                  padding: '6px 8px',
-                  borderRadius: theme.radius.sm,
-                  fontSize: '12px',
-                  opacity: 0,
-                  transition: 'opacity 0.2s ease',
-                  pointerEvents: 'none',
-                  textAlign: 'center'
-                }}
-                className="preset-info"
-                >
-                  {preset.description}
-                </div>
-                
-                {/* Popularity Badge */}
-                {preset.popularity && preset.popularity > 80 && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '8px',
-                    right: '8px',
-                    backgroundColor: theme.colors.warning,
-                    color: 'white',
-                    padding: '4px 8px',
-                    borderRadius: theme.radius.sm,
-                    fontSize: '10px',
-                    fontWeight: '600',
-                    textTransform: 'uppercase'
-                  }}>
-                    HOT
-                  </div>
-                )}
-              </div>
+              <LivePresetPreview
+                key={preset.id}
+                preset={preset}
+                text={selectedFrameText || 'Every SaaS founder faces is'}
+                isSelected={selectedPresetId === preset.id}
+                onClick={() => handlePresetSelect(preset)}
+              />
             ))}
           </div>
           
@@ -279,7 +445,7 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
               justifyContent: 'center',
               alignItems: 'center',
               gap: '12px',
-              marginTop: '16px'
+              marginTop: '24px'
             }}>
               <button
                 onClick={() => setCurrentPage(Math.max(0, currentPage - 1))}
@@ -340,12 +506,11 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
       )}
 
       {/* No Results */}
-      {(filteredCategories.length === 0 || (selectedCategoryData && selectedCategoryData.presets.length === 0)) && (
+      {filteredPresets.length === 0 && (
         <div style={{
           textAlign: 'center',
           padding: '40px 20px',
-          color: theme.colors.textSecondary,
-          gridColumn: '1 / -1'
+          color: theme.colors.textSecondary
         }}>
           <div style={{
             marginBottom: '16px',
@@ -371,38 +536,10 @@ export const PresetSelector: React.FC<PresetSelectorProps> = ({
             fontSize: '10px',
             color: theme.colors.textSecondary
           }}>
-            Try adjusting your search term or browse different categories
+            Try adjusting your search term or enabling more category filters
           </p>
         </div>
       )}
-
-      <style>
-        {`
-          .preset-info:hover {
-            opacity: 1 !important;
-          }
-          
-          /* Custom scrollbar styling */
-          div::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-          }
-          
-          div::-webkit-scrollbar-track {
-            background: ${theme.colors.background};
-            border-radius: 4px;
-          }
-          
-          div::-webkit-scrollbar-thumb {
-            background: ${theme.colors.border};
-            border-radius: 4px;
-          }
-          
-          div::-webkit-scrollbar-thumb:hover {
-            background: ${theme.colors.primary};
-          }
-        `}
-      </style>
     </div>
   );
 };

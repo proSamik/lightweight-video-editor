@@ -925,9 +925,9 @@ export class FFmpegOverlayWithClips {
       const codec = this.getVideoCodecForMac();
       const quality = exportSettings?.quality || 'high';
       
-      if (filterChain.filterComplex && filterChain.filterScriptPath) {
+      if (filterChain.filterComplex) {
         const outputOptions = [
-          '-filter_complex_script', filterChain.filterScriptPath,
+          '-filter_complex', filterChain.filterComplex,
           '-map', '[final]', // Map the final video output
           '-map', '0:a?', // Map audio stream if available (? makes it optional)
           '-c:v', codec,
@@ -1227,7 +1227,7 @@ export class FFmpegOverlayWithClips {
   private async concatenateVideoFiles(filePaths: string[], outputPath: string, useStreamCopy: boolean = true): Promise<void> {
     return new Promise((resolve, reject) => {
       const concatFile = path.join(path.dirname(outputPath), `concat_${Date.now()}.txt`);
-      const concatContent = filePaths.map(file => `file '${path.resolve(file)}'`).join('\n');
+      const concatContent = filePaths.map(file => `file '${path.resolve(file).replace(/'/g, "'\"'\"'")}'`).join('\n');
       
       fs.writeFileSync(concatFile, concatContent);
       

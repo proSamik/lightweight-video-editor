@@ -99,6 +99,14 @@ const UnifiedTimeline: React.FC<UnifiedTimelineProps> = ({
     setLocalClips(clips);
   }, [clips]);
 
+  // Auto-disable audio preview when no replacement audio is available
+  useEffect(() => {
+    if (!replacementAudioPath && isAudioPreviewEnabled && onAudioPreviewToggle) {
+      console.log('Auto-disabling audio preview: no replacement audio available');
+      onAudioPreviewToggle(false);
+    }
+  }, [replacementAudioPath, isAudioPreviewEnabled, onAudioPreviewToggle]);
+
   // Reset timeline when video file path changes (new video loaded)
   useEffect(() => {
     if (videoFile?.path && localClips.length > 0) {

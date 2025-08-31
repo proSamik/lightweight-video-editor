@@ -3,6 +3,7 @@ import { VideoFile, AISubtitleData, SubtitleFrame, VideoClip } from '../../types
 import { useTheme } from '../contexts/ThemeContext';
 import { Video, AlertTriangle } from 'lucide-react';
 import CaptionStyleModal from './CaptionStyleModal';
+import GlassVideoWrapper from './ui/GlassVideoWrapper';
 
 interface VideoPanelProps {
   videoFile: VideoFile | null;
@@ -294,6 +295,19 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
 
     checkFileExists();
   }, [videoFile]);
+
+  // Pause video when videoFile changes (project switching)
+  useEffect(() => {
+    const video = videoRef.current;
+    if (video && !video.paused) {
+      video.pause();
+      // Notify parent that video has been paused
+      if (onPlayPause && isPlaying) {
+        onPlayPause();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoFile]); // Only depend on videoFile changes
 
   // Helper function to check if mouse click is on rendered caption text
   const isClickOnCaption = (mouseX: number, mouseY: number, caption: any): boolean => {
@@ -966,6 +980,7 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
 
     if (!replacementAudioPath || !replacementAudio) {
       // No replacement audio - use original video audio
+      videoAudio.muted = false;
       videoAudio.volume = 1;
       return;
     }
@@ -1088,204 +1103,96 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
   // No video file selected
   if (!videoFile) {
     return (
-      <div 
-        data-drop-zone="video"
-        className="video-drop-zone"
-        style={{
-          flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: isDragOver ? theme.colors.primarySubtle : theme.colors.backgroundSecondary,
-          margin: '20px',
-          borderRadius: theme.radius.lg,
-          border: isDragOver ? `2px dashed ${theme.colors.primary}` : `2px dashed ${theme.colors.primary}40`,
-          cursor: dependenciesReady ? 'pointer' : 'not-allowed',
-          opacity: dependenciesReady ? 1 : 0.6,
-          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          boxShadow: isDragOver ? theme.shadows.lg : theme.shadows.sm,
-          position: 'relative',
-          overflow: 'hidden'
-        }} 
-        onClick={dependenciesReady ? onVideoSelect : undefined}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-      >
-        {/* Subtle gradient background for depth */}
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: `linear-gradient(135deg, ${theme.colors.primarySubtle}40, ${theme.colors.backgroundSecondary})`,
-          opacity: 0.6
-        }} />
-        
-        <div style={{ 
-          textAlign: 'center', 
-          position: 'relative',
-          zIndex: 1,
-          padding: '40px'
-        }}>
-          {/* Video icon at the top */}
-          <div style={{ 
+      <GlassVideoWrapper>
+        <div 
+          data-drop-zone="video"
+          className="video-drop-zone"
+          style={{
+            width: '100%',
+            height: '100%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            width: '80px',
-            height: '80px',
-            borderRadius: '50%',
-            backgroundColor: theme.colors.primary + '20',
-            marginBottom: '24px',
-            boxShadow: `0 8px 24px ${theme.colors.primary}30`,
-            margin: '0 auto 24px auto', // Center the icon horizontally
-          }}>
-            <Video 
-              size={40} 
-              color={theme.colors.primary}
-              style={{
-                filter: `drop-shadow(0 4px 8px ${theme.colors.primary}40)`
-              }}
-            />
-          </div>
-          
-          <div style={{ 
-            fontSize: '20px', 
-            marginBottom: '12px',
-            color: theme.colors.text,
-            fontWeight: '600',
-            fontFamily: theme.typography.fontFamily
-          }}>
-{isCheckingDependencies 
-              ? 'Checking dependencies...' 
-              : dependenciesReady 
-                ? 'Drop a video file here or click to select'
-                : 'Dependencies not ready'}
-          </div>
-          
-          <div style={{ 
-            fontSize: '15px', 
-            color: theme.colors.textSecondary,
-            marginBottom: '20px'
-          }}>
-{isCheckingDependencies 
-              ? 'Please wait while we initialize...'
-              : dependenciesReady 
-                ? 'Supports MP4, MOV, AVI'
-                : 'Please install missing dependencies'}
-          </div>
-          
-          {/* Blue accent button for visual appeal */}
+            backgroundColor: isDragOver ? `${theme.colors.primary}15` : `rgba(255, 255, 255, 0.95)`,
+            borderRadius: '12px',
+            border: isDragOver ? `2px dashed ${theme.colors.primary}` : `2px dashed ${theme.colors.primary}40`,
+            cursor: dependenciesReady ? 'pointer' : 'not-allowed',
+            opacity: dependenciesReady ? 1 : 0.6,
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            position: 'relative',
+            overflow: 'hidden'
+          }} 
+          onClick={dependenciesReady ? onVideoSelect : undefined}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+        >
+          {/* Subtle gradient background for depth */}
           <div style={{
-            display: 'inline-block',
-            padding: '8px 16px',
-            backgroundColor: theme.colors.primary,
-            color: theme.colors.primaryForeground,
-            borderRadius: theme.radius.md,
-            fontSize: '14px',
-            fontWeight: '500',
-            boxShadow: theme.shadows.sm,
-            transition: 'all 0.2s ease'
-          }}>
-            Choose Video File
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Video file selected but doesn't exist
-  if (videoFile && videoFileExists === false) {
-    return (
-      <div 
-        style={{
-          flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: theme.colors.backgroundSecondary,
-          margin: '20px',
-          borderRadius: theme.radius.lg,
-          border: `2px solid ${theme.colors.error}40`,
-          position: 'relative',
-          overflow: 'hidden'
-        }}
-      >
-        {/* Error gradient background */}
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: `linear-gradient(135deg, ${theme.colors.error}20, ${theme.colors.backgroundSecondary})`,
-          opacity: 0.6
-        }} />
-        
-        <div style={{ 
-          textAlign: 'center', 
-          position: 'relative',
-          zIndex: 1,
-          padding: '40px'
-        }}>
-          {/* Warning icon */}
-          <div style={{ 
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '80px',
-            height: '80px',
-            borderRadius: '50%',
-            backgroundColor: theme.colors.error + '20',
-            marginBottom: '24px',
-            boxShadow: `0 8px 24px ${theme.colors.error}30`,
-            margin: '0 auto 24px auto',
-          }}>
-            <AlertTriangle 
-              size={40} 
-              color={theme.colors.error}
-              style={{
-                filter: `drop-shadow(0 4px 8px ${theme.colors.error}40)`
-              }}
-            />
-          </div>
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: `linear-gradient(135deg, ${theme.colors.primary}10, rgba(255, 255, 255, 0.3))`,
+            opacity: 0.4
+          }} />
           
           <div style={{ 
-            fontSize: '20px', 
-            marginBottom: '12px',
-            color: theme.colors.text,
-            fontWeight: '600',
-            fontFamily: theme.typography.fontFamily
+            textAlign: 'center', 
+            position: 'relative',
+            zIndex: 1,
+            padding: '40px'
           }}>
-            Video file not found
-          </div>
-          
-          <div style={{ 
-            fontSize: '15px', 
-            color: theme.colors.textSecondary,
-            marginBottom: '20px',
-            maxWidth: '400px',
-            lineHeight: '1.5'
-          }}>
-            The video file "{videoFile.name}" could not be found at:
-            <br />
-            <span style={{ 
-              fontFamily: 'monospace', 
-              backgroundColor: theme.colors.background,
-              padding: '4px 8px',
-              borderRadius: '4px',
-              display: 'inline-block',
-              marginTop: '8px',
-              wordBreak: 'break-all'
+            {/* Video icon at the top */}
+            <div style={{ 
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '80px',
+              height: '80px',
+              borderRadius: '50%',
+              backgroundColor: theme.colors.primary + '20',
+              marginBottom: '24px',
+              boxShadow: `0 8px 24px ${theme.colors.primary}30`,
+              margin: '0 auto 24px auto', // Center the icon horizontally
             }}>
-              {videoFile.path}
-            </span>
-          </div>
-          
-          {/* Select new video button */}
-          <div 
-            style={{
+              <Video 
+                size={40} 
+                color={theme.colors.primary}
+                style={{
+                  filter: `drop-shadow(0 4px 8px ${theme.colors.primary}40)`
+                }}
+              />
+            </div>
+            
+            <div style={{ 
+              fontSize: '20px', 
+              marginBottom: '12px',
+              color: theme.colors.text,
+              fontWeight: '600',
+              fontFamily: theme.typography.fontFamily
+            }}>
+{isCheckingDependencies 
+                ? 'Checking dependencies...' 
+                : dependenciesReady 
+                  ? 'Drop a video file here or click to select'
+                  : 'Dependencies not ready'}
+            </div>
+            
+            <div style={{ 
+              fontSize: '15px', 
+              color: theme.colors.textSecondary,
+              marginBottom: '20px'
+            }}>
+{isCheckingDependencies 
+                ? 'Please wait while we initialize...'
+                : dependenciesReady 
+                  ? 'Supports MP4, MOV, AVI'
+                  : 'Please install missing dependencies'}
+            </div>
+            
+            {/* Blue accent button for visual appeal */}
+            <div style={{
               display: 'inline-block',
               padding: '8px 16px',
               backgroundColor: theme.colors.primary,
@@ -1294,42 +1201,160 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
               fontSize: '14px',
               fontWeight: '500',
               boxShadow: theme.shadows.sm,
-              transition: 'all 0.2s ease',
-              cursor: 'pointer'
-            }}
-            onClick={onVideoSelect}
-          >
-            Select New Video File
+              transition: 'all 0.2s ease'
+            }}>
+              Choose Video File
+            </div>
           </div>
         </div>
-      </div>
+      </GlassVideoWrapper>
+    );
+  }
+
+  // Video file selected but doesn't exist
+  if (videoFile && videoFileExists === false) {
+    return (
+      <GlassVideoWrapper>
+        <div 
+          style={{
+            width: '100%',
+            height: '400px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'transparent',
+            borderRadius: '12px',
+            border: `2px solid ${theme.colors.error}40`,
+            position: 'relative',
+            overflow: 'hidden'
+          }}
+        >
+          {/* Error gradient background */}
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: `linear-gradient(135deg, ${theme.colors.error}20, transparent)`,
+            opacity: 0.6
+          }} />
+          
+          <div style={{ 
+            textAlign: 'center', 
+            position: 'relative',
+            zIndex: 1,
+            padding: '40px'
+          }}>
+            {/* Warning icon */}
+            <div style={{ 
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '80px',
+              height: '80px',
+              borderRadius: '50%',
+              backgroundColor: theme.colors.error + '20',
+              marginBottom: '24px',
+              boxShadow: `0 8px 24px ${theme.colors.error}30`,
+              margin: '0 auto 24px auto',
+            }}>
+              <AlertTriangle 
+                size={40} 
+                color={theme.colors.error}
+                style={{
+                  filter: `drop-shadow(0 4px 8px ${theme.colors.error}40)`
+                }}
+              />
+            </div>
+            
+            <div style={{ 
+              fontSize: '20px', 
+              marginBottom: '12px',
+              color: theme.colors.text,
+              fontWeight: '600',
+              fontFamily: theme.typography.fontFamily
+            }}>
+              Video file not found
+            </div>
+            
+            <div style={{ 
+              fontSize: '15px', 
+              color: theme.colors.textSecondary,
+              marginBottom: '20px',
+              maxWidth: '400px',
+              lineHeight: '1.5'
+            }}>
+              The video file "{videoFile.name}" could not be found at:
+              <br />
+              <span style={{ 
+                fontFamily: 'monospace', 
+                backgroundColor: theme.colors.background,
+                padding: '4px 8px',
+                borderRadius: '4px',
+                display: 'inline-block',
+                marginTop: '8px',
+                wordBreak: 'break-all'
+              }}>
+                {videoFile.path}
+              </span>
+            </div>
+            
+            {/* Select new video button */}
+            <div 
+              style={{
+                display: 'inline-block',
+                padding: '8px 16px',
+                backgroundColor: theme.colors.primary,
+                color: theme.colors.primaryForeground,
+                borderRadius: theme.radius.md,
+                fontSize: '14px',
+                fontWeight: '500',
+                boxShadow: theme.shadows.sm,
+                transition: 'all 0.2s ease',
+                cursor: 'pointer'
+              }}
+              onClick={onVideoSelect}
+            >
+              Select New Video File
+            </div>
+          </div>
+        </div>
+      </GlassVideoWrapper>
     );
   }
 
   // Loading state while checking file existence
   if (videoFile && videoFileExists === null) {
     return (
-      <div 
-        style={{
-          flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: theme.colors.backgroundSecondary,
-          margin: '20px',
-          borderRadius: theme.radius.lg,
-          border: `1px solid ${theme.colors.border}`,
-        }}
-      >
-        <div style={{ 
-          textAlign: 'center',
-          color: theme.colors.textSecondary
-        }}>
-          Checking video file...
+      <GlassVideoWrapper>
+        <div 
+          style={{
+            width: '100%',
+            height: '400px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'transparent',
+            borderRadius: '12px',
+            border: `1px solid ${theme.colors.border}`,
+          }}
+        >
+          <div style={{ 
+            textAlign: 'center',
+            color: theme.colors.textSecondary
+          }}>
+            Checking video file...
+          </div>
         </div>
-      </div>
+      </GlassVideoWrapper>
     );
   }
+
+  // Determine aspect ratio for wrapper
+  const aspectRatio = videoFile && videoFile.width && videoFile.height 
+    ? videoFile.height / videoFile.width > 1.5 ? '9:16' : '16:9'
+    : '16:9';
 
   return (
     <div 
@@ -1338,35 +1363,30 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
         flex: 1, 
         display: 'flex',
         flexDirection: 'column',
-        backgroundColor: theme.colors.background,
+        background: `linear-gradient(135deg, ${theme.colors.primary}20 0%, ${theme.colors.primary}10 50%, ${theme.colors.primary}05 100%)`,
         padding: '1px',
         border: `1px solid ${theme.colors.border}`,
-        borderRadius: '2px'
+        borderRadius: '2px',
+        position: 'relative',
+        minHeight: 0,
+        overflow: 'hidden'
       }}
     >
-
-
-      {/* Video Container with Canvas Overlay */}
-      <div style={{ 
-        flex: 1,
-        position: 'relative',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: 0,
-        maxHeight: 'calc(100vh - 300px)', // Constrain to viewport height minus space for UI
-        overflow: 'hidden',
-        padding: '10px'
-      }}>
+      <GlassVideoWrapper aspectRatio={aspectRatio}>
+        {/* Video Container with Canvas Overlay */}
+        <div style={{ 
+          position: 'relative',
+          width: '100%',
+          height: '100%',
+          overflow: 'hidden'
+        }}>
         <video
           ref={videoRef}
           src={`file://${videoFile.path}`}
           style={{
-            maxWidth: '100%',
-            maxHeight: '100%',
-            width: 'auto',
-            height: 'auto',
-            objectFit: 'contain',
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
             display: videoLoadError ? 'none' : 'block'
           }}
           onTimeUpdate={() => {
@@ -1425,11 +1445,10 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
           ref={canvasRef}
           style={{
             position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            maxWidth: '100%',
-            maxHeight: '100%',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
             objectFit: 'contain',
             pointerEvents: (() => {
               const originalTimeMs = currentTime;
@@ -1509,12 +1528,51 @@ const VideoPanel: React.FC<VideoPanelProps> = ({
           isOpen={showCaptionStyleModal}
           onClose={() => setShowCaptionStyleModal(false)}
           caption={selectedCaptionForStyling}
-          onUpdate={() => {}}
+          onUpdate={({ style }) => {
+            if (!selectedCaptionForStyling || !aiSubtitleData || !onAISubtitleUpdate) return;
+            
+            // Update the specific frame's style in aiSubtitleData
+            const updatedFrames = aiSubtitleData.frames.map(frame => {
+              if (frame.id !== selectedCaptionForStyling.id) return frame;
+              const safeStyle = {
+                font: style.font || 'Poppins',
+                fontSize: style.fontSize ?? 85,
+                textColor: style.textColor || '#ffffff',
+                textColorOpacity: style.textColorOpacity !== undefined ? style.textColorOpacity : 100,
+                highlighterColor: style.highlighterColor || '#00ff00',
+                highlighterColorOpacity: style.highlighterColorOpacity !== undefined ? style.highlighterColorOpacity : 100,
+                backgroundColor: style.backgroundColor ?? '#000000',
+                backgroundColorOpacity: style.backgroundColorOpacity !== undefined ? style.backgroundColorOpacity : 100,
+                strokeColor: style.strokeColor,
+                strokeColorOpacity: style.strokeColorOpacity !== undefined ? style.strokeColorOpacity : 100,
+                position: style.position || { x: 50, y: 80 },
+                strokeWidth: style.strokeWidth,
+                textTransform: style.textTransform,
+                scale: style.scale,
+                emphasizeMode: style.emphasizeMode,
+                renderMode: style.renderMode,
+                textAlign: style.textAlign,
+                burnInSubtitles: style.burnInSubtitles,
+              };
+              return { ...frame, style: safeStyle };
+            });
+
+            onAISubtitleUpdate({
+              ...aiSubtitleData,
+              frames: updatedFrames,
+              lastModified: Date.now()
+            });
+            
+            // Update the local selection state
+            setSelectedCaptionForStyling({
+              ...selectedCaptionForStyling,
+              style
+            });
+          }}
           position={modalPosition}
         />
-      </div>
-
-
+        </div>
+      </GlassVideoWrapper>
     </div>
   );
 };
@@ -1634,9 +1692,9 @@ function renderSimpleTextOnCanvas(
     scaleFactor,
     captionText: text.substring(0, 20)
   });
-  const textColor = parseColor(caption.style?.textColor || '#ffffff');
-  const backgroundColor = parseColor(caption.style?.backgroundColor || '#80000000');
-  const strokeColor = parseColor(caption.style?.strokeColor || '#000000');
+  const textColor = parseColor(caption.style?.textColor || '#ffffff', caption.style?.textColorOpacity);
+  const backgroundColor = parseColor(caption.style?.backgroundColor || '#80000000', caption.style?.backgroundColorOpacity);
+  const strokeColor = parseColor(caption.style?.strokeColor || '#000000', caption.style?.strokeColorOpacity);
   const strokeWidth = caption.style?.strokeWidth || 0;
   
   // Set font with actual font from caption style (matching export system exactly)
@@ -1706,10 +1764,10 @@ function renderKaraokeTextOnCanvas(
   const baseFontSize = caption.style?.fontSize || 85;
   const scale = caption.style?.scale || 1;
   const fontSize = baseFontSize * scale;
-  const textColor = parseColor(caption.style?.textColor || '#ffffff');
-  const highlighterColor = parseColor(caption.style?.highlighterColor || '#ffff00');
-  const backgroundColor = parseColor(caption.style?.backgroundColor || '#80000000');
-  const strokeColor = parseColor(caption.style?.strokeColor || '#000000');
+  const textColor = parseColor(caption.style?.textColor || '#ffffff', caption.style?.textColorOpacity);
+  const highlighterColor = parseColor(caption.style?.highlighterColor || '#ffff00', caption.style?.highlighterColorOpacity);
+  const backgroundColor = parseColor(caption.style?.backgroundColor || '#80000000', caption.style?.backgroundColorOpacity);
+  const strokeColor = parseColor(caption.style?.strokeColor || '#000000', caption.style?.strokeColorOpacity);
   const strokeWidth = caption.style?.strokeWidth || 0;
   
   // Set font with actual font from caption style (matching VideoPanel exactly)
@@ -1881,10 +1939,10 @@ function renderProgressiveTextOnCanvas(
   const baseFontSize = caption.style?.fontSize || 85;
   const scale = caption.style?.scale || 1;
   const fontSize = baseFontSize * scale;
-  const textColor = parseColor(caption.style?.textColor || '#ffffff');
-  const highlighterColor = parseColor(caption.style?.highlighterColor || '#ffff00');
-  const backgroundColor = parseColor(caption.style?.backgroundColor || '#80000000');
-  const strokeColor = parseColor(caption.style?.strokeColor || '#000000');
+  const textColor = parseColor(caption.style?.textColor || '#ffffff', caption.style?.textColorOpacity);
+  const highlighterColor = parseColor(caption.style?.highlighterColor || '#ffff00', caption.style?.highlighterColorOpacity);
+  const backgroundColor = parseColor(caption.style?.backgroundColor || '#80000000', caption.style?.backgroundColorOpacity);
+  const strokeColor = parseColor(caption.style?.strokeColor || '#000000', caption.style?.strokeColorOpacity);
   const strokeWidth = caption.style?.strokeWidth || 0;
   
   // Set font with actual font from caption style
@@ -2004,10 +2062,13 @@ function renderProgressiveTextOnCanvas(
 }
 
 // Color parsing function (matching CanvasVideoRenderer)
-function parseColor(colorStr: string): { r: number, g: number, b: number, a: number } {
+function parseColor(colorStr: string, opacity?: number): { r: number, g: number, b: number, a: number } {
   if (colorStr === 'transparent') {
     return { r: 0, g: 0, b: 0, a: 0 };
   }
+  
+  let baseAlpha = 1;
+  let r = 255, g = 255, b = 255;
   
   // Handle hex colors
   if (colorStr.startsWith('#')) {
@@ -2015,22 +2076,23 @@ function parseColor(colorStr: string): { r: number, g: number, b: number, a: num
     
     if (hex.length === 8) {
       // 8-character hex with alpha
-      const alpha = parseInt(hex.substring(0, 2), 16) / 255;
-      const r = parseInt(hex.substring(2, 4), 16);
-      const g = parseInt(hex.substring(4, 6), 16);
-      const b = parseInt(hex.substring(6, 8), 16);
-      return { r, g, b, a: alpha };
+      baseAlpha = parseInt(hex.substring(0, 2), 16) / 255;
+      r = parseInt(hex.substring(2, 4), 16);
+      g = parseInt(hex.substring(4, 6), 16);
+      b = parseInt(hex.substring(6, 8), 16);
     } else if (hex.length === 6) {
       // 6-character hex without alpha
-      const r = parseInt(hex.substring(0, 2), 16);
-      const g = parseInt(hex.substring(2, 4), 16);
-      const b = parseInt(hex.substring(4, 6), 16);
-      return { r, g, b, a: 1 };
+      r = parseInt(hex.substring(0, 2), 16);
+      g = parseInt(hex.substring(2, 4), 16);
+      b = parseInt(hex.substring(4, 6), 16);
+      baseAlpha = 1;
     }
   }
   
-  // Default to white
-  return { r: 255, g: 255, b: 255, a: 1 };
+  // Apply opacity if provided (convert percentage to decimal)
+  const finalAlpha = opacity !== undefined ? (baseAlpha * (opacity / 100)) : baseAlpha;
+  
+  return { r, g, b, a: finalAlpha };
 }
 
 // Expose rendering functions globally for PresetPreview

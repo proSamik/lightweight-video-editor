@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { FiType, FiRotateCw, FiDroplet, FiAlignLeft, FiAlignCenter, FiAlignRight, FiMove, FiSettings } from 'react-icons/fi';
-import { SubtitleStyle } from '../../../types';
+import { FiType, FiAlignLeft, FiAlignCenter, FiAlignRight } from 'react-icons/fi';
+import { SubtitleStyle, FontOption, ColorOption } from '../../../types';
 
 interface StyleControlsProps {
   style: SubtitleStyle;
@@ -13,866 +13,1650 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
   onStyleUpdate,
 }) => {
   const { theme } = useTheme();
+  const [openModalState, setOpenModalState] = useState<string | null>(null);
+  const [tempStyle, setTempStyle] = useState<SubtitleStyle>({
+    ...style,
+    textColorOpacity: style.textColorOpacity ?? 100,
+    highlighterColorOpacity: style.highlighterColorOpacity ?? 100,
+    backgroundColorOpacity: style.backgroundColorOpacity ?? 100,
+    strokeColorOpacity: style.strokeColorOpacity ?? 100,
+  });
+  const [originalStyleSnapshot, setOriginalStyleSnapshot] = useState<SubtitleStyle | null>(null);
 
-  // Custom slider thumb styles
-  const sliderThumbStyles = `
-    input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: ${theme.colors.primary};
-      cursor: pointer;
-      border: none;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  // Update temp style when main style changes, but ONLY if no modal is open
+  useEffect(() => {
+    if (!openModalState) {
+      // Ensure all opacity fields have default values
+      const styleWithDefaults = {
+        ...style,
+        textColorOpacity: style.textColorOpacity ?? 100,
+        highlighterColorOpacity: style.highlighterColorOpacity ?? 100,
+        backgroundColorOpacity: style.backgroundColorOpacity ?? 100,
+        strokeColorOpacity: style.strokeColorOpacity ?? 100,
+      };
+      setTempStyle(styleWithDefaults);
+      // Clear any leftover snapshot
+      setOriginalStyleSnapshot(null);
     }
-    
-    input[type="range"]::-moz-range-thumb {
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: ${theme.colors.primary};
-      cursor: pointer;
-      border: none;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    }
-    
-    input[type="range"]::-ms-thumb {
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: ${theme.colors.primary};
-      cursor: pointer;
-      border: none;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    }
-  `;
+  }, [style, openModalState]);
 
-  // Section header component for consistent styling
-  const SectionHeader: React.FC<{ icon: React.ReactNode; title: string }> = ({ icon, title }) => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+
+  // Modal Component - positioned within styling panel
+  const Modal: React.FC<{ 
+    isOpen: boolean; 
+    onClose: () => void; 
+    title: string; 
+    children: React.ReactNode;
+  }> = ({ isOpen, onClose, title, children }) => {
+    if (!isOpen) return null;
+    
+    return (
       <div style={{
-        width: '24px',
-        height: '24px',
-        backgroundColor: theme.colors.accent,
-        borderRadius: '6px',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center'
+        justifyContent: 'center',
+        zIndex: 1000,
+        borderRadius: '8px'
       }}>
-        {icon}
+        <div style={{
+          backgroundColor: '#ffffff',
+          borderRadius: '12px',
+          padding: '20px',
+          maxWidth: '350px',
+          width: '90%',
+          maxHeight: '400px',
+          overflow: 'auto',
+          border: `2px solid ${theme.colors.border}`,
+          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2)'
+        }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '16px'
+          }}>
+            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: theme.colors.text }}>
+              {title}
+            </h3>
+            <button
+              onClick={onClose}
+              style={{
+                background: 'none',
+                border: 'none',
+                fontSize: '18px',
+                cursor: 'pointer',
+                color: theme.colors.textSecondary
+              }}
+            >
+              ×
+            </button>
+          </div>
+          {children}
+          
+          {/* Apply/Cancel Buttons */}
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            marginTop: '16px',
+            justifyContent: 'flex-end',
+            borderTop: `1px solid ${theme.colors.border}`,
+            paddingTop: '12px'
+          }}>
+            <button
+              onClick={handleCancel}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: 'transparent',
+                color: theme.colors.text,
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: '6px',
+                fontSize: '11px',
+                cursor: 'pointer'
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleApply}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: theme.colors.primary,
+                color: theme.colors.primaryForeground,
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '11px',
+                cursor: 'pointer'
+              }}
+            >
+              Apply
+            </button>
+          </div>
+        </div>
       </div>
-      <h3 style={{ 
-        margin: 0, 
-        fontSize: '13px', 
-        fontWeight: '600', 
-        color: theme.colors.text,
-        letterSpacing: '0.01em'
-      }}>
-        {title}
-      </h3>
-    </div>
+    );
+  };
+
+  // Modal closing and opening handlers  
+  const openModal = (modalName: string) => {
+    openModalWithState(modalName);
+  };
+
+  // Compact Button Component
+  const CompactButton: React.FC<{ 
+    icon?: React.ReactNode; 
+    label: string; 
+    value?: string | number;
+    onClick: () => void;
+    active?: boolean;
+  }> = ({ icon, label, value, onClick, active }) => (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        padding: '12px 16px',
+        backgroundColor: active ? theme.colors.primary : '#ffffff',
+        color: active ? theme.colors.primaryForeground : theme.colors.text,
+        border: `1px solid ${theme.colors.border}`,
+        borderRadius: '8px',
+        cursor: 'pointer',
+        fontSize: '10px',
+        fontWeight: '500',
+        gap: '4px',
+        minWidth: '85px',
+        transition: 'all 0.2s ease'
+      }}
+    >
+      {icon && <div>{icon}</div>}
+      <div style={{ textAlign: 'center' }}>
+        <div>{label}</div>
+        {value && <div style={{ fontWeight: '600' }}>{value}</div>}
+      </div>
+    </button>
   );
 
-  // Consistent control container styling
-  const controlContainerStyle: React.CSSProperties = {
-    padding: '10px',
-    backgroundColor: theme.colors.background,
-    borderRadius: '8px',
-    border: `1px solid ${theme.colors.border}`,
-    marginBottom: '12px'
+  // Helper functions for modal interactions
+  const openModalWithState = (modalName: string) => {
+    // Take snapshot of current style when modal opens
+    const styleWithDefaults = {
+      ...style,
+      textColorOpacity: style.textColorOpacity ?? 100,
+      highlighterColorOpacity: style.highlighterColorOpacity ?? 100,
+      backgroundColorOpacity: style.backgroundColorOpacity ?? 100,
+      strokeColorOpacity: style.strokeColorOpacity ?? 100,
+    };
+    setOriginalStyleSnapshot({ ...styleWithDefaults });
+    setTempStyle({ ...styleWithDefaults });
+    setOpenModalState(modalName);
   };
 
-  const labelStyle: React.CSSProperties = {
-    fontSize: '11px',
-    fontWeight: '500',
-    color: theme.colors.text,
-    marginBottom: '6px',
-    display: 'block'
+  const handleCancel = () => {
+    // Revert to snapshot taken when modal was opened
+    if (originalStyleSnapshot) {
+      onStyleUpdate(originalStyleSnapshot);
+      setTempStyle({ ...originalStyleSnapshot });
+    }
+    setOriginalStyleSnapshot(null); // Clean up memory
+    setOpenModalState(null);
   };
 
-  const valueDisplayStyle: React.CSSProperties = {
-    fontSize: '11px',
-    fontWeight: '600',
-    color: theme.colors.primary
+  const handleApply = () => {
+    // Changes are already applied via live preview - just close modal and cleanup
+    setOriginalStyleSnapshot(null); // Clean up memory
+    setOpenModalState(null);
+  };
+
+  // Update temp style WITH live preview - apply changes immediately for preview
+  const updateTempStyle = (updates: Partial<SubtitleStyle>) => {
+    const newTempStyle = { ...tempStyle, ...updates };
+    setTempStyle(newTempStyle);
+    // Apply changes immediately for live preview
+    onStyleUpdate(newTempStyle);
   };
 
   return (
     <>
-      <style>{sliderThumbStyles}</style>
-      <div style={{ padding: '16px', overflow: 'hidden', backgroundColor: theme.colors.surface }}>
+      <div style={{ padding: '12px', overflow: 'hidden', backgroundColor: theme.colors.surface, position: 'relative' }}>
         
-        {/* Z-Axis Rotation */}
-        <div style={{ marginBottom: '20px' }}>
-          <SectionHeader 
-            icon={<FiRotateCw size={12} color={theme.colors.accentForeground} />}
-            title="Rotation"
-          />
-          <div style={controlContainerStyle}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '6px'
-            }}>
-              <label style={labelStyle}>
-                Z-Axis Rotation
-              </label>
-              <span style={valueDisplayStyle}>
-                {style.position?.z || 0}°
-              </span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="360"
-              value={style.position?.z || 0}
-              onChange={(e) => {
-                onStyleUpdate({
-                  position: { ...(style.position || { x: 50, y: 80, z: 0 }), z: parseInt(e.target.value) }
-                });
-              }}
-              style={{
-                width: '100%',
-                height: '6px',
-                borderRadius: '3px',
-                background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${((style.position?.z || 0) / 360) * 100}%, ${theme.colors.border} ${((style.position?.z || 0) / 360) * 100}%, ${theme.colors.border} 100%)`,
-                outline: 'none',
-                appearance: 'none',
-                cursor: 'pointer',
-                WebkitAppearance: 'none',
-                MozAppearance: 'none'
-              }}
-            />
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              marginTop: '6px',
-              fontSize: '9px',
-              color: theme.colors.textSecondary,
-              fontWeight: '500'
-            }}>
-              <span>0°</span>
-              <span>360°</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Render Mode */}
-        <div style={{ marginBottom: '20px' }}>
-          <SectionHeader 
-            icon={<FiSettings size={12} color={theme.colors.accentForeground} />}
-            title="Render Mode"
-          />
-          <p style={{
-            margin: '0 0 12px 0',
-            fontSize: '10px',
-            color: theme.colors.textSecondary,
-            lineHeight: '1.4'
-          }}>
-            Choose how the text should be rendered on the video.
-          </p>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(2, 1fr)',
-            gap: '8px'
-          }}>
-            {[
-              { value: 'horizontal', label: 'Horizontal', description: 'Standard text display' },
-              { value: 'progressive', label: 'Progressive', description: 'Word-by-word highlighting' }
-            ].map((mode) => (
-              <button
-                key={mode.value}
-                onClick={() => onStyleUpdate({ renderMode: mode.value as 'horizontal' | 'progressive' })}
-                style={{
-                  padding: '12px',
-                  backgroundColor: style.renderMode === mode.value 
-                    ? theme.colors.primary 
-                    : theme.colors.background,
-                  color: style.renderMode === mode.value 
-                    ? theme.colors.primaryForeground 
-                    : theme.colors.text,
-                  border: `1px solid ${style.renderMode === mode.value 
-                    ? theme.colors.primary 
-                    : theme.colors.border}`,
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '10px',
-                  fontWeight: '500',
-                  transition: 'all 0.2s ease',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'flex-start',
-                  gap: '3px',
-                  textAlign: 'left'
-                }}
-                onMouseEnter={(e) => {
-                  if (style.renderMode !== mode.value) {
-                    e.currentTarget.style.backgroundColor = theme.colors.surfaceHover || theme.colors.background;
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (style.renderMode !== mode.value) {
-                    e.currentTarget.style.backgroundColor = theme.colors.background;
-                  }
-                }}
-              >
-                <span style={{ fontWeight: '600', fontSize: '11px' }}>{mode.label}</span>
-                <span style={{ 
-                  fontSize: '8px', 
-                  opacity: 0.7,
-                  lineHeight: '1.2'
-                }}>
-                  {mode.description}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Text Alignment (only for progressive mode) */}
-        {style.renderMode === 'progressive' && (
-          <div style={{ marginBottom: '20px' }}>
-            <SectionHeader 
-              icon={<FiAlignCenter size={12} color={theme.colors.accentForeground} />}
-              title="Text Alignment"
-            />
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: '8px'
-            }}>
-              {[
-                { value: 'left', label: 'Left', icon: <FiAlignLeft size={12} /> },
-                { value: 'center', label: 'Center', icon: <FiAlignCenter size={12} /> },
-                { value: 'right', label: 'Right', icon: <FiAlignRight size={12} /> }
-              ].map((align) => (
-                <button
-                  key={align.value}
-                  onClick={() => onStyleUpdate({ textAlign: align.value as 'left' | 'center' | 'right' })}
-                  style={{
-                    padding: '10px 8px',
-                    backgroundColor: style.textAlign === align.value 
-                      ? theme.colors.primary 
-                      : theme.colors.background,
-                    color: style.textAlign === align.value 
-                      ? theme.colors.primaryForeground 
-                      : theme.colors.text,
-                    border: `1px solid ${style.textAlign === align.value 
-                      ? theme.colors.primary 
-                      : theme.colors.border}`,
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontSize: '10px',
-                    fontWeight: '500',
-                    transition: 'all 0.2s ease',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (style.textAlign !== align.value) {
-                      e.currentTarget.style.backgroundColor = theme.colors.surfaceHover || theme.colors.background;
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (style.textAlign !== align.value) {
-                      e.currentTarget.style.backgroundColor = theme.colors.background;
-                    }
-                  }}
-                >
-                  {align.icon}
-                  <span>{align.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Typography */}
-        <div style={{ marginBottom: '20px' }}>
-          <SectionHeader 
-            icon={<FiType size={12} color={theme.colors.accentForeground} />}
-            title="Typography"
-          />
-          
-          {/* Font Size */}
-          <div style={controlContainerStyle}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '6px'
-            }}>
-              <label style={labelStyle}>
-                Font Size
-              </label>
-              <span style={valueDisplayStyle}>
-                {style.fontSize}px
-              </span>
-            </div>
-            <input
-              type="range"
-              min="16"
-              max="200"
-              value={style.fontSize}
-              onChange={(e) => onStyleUpdate({ fontSize: parseInt(e.target.value) })}
-              style={{
-                width: '100%',
-                height: '6px',
-                borderRadius: '3px',
-                background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${((style.fontSize - 16) / (200 - 16)) * 100}%, ${theme.colors.border} ${((style.fontSize - 16) / (200 - 16)) * 100}%, ${theme.colors.border} 100%)`,
-                outline: 'none',
-                appearance: 'none',
-                cursor: 'pointer',
-                WebkitAppearance: 'none',
-                MozAppearance: 'none'
-              }}
-            />
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              marginTop: '6px',
-              fontSize: '9px',
-              color: theme.colors.textSecondary,
-              fontWeight: '500'
-            }}>
-              <span>16px</span>
-              <span>200px</span>
-            </div>
-          </div>
-
-          {/* Scale */}
-          <div style={controlContainerStyle}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '6px'
-            }}>
-              <label style={labelStyle}>
-                Scale
-              </label>
-              <span style={valueDisplayStyle}>
-                {Math.round((style.scale || 1) * 100)}%
-              </span>
-            </div>
-            <input
-              type="range"
-              min="0.5"
-              max="2.0"
-              step="0.1"
-              value={style.scale || 1}
-              onChange={(e) => onStyleUpdate({ scale: parseFloat(e.target.value) })}
-              style={{
-                width: '100%',
-                height: '6px',
-                borderRadius: '3px',
-                background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${(((style.scale || 1) - 0.5) / (2.0 - 0.5)) * 100}%, ${theme.colors.border} ${(((style.scale || 1) - 0.5) / (2.0 - 0.5)) * 100}%, ${theme.colors.border} 100%)`,
-                outline: 'none',
-                appearance: 'none',
-                cursor: 'pointer',
-                WebkitAppearance: 'none',
-                MozAppearance: 'none'
-              }}
-            />
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              marginTop: '6px',
-              fontSize: '9px',
-              color: theme.colors.textSecondary,
-              fontWeight: '500'
-            }}>
-              <span>50%</span>
-              <span>200%</span>
-            </div>
-          </div>
-
-          {/* Font Family */}
-          <div style={controlContainerStyle}>
-            <label style={labelStyle}>
-              Font Family
-            </label>
-            <select
-              value={style.font || 'Poppins'}
-              onChange={(e) => onStyleUpdate({ font: e.target.value })}
-              style={{
-                width: '100%',
-                padding: '8px 10px',
-                backgroundColor: theme.colors.surface,
-                color: theme.colors.text,
-                border: `1px solid ${theme.colors.border}`,
-                borderRadius: '8px',
-                fontSize: '10px',
-                transition: 'all 0.2s ease',
-                outline: 'none'
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = theme.colors.borderFocus || theme.colors.primary;
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = theme.colors.border;
-              }}
-            >
-              <option value="Segoe UI">Segoe UI (Microsoft System)</option>
-              <option value="Inter">Inter (Modern & Readable)</option>
-              <option value="Roboto">Roboto (Google System)</option>
-              <option value="Open Sans">Open Sans (Clean & Friendly)</option>
-              <option value="Source Sans Pro">Source Sans Pro (Adobe)</option>
-              <option value="Noto Sans">Noto Sans (Universal)</option>
-              <option value="SF Pro Display">SF Pro Display (Apple)</option>
-              <option value="Ubuntu">Ubuntu (Modern)</option>
-              <option value="Montserrat">Montserrat (Stylish & Modern)</option>
-              <option value="Poppins">Poppins (Clean & Geometric)</option>
-              <option value="Raleway">Raleway (Elegant & Light)</option>
-              <option value="Lato">Lato (Friendly & Readable)</option>
-              <option value="Nunito">Nunito (Rounded & Friendly)</option>
-              <option value="Quicksand">Quicksand (Modern & Rounded)</option>
-              <option value="Arial">Arial (Classic)</option>
-              <option value="Helvetica">Helvetica (Classic)</option>
-            </select>
-          </div>
-
-          {/* Text Transform */}
-          <div style={controlContainerStyle}>
-            <label style={labelStyle}>
-              Text Transform
-            </label>
-            <select
-              value={style.textTransform || 'none'}
-              onChange={(e) => onStyleUpdate({ textTransform: e.target.value as 'none' | 'capitalize' | 'uppercase' | 'lowercase' })}
-              style={{
-                width: '100%',
-                padding: '8px 10px',
-                backgroundColor: theme.colors.surface,
-                color: theme.colors.text,
-                border: `1px solid ${theme.colors.border}`,
-                borderRadius: '8px',
-                fontSize: '10px',
-                transition: 'all 0.2s ease',
-                outline: 'none'
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = theme.colors.borderFocus || theme.colors.primary;
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = theme.colors.border;
-              }}
-            >
-              <option value="none">None</option>
-              <option value="capitalize">Capitalize</option>
-              <option value="uppercase">Uppercase</option>
-              <option value="lowercase">Lowercase</option>
-            </select>
-          </div>
-
-          {/* Stroke Width */}
-          <div style={controlContainerStyle}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '6px'
-            }}>
-              <label style={labelStyle}>
-                Stroke Width
-              </label>
-              <span style={valueDisplayStyle}>
-                {style.strokeWidth || 0}px
-              </span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="10"
-              step="0.5"
-              value={style.strokeWidth || 0}
-              onChange={(e) => onStyleUpdate({ strokeWidth: parseFloat(e.target.value) })}
-              style={{
-                width: '100%',
-                height: '6px',
-                borderRadius: '3px',
-                background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${((style.strokeWidth || 0) / 10) * 100}%, ${theme.colors.border} ${((style.strokeWidth || 0) / 10) * 100}%, ${theme.colors.border} 100%)`,
-                outline: 'none',
-                appearance: 'none',
-                cursor: 'pointer',
-                WebkitAppearance: 'none',
-                MozAppearance: 'none'
-              }}
-            />
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              marginTop: '6px',
-              fontSize: '9px',
-              color: theme.colors.textSecondary,
-              fontWeight: '500'
-            }}>
-              <span>0px</span>
-              <span>10px</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Colors */}
-        <div style={{ marginBottom: '20px' }}>
-          <SectionHeader 
-            icon={<FiDroplet size={12} color={theme.colors.accentForeground} />}
-            title="Colors"
-          />
-          
-          {/* Text Color */}
-          <div style={controlContainerStyle}>
-            <label style={labelStyle}>
-              Text Color
-            </label>
-            <input
-              type="color"
-              value={style.textColor || '#ffffff'}
-              onChange={(e) => onStyleUpdate({ textColor: e.target.value })}
-              style={{
-                width: '100%',
-                height: '30px',
-                border: `1px solid ${theme.colors.border}`,
-                borderRadius: '8px',
-                cursor: 'pointer'
-              }}
-            />
-          </div>
-
-          {/* Highlight Color */}
-          <div style={controlContainerStyle}>
-            <label style={labelStyle}>
-              Highlight Color
-            </label>
-            <input
-              type="color"
-              value={style.highlighterColor || '#ffff00'}
-              onChange={(e) => onStyleUpdate({ highlighterColor: e.target.value })}
-              style={{
-                width: '100%',
-                height: '30px',
-                border: `1px solid ${theme.colors.border}`,
-                borderRadius: '8px',
-                cursor: 'pointer'
-              }}
-            />
-          </div>
-
-          {/* Background Color */}
-          <div style={controlContainerStyle}>
-            <label style={labelStyle}>
-              Background Color
-            </label>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <input
-                type="color"
-                value={style.backgroundColor === 'transparent' ? '#000000' : (style.backgroundColor || '#80000000')}
-                onChange={(e) => onStyleUpdate({ backgroundColor: e.target.value })}
-                style={{
-                  flex: 1,
-                  height: '30px',
-                  border: `1px solid ${theme.colors.border}`,
-                  borderRadius: '8px',
-                  cursor: 'pointer'
-                }}
-              />
-              <button
-                onClick={() => onStyleUpdate({ backgroundColor: 'transparent' })}
-                style={{
-                  padding: '6px 10px',
-                  backgroundColor: style.backgroundColor === 'transparent' 
-                    ? theme.colors.primary 
-                    : theme.colors.background,
-                  color: style.backgroundColor === 'transparent' 
-                    ? theme.colors.primaryForeground 
-                    : theme.colors.text,
-                  border: `1px solid ${style.backgroundColor === 'transparent' 
-                    ? theme.colors.primary 
-                    : theme.colors.border}`,
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '10px',
-                  fontWeight: '500',
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseEnter={(e) => {
-                  if (style.backgroundColor !== 'transparent') {
-                    e.currentTarget.style.backgroundColor = theme.colors.surfaceHover || theme.colors.background;
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (style.backgroundColor !== 'transparent') {
-                    e.currentTarget.style.backgroundColor = theme.colors.background;
-                  }
-                }}
-              >
-                Transparent
-              </button>
-            </div>
-          </div>
-
-          {/* Stroke Color */}
-          <div style={controlContainerStyle}>
-            <label style={labelStyle}>
-              Stroke Color
-            </label>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <input
-                type="color"
-                value={style.strokeColor || '#000000'}
-                onChange={(e) => onStyleUpdate({ strokeColor: e.target.value })}
-                style={{
-                  flex: 1,
-                  height: '30px',
-                  border: `1px solid ${theme.colors.border}`,
-                  borderRadius: '8px',
-                  cursor: 'pointer'
-                }}
-              />
-              <button
-                onClick={() => onStyleUpdate({ strokeColor: 'transparent' })}
-                style={{
-                  padding: '6px 10px',
-                  backgroundColor: (style.strokeColor || '#000000') === 'transparent' 
-                    ? theme.colors.primary 
-                    : theme.colors.background,
-                  color: (style.strokeColor || '#000000') === 'transparent' 
-                    ? theme.colors.primaryForeground 
-                    : theme.colors.text,
-                  border: `1px solid ${(style.strokeColor || '#000000') === 'transparent' 
-                    ? theme.colors.primary 
-                    : theme.colors.border}`,
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '10px',
-                  fontWeight: '500',
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseEnter={(e) => {
-                  if ((style.strokeColor || '#000000') !== 'transparent') {
-                    e.currentTarget.style.backgroundColor = theme.colors.surfaceHover || theme.colors.background;
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if ((style.strokeColor || '#000000') !== 'transparent') {
-                    e.currentTarget.style.backgroundColor = theme.colors.background;
-                  }
-                }}
-              >
-                Transparent
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Position Controls */}
-        <div style={{ marginBottom: '20px' }}>
-          <SectionHeader 
-            icon={<FiMove size={12} color={theme.colors.accentForeground} />}
-            title="Position"
-          />
-          
-          {/* X Position */}
-          <div style={controlContainerStyle}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '6px'
-            }}>
-              <label style={labelStyle}>
-                X Position (Left/Right)
-              </label>
-              <span style={valueDisplayStyle}>
-                {Math.round(style.position?.x || 50)}%
-              </span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={style.position?.x || 50}
-              onChange={(e) => onStyleUpdate({ 
-                position: { ...(style.position || { x: 50, y: 80, z: 0 }), x: parseFloat(e.target.value) }
-              })}
-              style={{
-                width: '100%',
-                height: '6px',
-                borderRadius: '3px',
-                background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${(style.position?.x || 50)}%, ${theme.colors.border} ${(style.position?.x || 50)}%, ${theme.colors.border} 100%)`,
-                outline: 'none',
-                appearance: 'none',
-                cursor: 'pointer',
-                WebkitAppearance: 'none',
-                MozAppearance: 'none'
-              }}
-            />
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              marginTop: '6px',
-              fontSize: '9px',
-              color: theme.colors.textSecondary,
-              fontWeight: '500'
-            }}>
-              <span>0%</span>
-              <span>100%</span>
-            </div>
-          </div>
-
-          {/* Y Position */}
-          <div style={controlContainerStyle}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '6px'
-            }}>
-              <label style={labelStyle}>
-                Y Position (Top/Bottom)
-              </label>
-              <span style={valueDisplayStyle}>
-                {Math.round(style.position?.y || 80)}%
-              </span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={style.position?.y || 80}
-              onChange={(e) => onStyleUpdate({ 
-                position: { ...(style.position || { x: 50, y: 80, z: 0 }), y: parseFloat(e.target.value) }
-              })}
-              style={{
-                width: '100%',
-                height: '6px',
-                borderRadius: '3px',
-                background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${(style.position?.y || 80)}%, ${theme.colors.border} ${(style.position?.y || 80)}%, ${theme.colors.border} 100%)`,
-                outline: 'none',
-                appearance: 'none',
-                cursor: 'pointer',
-                WebkitAppearance: 'none',
-                MozAppearance: 'none'
-              }}
-            />
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              marginTop: '6px',
-              fontSize: '9px',
-              color: theme.colors.textSecondary,
-              fontWeight: '500'
-            }}>
-              <span>0%</span>
-              <span>100%</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Behavior Settings */}
-        <div style={{ marginBottom: '20px' }}>
-          <SectionHeader 
-            icon={<FiSettings size={12} color={theme.colors.accentForeground} />}
-            title="Behavior"
-          />
-          
-          {/* Emphasis Mode Checkbox */}
-          <div style={{ 
+        {/* Burn-in Subtitles Toggle - Top */}
+        <div style={{ 
+          marginBottom: '16px',
+          padding: '16px 20px',
+          backgroundColor: '#e3f2fd',
+          borderRadius: '10px',
+          border: `2px solid ${theme.colors.primary}`,
+          boxShadow: '0 3px 8px rgba(25, 118, 210, 0.1)'
+        }}>
+          <label style={{ 
             display: 'flex', 
-            alignItems: 'flex-start', 
-            gap: '12px', 
-            padding: '12px',
-            backgroundColor: theme.colors.background,
-            border: `1px solid ${theme.colors.border}`,
-            borderRadius: '8px',
-            marginBottom: '6px'
+            alignItems: 'center', 
+            gap: '8px',
+            fontSize: '12px',
+            fontWeight: '500',
+            color: theme.colors.primary,
+            cursor: 'pointer'
           }}>
             <input
               type="checkbox"
-              id="emphasizeMode"
-              checked={style.emphasizeMode || false}
-              onChange={(e) => onStyleUpdate({ emphasizeMode: e.target.checked })}
-              style={{
-                width: '16px',
-                height: '16px',
-                marginTop: '2px',
-                accentColor: theme.colors.primary
-              }}
-            />
-            <div style={{ flex: 1 }}>
-              <label htmlFor="emphasizeMode" style={{
-                fontSize: '11px',
-                fontWeight: '500',
-                color: theme.colors.text,
-                cursor: 'pointer',
-                display: 'block',
-                marginBottom: '2px'
-              }}>
-                Emphasis Mode
-              </label>
-              <div style={{
-                fontSize: '10px',
-                color: theme.colors.textSecondary,
-                lineHeight: '1.3'
-              }}>
-                {style.emphasizeMode 
-                  ? 'Highlighted words will be emphasized (larger + color change)'
-                  : 'Highlighted words will have background highlighting'
-                }
-              </div>
-            </div>
-          </div>
-
-          {/* Burn-in Subtitles Checkbox */}
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'flex-start', 
-            gap: '12px', 
-            padding: '12px',
-            backgroundColor: theme.colors.background,
-            border: `1px solid ${theme.colors.border}`,
-            borderRadius: '8px'
-          }}>
-            <input
-              type="checkbox"
-              id="burnInSubtitles"
               checked={style.burnInSubtitles !== false}
               onChange={(e) => onStyleUpdate({ burnInSubtitles: e.target.checked })}
               style={{
                 width: '16px',
                 height: '16px',
-                marginTop: '2px',
                 accentColor: theme.colors.primary
               }}
             />
-            <div style={{ flex: 1 }}>
-              <label htmlFor="burnInSubtitles" style={{
+            Burn-in Subtitles
+          </label>
+        </div>
+
+        {/* Render Mode & Emphasis */}
+        <div style={{ 
+          marginBottom: '16px',
+          padding: '16px 20px',
+          backgroundColor: '#e3f2fd',
+          borderRadius: '10px',
+          border: `2px solid ${theme.colors.primary}`,
+          boxShadow: '0 3px 8px rgba(25, 118, 210, 0.1)'
+        }}>
+          <div style={{ 
+            fontSize: '12px', 
+            fontWeight: '600', 
+            color: theme.colors.primary, 
+            marginBottom: '12px' 
+          }}>
+            Animation Style
+          </div>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+            <button
+              onClick={() => onStyleUpdate({ renderMode: 'horizontal' })}
+              style={{
+                flex: 1,
+                padding: '10px',
+                backgroundColor: style.renderMode === 'horizontal' ? theme.colors.primary : '#ffffff',
+                color: style.renderMode === 'horizontal' ? '#ffffff' : theme.colors.text,
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: '6px',
                 fontSize: '11px',
                 fontWeight: '500',
-                color: theme.colors.text,
                 cursor: 'pointer',
-                display: 'block',
-                marginBottom: '2px'
+                transition: 'all 0.2s ease'
+              }}
+            >
+              Horizontal
+            </button>
+            <button
+              onClick={() => onStyleUpdate({ renderMode: 'progressive' })}
+              style={{
+                flex: 1,
+                padding: '10px',
+                backgroundColor: style.renderMode === 'progressive' ? theme.colors.primary : '#ffffff',
+                color: style.renderMode === 'progressive' ? '#ffffff' : theme.colors.text,
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: '6px',
+                fontSize: '11px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              Progressive
+            </button>
+          </div>
+          
+          {/* Emphasis Mode Toggle */}
+          <label style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '8px',
+            fontSize: '11px',
+            color: theme.colors.primary,
+            cursor: 'pointer'
+          }}>
+            <input
+              type="checkbox"
+              checked={style.emphasizeMode || false}
+              onChange={(e) => onStyleUpdate({ emphasizeMode: e.target.checked })}
+              style={{
+                width: '14px',
+                height: '14px',
+                accentColor: theme.colors.primary
+              }}
+            />
+            Emphasis Mode
+          </label>
+        </div>
+
+        {/* Typography Row */}
+        <div style={{ 
+          marginBottom: '16px',
+          padding: '16px 20px',
+          backgroundColor: '#e3f2fd',
+          borderRadius: '10px',
+          border: `2px solid ${theme.colors.primary}`,
+          boxShadow: '0 3px 8px rgba(25, 118, 210, 0.1)'
+        }}>
+          <div style={{ 
+            fontSize: '12px', 
+            fontWeight: '600', 
+            color: theme.colors.primary, 
+            marginBottom: '12px' 
+          }}>
+            Typography
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => openModal('font')}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                padding: '12px 16px',
+                backgroundColor: '#ffffff',
+                color: theme.colors.text,
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '10px',
+                fontWeight: '500',
+                gap: '4px',
+                minWidth: '85px',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '4px',
+                fontWeight: '600' 
               }}>
-                Burn-in Subtitles
-              </label>
+                <FiType size={14} />
+                <span>{style.font}</span>
+              </div>
+              <div>Font</div>
+            </button>
+            <button
+              onClick={() => openModal('fontSize')}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                padding: '12px 16px',
+                backgroundColor: '#ffffff',
+                color: theme.colors.text,
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '10px',
+                fontWeight: '500',
+                gap: '4px',
+                minWidth: '85px',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <div style={{ fontWeight: '600' }}>{style.fontSize}px</div>
+              <div>Size</div>
+            </button>
+            <button
+              onClick={() => openModal('textTransform')}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                padding: '12px 16px',
+                backgroundColor: '#ffffff',
+                color: theme.colors.text,
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '10px',
+                fontWeight: '500',
+                gap: '4px',
+                minWidth: '85px',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <div style={{ fontWeight: '600' }}>{style.textTransform || 'none'}</div>
+              <div>Transform</div>
+            </button>
+            <button
+              onClick={() => openModal('textAlign')}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                padding: '12px 16px',
+                backgroundColor: '#ffffff',
+                color: theme.colors.text,
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '10px',
+                fontWeight: '500',
+                gap: '4px',
+                minWidth: '85px',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <div style={{ fontWeight: '600' }}>
+                {style.textAlign === 'left' ? <FiAlignLeft size={14} /> : 
+                 style.textAlign === 'right' ? <FiAlignRight size={14} /> : 
+                 <FiAlignCenter size={14} />}
+              </div>
+              <div>Align</div>
+            </button>
+            <button
+              onClick={() => openModal('strokeWidth')}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                padding: '12px 16px',
+                backgroundColor: '#ffffff',
+                color: theme.colors.text,
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '10px',
+                fontWeight: '500',
+                gap: '4px',
+                minWidth: '85px',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <div style={{ fontWeight: '600' }}>{style.strokeWidth || 0}px</div>
+              <div>Stroke Width</div>
+            </button>
+          </div>
+        </div>
+
+        {/* Colors Row */}
+        <div style={{ 
+          marginBottom: '16px',
+          padding: '16px 20px',
+          backgroundColor: '#e3f2fd',
+          borderRadius: '10px',
+          border: `2px solid ${theme.colors.primary}`,
+          boxShadow: '0 3px 8px rgba(25, 118, 210, 0.1)'
+        }}>
+          <div style={{ 
+            fontSize: '12px', 
+            fontWeight: '600', 
+            color: theme.colors.primary, 
+            marginBottom: '12px' 
+          }}>
+            Colors
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <CompactButton
+              icon={<div style={{ 
+                width: '14px', 
+                height: '14px', 
+                backgroundColor: style.textColor, 
+                borderRadius: '3px',
+                border: '2px solid #ddd',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+              }} />}
+              label="Text"
+              onClick={() => openModal('textColor')}
+            />
+            <CompactButton
+              icon={<div style={{ 
+                width: '14px', 
+                height: '14px', 
+                backgroundColor: style.highlighterColor, 
+                borderRadius: '3px',
+                border: '2px solid #ddd',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+              }} />}
+              label="Highlight"
+              onClick={() => openModal('highlighterColor')}
+            />
+            <CompactButton
+              icon={<div style={{ 
+                width: '14px', 
+                height: '14px', 
+                backgroundColor: style.backgroundColor, 
+                borderRadius: '3px',
+                border: '2px solid #ddd',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+              }} />}
+              label="Background"
+              onClick={() => openModal('backgroundColor')}
+            />
+            <CompactButton
+              icon={<div style={{ 
+                width: '14px', 
+                height: '14px', 
+                backgroundColor: style.strokeColor, 
+                borderRadius: '3px',
+                border: '2px solid #ddd',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+              }} />}
+              label="Stroke"
+              onClick={() => openModal('strokeColor')}
+            />
+          </div>
+        </div>
+
+        {/* Position Row */}
+        <div style={{ 
+          marginBottom: '16px',
+          padding: '16px 20px',
+          backgroundColor: '#e3f2fd',
+          borderRadius: '10px',
+          border: `2px solid ${theme.colors.primary}`,
+          boxShadow: '0 3px 8px rgba(25, 118, 210, 0.1)'
+        }}>
+          <div style={{ 
+            fontSize: '12px', 
+            fontWeight: '600', 
+            color: theme.colors.primary, 
+            marginBottom: '12px' 
+          }}>
+            Position
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => openModal('position')}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                padding: '12px 16px',
+                backgroundColor: '#ffffff',
+                color: theme.colors.text,
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '10px',
+                fontWeight: '500',
+                gap: '4px',
+                minWidth: '85px',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <div style={{ fontWeight: '600' }}>{(style.position?.x || 50).toFixed(1)}, {(style.position?.y || 80).toFixed(1)}</div>
+              <div>Position</div>
+            </button>
+            <button
+              onClick={() => openModal('rotation')}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                padding: '12px 16px',
+                backgroundColor: '#ffffff',
+                color: theme.colors.text,
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '10px',
+                fontWeight: '500',
+                gap: '4px',
+                minWidth: '85px',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <div style={{ fontWeight: '600' }}>{style.position?.z || 0}°</div>
+              <div>Rotation</div>
+            </button>
+          </div>
+        </div>
+
+        {/* All Modals */}
+
+        {/* Font Modal */}
+        <Modal 
+          isOpen={openModalState === 'font'} 
+          onClose={handleCancel} 
+          title="Font Family"
+        >
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+            {Object.values(FontOption).map((font) => (
+              <button
+                key={font}
+                onClick={() => updateTempStyle({ font })}
+                style={{
+                  padding: '12px',
+                  backgroundColor: tempStyle.font === font ? theme.colors.primary : theme.colors.background,
+                  color: tempStyle.font === font ? theme.colors.primaryForeground : theme.colors.text,
+                  border: `1px solid ${theme.colors.border}`,
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  fontFamily: font
+                }}
+              >
+                {font}
+              </button>
+            ))}
+          </div>
+        </Modal>
+
+        {/* Font Size Modal */}
+        <Modal 
+          isOpen={openModalState === 'fontSize'} 
+          onClose={handleCancel} 
+          title="Font Size"
+        >
+          <div style={{ marginBottom: '16px' }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '8px'
+            }}>
+              <span style={{ fontSize: '12px', color: theme.colors.text }}>Size</span>
+              <span style={{ fontSize: '12px', fontWeight: '600', color: theme.colors.primary }}>
+                {tempStyle.fontSize}px
+              </span>
+            </div>
+            <div style={{
+              padding: '12px',
+              backgroundColor: '#ffffff',
+              borderRadius: '8px',
+              border: `1px solid ${theme.colors.border}`
+            }}>
+              {/* Custom draggable slider */}
+              <div style={{ position: 'relative', height: '40px' }}>
+                {/* Track background */}
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: 0,
+                  right: 0,
+                  height: '6px',
+                  backgroundColor: theme.colors.border,
+                  borderRadius: '3px',
+                  transform: 'translateY(-50%)'
+                }} />
+                
+                {/* Active track */}
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: 0,
+                  width: `${((tempStyle.fontSize - 16) / (200 - 16)) * 100}%`,
+                  height: '6px',
+                  backgroundColor: theme.colors.primary,
+                  borderRadius: '3px',
+                  transform: 'translateY(-50%)'
+                }} />
+                
+                {/* Clickable track for direct positioning */}
+                <div 
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: '40px',
+                    cursor: 'pointer'
+                  }}
+                  onClick={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const clickX = e.clientX - rect.left;
+                    const percentage = Math.max(0, Math.min(1, clickX / rect.width));
+                    const newValue = Math.round(16 + percentage * (200 - 16));
+                    updateTempStyle({ fontSize: newValue });
+                  }}
+                />
+                
+                {/* Draggable thumb */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: `${((tempStyle.fontSize - 16) / (200 - 16)) * 100}%`,
+                    width: '20px',
+                    height: '20px',
+                    backgroundColor: theme.colors.primary,
+                    borderRadius: '50%',
+                    border: '3px solid #ffffff',
+                    transform: 'translate(-50%, -50%)',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                    cursor: 'grab',
+                    zIndex: 5,
+                    transition: 'transform 0.1s ease'
+                  }}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    const thumb = e.currentTarget as HTMLElement;
+                    thumb.style.cursor = 'grabbing';
+                    
+                    const container = thumb.parentElement;
+                    if (!container) return;
+                    
+                    const containerRect = container.getBoundingClientRect();
+                    
+                    const handleMouseMove = (moveEvent: MouseEvent) => {
+                      const mouseX = moveEvent.clientX - containerRect.left;
+                      const percentage = Math.max(0, Math.min(1, mouseX / containerRect.width));
+                      const newValue = Math.round(16 + percentage * (200 - 16));
+                      updateTempStyle({ fontSize: newValue });
+                    };
+                    
+                    const handleMouseUp = () => {
+                      thumb.style.cursor = 'grab';
+                      document.removeEventListener('mousemove', handleMouseMove);
+                      document.removeEventListener('mouseup', handleMouseUp);
+                    };
+                    
+                    document.addEventListener('mousemove', handleMouseMove);
+                    document.addEventListener('mouseup', handleMouseUp);
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1)';
+                  }}
+                />
+              </div>
               <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                marginTop: '8px',
                 fontSize: '10px',
                 color: theme.colors.textSecondary,
-                lineHeight: '1.3'
+                fontWeight: '500'
               }}>
-                {style.burnInSubtitles !== false
-                  ? 'Subtitles will be permanently embedded in the exported video'
-                  : 'Subtitles will not appear in the exported video (SRT file only)'
-                }
+                <span>16</span>
+                <span>200</span>
               </div>
             </div>
           </div>
-        </div>
+        </Modal>
+
+        {/* Text Transform Modal */}
+        <Modal 
+          isOpen={openModalState === 'textTransform'} 
+          onClose={handleCancel} 
+          title="Text Transform"
+        >
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+            {['none', 'capitalize', 'uppercase', 'lowercase'].map((transform) => (
+              <button
+                key={transform}
+                onClick={() => updateTempStyle({ textTransform: transform as any })}
+                style={{
+                  padding: '12px',
+                  backgroundColor: tempStyle.textTransform === transform ? theme.colors.primary : theme.colors.background,
+                  color: tempStyle.textTransform === transform ? theme.colors.primaryForeground : theme.colors.text,
+                  border: `1px solid ${theme.colors.border}`,
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  textTransform: transform as any
+                }}
+              >
+                {transform === 'none' ? 'Normal' : transform}
+              </button>
+            ))}
+          </div>
+        </Modal>
+
+        {/* Text Align Modal */}
+        <Modal 
+          isOpen={openModalState === 'textAlign'} 
+          onClose={handleCancel} 
+          title="Text Alignment"
+        >
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {[
+              { value: 'left', icon: <FiAlignLeft size={16} />, label: 'Left' },
+              { value: 'center', icon: <FiAlignCenter size={16} />, label: 'Center' },
+              { value: 'right', icon: <FiAlignRight size={16} />, label: 'Right' }
+            ].map(({ value, icon, label }) => (
+              <button
+                key={value}
+                onClick={() => updateTempStyle({ textAlign: value as any })}
+                style={{
+                  flex: 1,
+                  padding: '16px',
+                  backgroundColor: tempStyle.textAlign === value ? theme.colors.primary : theme.colors.background,
+                  color: tempStyle.textAlign === value ? theme.colors.primaryForeground : theme.colors.text,
+                  border: `1px solid ${theme.colors.border}`,
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                {icon}
+                {label}
+              </button>
+            ))}
+          </div>
+        </Modal>
+
+        {/* Color Modals with Opacity */}
+        {['textColor', 'highlighterColor', 'backgroundColor', 'strokeColor'].map((colorType) => {
+          const opacityKey = `${colorType}Opacity` as keyof SubtitleStyle;
+          const currentOpacity = (tempStyle as any)[opacityKey] || 100;
+          
+          return (
+            <Modal 
+              key={colorType}
+              isOpen={openModalState === colorType} 
+              onClose={handleCancel} 
+              title={colorType.replace('Color', '').replace(/([A-Z])/g, ' $1').replace(/^\w/, c => c.toUpperCase()) + ' Color'}
+            >
+              <div style={{ marginBottom: '20px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '16px' }}>
+                  {Object.values(ColorOption).map((color) => (
+                    <button
+                      key={color}
+                      onClick={() => updateTempStyle({ [colorType]: color })}
+                      style={{
+                        width: '40px',
+                        height: '40px',
+                        backgroundColor: color === 'transparent' ? 'transparent' : color,
+                        border: color === 'transparent' 
+                          ? '2px dashed #ccc' 
+                          : `3px solid ${(tempStyle as any)[colorType] === color ? theme.colors.primary : '#ddd'}`,
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        position: 'relative',
+                        boxShadow: color !== 'transparent' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
+                      }}
+                    >
+                      {color === 'transparent' && (
+                        <div style={{
+                          position: 'absolute',
+                          top: '50%',
+                          left: '50%',
+                          transform: 'translate(-50%, -50%)',
+                          fontSize: '8px',
+                          color: '#666',
+                          fontWeight: '500'
+                        }}>
+                          None
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Opacity Slider */}
+                <div>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '8px'
+                  }}>
+                    <label style={{
+                      fontSize: '12px',
+                      fontWeight: '500',
+                      color: theme.colors.text
+                    }}>
+                      Opacity
+                    </label>
+                    <span style={{
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      color: theme.colors.primary
+                    }}>
+                      {currentOpacity}%
+                    </span>
+                  </div>
+                  <div style={{
+                    padding: '12px',
+                    backgroundColor: '#ffffff',
+                    borderRadius: '8px',
+                    border: `1px solid ${theme.colors.border}`
+                  }}>
+                    {/* Custom draggable slider */}
+                    <div style={{ position: 'relative', height: '30px' }}>
+                      {/* Track background */}
+                      <div style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: 0,
+                        right: 0,
+                        height: '4px',
+                        backgroundColor: theme.colors.border,
+                        borderRadius: '2px',
+                        transform: 'translateY(-50%)'
+                      }} />
+                      
+                      {/* Active track */}
+                      <div style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: 0,
+                        width: `${currentOpacity}%`,
+                        height: '4px',
+                        backgroundColor: theme.colors.primary,
+                        borderRadius: '2px',
+                        transform: 'translateY(-50%)'
+                      }} />
+                      
+                      {/* Clickable track for direct positioning */}
+                      <div 
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          height: '30px',
+                          cursor: 'pointer'
+                        }}
+                        onClick={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const clickX = e.clientX - rect.left;
+                          const percentage = Math.max(0, Math.min(100, Math.round((clickX / rect.width) * 100)));
+                          // Create explicit update object instead of computed property
+                          const opacityUpdate: Partial<SubtitleStyle> = {};
+                          if (colorType === 'textColor') {
+                            opacityUpdate.textColorOpacity = percentage;
+                          } else if (colorType === 'highlighterColor') {
+                            opacityUpdate.highlighterColorOpacity = percentage;
+                          } else if (colorType === 'backgroundColor') {
+                            opacityUpdate.backgroundColorOpacity = percentage;
+                          } else if (colorType === 'strokeColor') {
+                            opacityUpdate.strokeColorOpacity = percentage;
+                          }
+                          
+                          updateTempStyle(opacityUpdate);
+                        }}
+                      />
+                      
+                      {/* Draggable thumb */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '50%',
+                          left: `${currentOpacity}%`,
+                          width: '16px',
+                          height: '16px',
+                          backgroundColor: theme.colors.primary,
+                          borderRadius: '50%',
+                          border: '2px solid #ffffff',
+                          transform: 'translate(-50%, -50%)',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                          cursor: 'grab',
+                          zIndex: 5,
+                          transition: 'transform 0.1s ease'
+                        }}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          
+                          const thumb = e.currentTarget as HTMLElement;
+                          thumb.style.cursor = 'grabbing';
+                          
+                          const container = thumb.parentElement;
+                          if (!container) return;
+                          
+                          const containerRect = container.getBoundingClientRect();
+                          
+                          const handleMouseMove = (moveEvent: MouseEvent) => {
+                            const mouseX = moveEvent.clientX - containerRect.left;
+                            const percentage = Math.max(0, Math.min(100, Math.round((mouseX / containerRect.width) * 100)));
+                            
+                            // Create explicit update object instead of computed property
+                            const opacityUpdate: Partial<SubtitleStyle> = {};
+                            if (colorType === 'textColor') {
+                              opacityUpdate.textColorOpacity = percentage;
+                            } else if (colorType === 'highlighterColor') {
+                              opacityUpdate.highlighterColorOpacity = percentage;
+                            } else if (colorType === 'backgroundColor') {
+                              opacityUpdate.backgroundColorOpacity = percentage;
+                            } else if (colorType === 'strokeColor') {
+                              opacityUpdate.strokeColorOpacity = percentage;
+                            }
+                            
+                            updateTempStyle(opacityUpdate);
+                          };
+                          
+                          const handleMouseUp = () => {
+                            thumb.style.cursor = 'grab';
+                            document.removeEventListener('mousemove', handleMouseMove);
+                            document.removeEventListener('mouseup', handleMouseUp);
+                          };
+                          
+                          document.addEventListener('mousemove', handleMouseMove);
+                          document.addEventListener('mouseup', handleMouseUp);
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1.1)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1)';
+                        }}
+                      />
+                    </div>
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      marginTop: '4px',
+                      fontSize: '10px',
+                      color: theme.colors.textSecondary,
+                      fontWeight: '500'
+                    }}>
+                      <span>0</span>
+                      <span>100</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Modal>
+          );
+        })}
+
+        {/* Position Modal */}
+        <Modal 
+          isOpen={openModalState === 'position'} 
+          onClose={handleCancel} 
+          title="Position"
+        >
+          <div style={{ padding: '20px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '8px'
+                }}>
+                  <label style={{
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    color: theme.colors.text
+                  }}>
+                    X Position
+                  </label>
+                  <span style={{
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: theme.colors.text
+                  }}>
+                    {tempStyle.position?.x || 50}%
+                  </span>
+                </div>
+                <div style={{
+                  padding: '12px',
+                  backgroundColor: theme.colors.modal.background,
+                  borderRadius: theme.radius.lg,
+                  border: `1px solid ${theme.colors.border}`
+                }}>
+                  {/* Custom draggable slider */}
+                  <div style={{ position: 'relative', height: '40px' }}>
+                    {/* Track background */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: 0,
+                      right: 0,
+                      height: '6px',
+                      backgroundColor: theme.colors.border,
+                      borderRadius: '3px',
+                      transform: 'translateY(-50%)'
+                    }} />
+                    
+                    {/* Active track */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: 0,
+                      width: `${(tempStyle.position?.x || 50)}%`,
+                      height: '6px',
+                      backgroundColor: theme.colors.primary,
+                      borderRadius: '3px',
+                      transform: 'translateY(-50%)'
+                    }} />
+                    
+                    {/* Clickable track */}
+                    <div 
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        height: '40px',
+                        cursor: 'pointer'
+                      }}
+                      onClick={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const clickX = e.clientX - rect.left;
+                        const percentage = Math.max(0, Math.min(100, (clickX / rect.width) * 100));
+                        updateTempStyle({
+                          position: { ...(tempStyle.position || { x: 50, y: 80, z: 0 }), x: Math.round(percentage) }
+                        });
+                      }}
+                    />
+                    
+                    {/* Draggable thumb */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: `${(tempStyle.position?.x || 50)}%`,
+                        width: '20px',
+                        height: '20px',
+                        backgroundColor: theme.colors.primary,
+                        borderRadius: '50%',
+                        border: '3px solid #ffffff',
+                        transform: 'translate(-50%, -50%)',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                        cursor: 'grab',
+                        zIndex: 5,
+                        transition: 'transform 0.1s ease'
+                      }}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        const thumb = e.currentTarget as HTMLElement;
+                        thumb.style.cursor = 'grabbing';
+                        
+                        const container = thumb.parentElement;
+                        if (!container) return;
+                        
+                        const containerRect = container.getBoundingClientRect();
+                        
+                        const handleMouseMove = (moveEvent: MouseEvent) => {
+                          const mouseX = moveEvent.clientX - containerRect.left;
+                          const percentage = Math.max(0, Math.min(100, (mouseX / containerRect.width) * 100));
+                          updateTempStyle({
+                            position: { ...(tempStyle.position || { x: 50, y: 80, z: 0 }), x: Math.round(percentage) }
+                          });
+                        };
+                        
+                        const handleMouseUp = () => {
+                          thumb.style.cursor = 'grab';
+                          document.removeEventListener('mousemove', handleMouseMove);
+                          document.removeEventListener('mouseup', handleMouseUp);
+                        };
+                        
+                        document.addEventListener('mousemove', handleMouseMove);
+                        document.addEventListener('mouseup', handleMouseUp);
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1.1)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1)';
+                      }}
+                    />
+                  </div>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    marginTop: '8px',
+                    fontSize: '12px',
+                    color: theme.colors.textSecondary,
+                    fontWeight: '500'
+                  }}>
+                    <span>0</span>
+                    <span>100</span>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '8px'
+                }}>
+                  <label style={{
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    color: theme.colors.text
+                  }}>
+                    Y Position
+                  </label>
+                  <span style={{
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: theme.colors.text
+                  }}>
+                    {tempStyle.position?.y || 80}%
+                  </span>
+                </div>
+                <div style={{
+                  padding: '12px',
+                  backgroundColor: theme.colors.modal.background,
+                  borderRadius: theme.radius.lg,
+                  border: `1px solid ${theme.colors.border}`
+                }}>
+                  {/* Custom draggable slider */}
+                  <div style={{ position: 'relative', height: '40px' }}>
+                    {/* Track background */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: 0,
+                      right: 0,
+                      height: '6px',
+                      backgroundColor: theme.colors.border,
+                      borderRadius: '3px',
+                      transform: 'translateY(-50%)'
+                    }} />
+                    
+                    {/* Active track */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: 0,
+                      width: `${(tempStyle.position?.y || 80)}%`,
+                      height: '6px',
+                      backgroundColor: theme.colors.primary,
+                      borderRadius: '3px',
+                      transform: 'translateY(-50%)'
+                    }} />
+                    
+                    {/* Clickable track */}
+                    <div 
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        height: '40px',
+                        cursor: 'pointer'
+                      }}
+                      onClick={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const clickX = e.clientX - rect.left;
+                        const percentage = Math.max(0, Math.min(100, (clickX / rect.width) * 100));
+                        updateTempStyle({
+                          position: { ...(tempStyle.position || { x: 50, y: 80, z: 0 }), y: Math.round(percentage) }
+                        });
+                      }}
+                    />
+                    
+                    {/* Draggable thumb */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: `${(tempStyle.position?.y || 80)}%`,
+                        width: '20px',
+                        height: '20px',
+                        backgroundColor: theme.colors.primary,
+                        borderRadius: '50%',
+                        border: '3px solid #ffffff',
+                        transform: 'translate(-50%, -50%)',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                        cursor: 'grab',
+                        zIndex: 5,
+                        transition: 'transform 0.1s ease'
+                      }}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        const thumb = e.currentTarget as HTMLElement;
+                        thumb.style.cursor = 'grabbing';
+                        
+                        const container = thumb.parentElement;
+                        if (!container) return;
+                        
+                        const containerRect = container.getBoundingClientRect();
+                        
+                        const handleMouseMove = (moveEvent: MouseEvent) => {
+                          const mouseX = moveEvent.clientX - containerRect.left;
+                          const percentage = Math.max(0, Math.min(100, (mouseX / containerRect.width) * 100));
+                          updateTempStyle({
+                            position: { ...(tempStyle.position || { x: 50, y: 80, z: 0 }), y: Math.round(percentage) }
+                          });
+                        };
+                        
+                        const handleMouseUp = () => {
+                          thumb.style.cursor = 'grab';
+                          document.removeEventListener('mousemove', handleMouseMove);
+                          document.removeEventListener('mouseup', handleMouseUp);
+                        };
+                        
+                        document.addEventListener('mousemove', handleMouseMove);
+                        document.addEventListener('mouseup', handleMouseUp);
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1.1)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1)';
+                      }}
+                    />
+                  </div>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    marginTop: '8px',
+                    fontSize: '12px',
+                    color: theme.colors.textSecondary,
+                    fontWeight: '500'
+                  }}>
+                    <span>0</span>
+                    <span>100</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Rotation Modal */}
+        <Modal
+          isOpen={openModalState === 'rotation'}
+          onClose={handleCancel}
+          title="Z-Axis Rotation"
+        >
+          <div style={{ padding: '20px' }}>
+            <div>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '8px'
+              }}>
+                <label style={{
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  color: theme.colors.text
+                }}>
+                  Rotation
+                </label>
+                <span style={{
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: theme.colors.text
+                }}>
+                  {tempStyle.position?.z || 0}°
+                </span>
+              </div>
+              <div style={{
+                padding: '12px',
+                backgroundColor: theme.colors.modal.background,
+                borderRadius: theme.radius.lg,
+                border: `1px solid ${theme.colors.border}`
+              }}>
+                {/* Custom draggable slider */}
+                <div style={{ position: 'relative', height: '40px' }}>
+                  {/* Track background */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: 0,
+                    right: 0,
+                    height: '6px',
+                    backgroundColor: theme.colors.border,
+                    borderRadius: '3px',
+                    transform: 'translateY(-50%)'
+                  }} />
+                  
+                  {/* Active track */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: 0,
+                    width: `${((tempStyle.position?.z || 0) / 360) * 100}%`,
+                    height: '6px',
+                    backgroundColor: theme.colors.primary,
+                    borderRadius: '3px',
+                    transform: 'translateY(-50%)'
+                  }} />
+                  
+                  {/* Clickable track */}
+                  <div 
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: '40px',
+                      cursor: 'pointer'
+                    }}
+                    onClick={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const clickX = e.clientX - rect.left;
+                      const percentage = Math.max(0, Math.min(1, clickX / rect.width));
+                      const newValue = Math.round(percentage * 360);
+                      updateTempStyle({
+                        position: { ...(tempStyle.position || { x: 50, y: 80, z: 0 }), z: newValue }
+                      });
+                    }}
+                  />
+                  
+                  {/* Draggable thumb */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: `${((tempStyle.position?.z || 0) / 360) * 100}%`,
+                      width: '20px',
+                      height: '20px',
+                      backgroundColor: theme.colors.primary,
+                      borderRadius: '50%',
+                      border: '3px solid #ffffff',
+                      transform: 'translate(-50%, -50%)',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                      cursor: 'grab',
+                      zIndex: 5,
+                      transition: 'transform 0.1s ease'
+                    }}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      
+                      const thumb = e.currentTarget as HTMLElement;
+                      thumb.style.cursor = 'grabbing';
+                      
+                      const container = thumb.parentElement;
+                      if (!container) return;
+                      
+                      const containerRect = container.getBoundingClientRect();
+                      
+                      const handleMouseMove = (moveEvent: MouseEvent) => {
+                        const mouseX = moveEvent.clientX - containerRect.left;
+                        const percentage = Math.max(0, Math.min(1, mouseX / containerRect.width));
+                        const newValue = Math.round(percentage * 360);
+                        updateTempStyle({
+                          position: { ...(tempStyle.position || { x: 50, y: 80, z: 0 }), z: newValue }
+                        });
+                      };
+                      
+                      const handleMouseUp = () => {
+                        thumb.style.cursor = 'grab';
+                        document.removeEventListener('mousemove', handleMouseMove);
+                        document.removeEventListener('mouseup', handleMouseUp);
+                      };
+                      
+                      document.addEventListener('mousemove', handleMouseMove);
+                      document.addEventListener('mouseup', handleMouseUp);
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1)';
+                    }}
+                  />
+                </div>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  marginTop: '8px',
+                  fontSize: '12px',
+                  color: theme.colors.textSecondary,
+                  fontWeight: '500'
+                }}>
+                  <span>0°</span>
+                  <span>360°</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Stroke Width Modal */}
+        <Modal
+          isOpen={openModalState === 'strokeWidth'}
+          onClose={handleCancel}
+          title="Stroke Width"
+        >
+          <div style={{ padding: '20px' }}>
+            <div>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '8px'
+              }}>
+                <label style={{
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  color: theme.colors.text
+                }}>
+                  Width
+                </label>
+                <span style={{
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: theme.colors.text
+                }}>
+                  {tempStyle.strokeWidth || 0}px
+                </span>
+              </div>
+              <div style={{
+                padding: '12px',
+                backgroundColor: theme.colors.modal.background,
+                borderRadius: theme.radius.lg,
+                border: `1px solid ${theme.colors.border}`
+              }}>
+                {/* Custom draggable slider */}
+                <div style={{ position: 'relative', height: '40px' }}>
+                  {/* Track background */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: 0,
+                    right: 0,
+                    height: '6px',
+                    backgroundColor: theme.colors.border,
+                    borderRadius: '3px',
+                    transform: 'translateY(-50%)'
+                  }} />
+                  
+                  {/* Active track */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: 0,
+                    width: `${((tempStyle.strokeWidth || 0) / 10) * 100}%`,
+                    height: '6px',
+                    backgroundColor: theme.colors.primary,
+                    borderRadius: '3px',
+                    transform: 'translateY(-50%)'
+                  }} />
+                  
+                  {/* Clickable track */}
+                  <div 
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: '40px',
+                      cursor: 'pointer'
+                    }}
+                    onClick={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const clickX = e.clientX - rect.left;
+                      const percentage = Math.max(0, Math.min(1, clickX / rect.width));
+                      const newValue = Math.round(percentage * 10);
+                      updateTempStyle({ strokeWidth: newValue });
+                    }}
+                  />
+                  
+                  {/* Draggable thumb */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: `${((tempStyle.strokeWidth || 0) / 10) * 100}%`,
+                      width: '20px',
+                      height: '20px',
+                      backgroundColor: theme.colors.primary,
+                      borderRadius: '50%',
+                      border: '3px solid #ffffff',
+                      transform: 'translate(-50%, -50%)',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                      cursor: 'grab',
+                      zIndex: 5,
+                      transition: 'transform 0.1s ease'
+                    }}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      
+                      const thumb = e.currentTarget as HTMLElement;
+                      thumb.style.cursor = 'grabbing';
+                      
+                      const container = thumb.parentElement;
+                      if (!container) return;
+                      
+                      const containerRect = container.getBoundingClientRect();
+                      
+                      const handleMouseMove = (moveEvent: MouseEvent) => {
+                        const mouseX = moveEvent.clientX - containerRect.left;
+                        const percentage = Math.max(0, Math.min(1, mouseX / containerRect.width));
+                        const newValue = Math.round(percentage * 10);
+                        updateTempStyle({ strokeWidth: newValue });
+                      };
+                      
+                      const handleMouseUp = () => {
+                        thumb.style.cursor = 'grab';
+                        document.removeEventListener('mousemove', handleMouseMove);
+                        document.removeEventListener('mouseup', handleMouseUp);
+                      };
+                      
+                      document.addEventListener('mousemove', handleMouseMove);
+                      document.addEventListener('mouseup', handleMouseUp);
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1)';
+                    }}
+                  />
+                </div>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  marginTop: '8px',
+                  fontSize: '12px',
+                  color: theme.colors.textSecondary,
+                  fontWeight: '500'
+                }}>
+                  <span>0</span>
+                  <span>10</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Modal>
 
       </div>
     </>

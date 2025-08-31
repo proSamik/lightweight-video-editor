@@ -594,7 +594,7 @@ export class FFmpegOverlayRenderer {
     return new Promise((resolve, reject) => {
       // Create concat file
       const concatFile = path.join(path.dirname(outputPath), 'chunks_concat.txt');
-      const concatContent = chunkPaths.map(file => `file '${path.resolve(file)}'`).join('\n');
+      const concatContent = chunkPaths.map(file => `file '${path.resolve(file).replace(/'/g, "'\"'\"'")}'`).join('\n');
       
       fs.writeFileSync(concatFile, concatContent);
       
@@ -1093,14 +1093,14 @@ export class FFmpegOverlayRenderer {
         if (overlay.startTime > currentTime) {
           const gapDurationMs = overlay.startTime - currentTime;
           const gapDurationSec = gapDurationMs / 1000; // Convert to seconds for FFmpeg
-          concatContent += `file '${transparentImagePath}'\n`;
+          concatContent += `file '${transparentImagePath.replace(/'/g, "'\"'\"'")}'\n`;
           concatContent += `duration ${gapDurationSec}\n`;
         }
         
         // Add the overlay segment
         const overlayDurationMs = overlay.endTime - overlay.startTime;
         const overlayDurationSec = overlayDurationMs / 1000; // Convert to seconds for FFmpeg
-        concatContent += `file '${overlay.file}'\n`;
+        concatContent += `file '${overlay.file.replace(/'/g, "'\"'\"'")}'\n`;
         concatContent += `duration ${overlayDurationSec}\n`;
         
         currentTime = overlay.endTime;
@@ -1110,14 +1110,14 @@ export class FFmpegOverlayRenderer {
       if (currentTime < videoDurationMs) {
         const finalGapDurationMs = videoDurationMs - currentTime;
         const finalGapDurationSec = finalGapDurationMs / 1000; // Convert to seconds for FFmpeg
-        concatContent += `file '${transparentImagePath}'\n`;
+        concatContent += `file '${transparentImagePath.replace(/'/g, "'\"'\"'")}'\n`;
         concatContent += `duration ${finalGapDurationSec}\n`;
       }
       
       // FFmpeg concat demuxer needs the last file repeated for the last duration
       if (concatContent) {
         // Add the final frame
-        concatContent += `file '${transparentImagePath}'\n`;
+        concatContent += `file '${transparentImagePath.replace(/'/g, "'\"'\"'")}'\n`;
       }
       
       fs.writeFileSync(concatFile, concatContent);
@@ -2087,7 +2087,7 @@ export class FFmpegOverlayRenderer {
     return new Promise((resolve, reject) => {
       // Create concat file
       const concatFile = path.join(path.dirname(outputPath), 'concat.txt');
-      const concatContent = chunkFiles.map(file => `file '${file}'`).join('\n');
+      const concatContent = chunkFiles.map(file => `file '${file.replace(/'/g, "'\"'\"'")}'`).join('\n');
       
       fs.writeFileSync(concatFile, concatContent);
       
@@ -2950,9 +2950,9 @@ if (!isMainThread && workerData?.isWorker) {
     const scale = caption.style?.scale || 1;
     const fontSize = baseFontSize * scale;
     const fontFamily = mapFontNameInWorker(caption.style?.font || 'Arial');
-    const textColor = parseColorInWorker(caption.style?.textColor || '#ffffff');
-    const backgroundColor = parseColorInWorker(caption.style?.backgroundColor || 'transparent');
-    const strokeColor = parseColorInWorker(caption.style?.strokeColor || 'transparent');
+    const textColor = parseColorInWorker(caption.style?.textColor || '#ffffff', caption.style?.textColorOpacity);
+    const backgroundColor = parseColorInWorker(caption.style?.backgroundColor || 'transparent', caption.style?.backgroundColorOpacity);
+    const strokeColor = parseColorInWorker(caption.style?.strokeColor || 'transparent', caption.style?.strokeColorOpacity);
     const strokeWidth = caption.style?.strokeWidth || 0;
     
     // Apply text transformation
@@ -2966,6 +2966,15 @@ if (!isMainThread && workerData?.isWorker) {
     // Calculate position
     const x = (canvasWidth * caption.style.position.x) / 100;
     const y = (canvasHeight * caption.style.position.y) / 100;
+    const rotation = (caption.style.position.z || 0) * (Math.PI / 180); // Convert degrees to radians
+    
+    // Apply rotation if specified
+    if (rotation !== 0) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(rotation);
+      ctx.translate(-x, -y);
+    }
     
     // Measure text for background box
     const textMetrics = ctx.measureText(displayText);
@@ -3008,6 +3017,11 @@ if (!isMainThread && workerData?.isWorker) {
     ctx.shadowBlur = 0;
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
+    
+    // Restore canvas state if rotation was applied
+    if (rotation !== 0) {
+      ctx.restore();
+    }
   }
   
   /**
@@ -3025,10 +3039,10 @@ if (!isMainThread && workerData?.isWorker) {
     const scale = caption.style?.scale || 1;
     const fontSize = baseFontSize * scale;
     const fontFamily = mapFontNameInWorker(caption.style?.font || 'Arial');
-    const textColor = parseColorInWorker(caption.style?.textColor || '#ffffff');
-    const highlighterColor = parseColorInWorker(caption.style?.highlighterColor || '#ffff00');
-    const backgroundColor = parseColorInWorker(caption.style?.backgroundColor || 'transparent');
-    const strokeColor = parseColorInWorker(caption.style?.strokeColor || 'transparent');
+    const textColor = parseColorInWorker(caption.style?.textColor || '#ffffff', caption.style?.textColorOpacity);
+    const highlighterColor = parseColorInWorker(caption.style?.highlighterColor || '#ffff00', caption.style?.highlighterColorOpacity);
+    const backgroundColor = parseColorInWorker(caption.style?.backgroundColor || 'transparent', caption.style?.backgroundColorOpacity);
+    const strokeColor = parseColorInWorker(caption.style?.strokeColor || 'transparent', caption.style?.strokeColorOpacity);
     const strokeWidth = caption.style?.strokeWidth || 0;
     const textTransform = caption.style?.textTransform || 'none';
     
@@ -3039,6 +3053,15 @@ if (!isMainThread && workerData?.isWorker) {
     
     const x = (canvasWidth * caption.style.position.x) / 100;
     const y = (canvasHeight * caption.style.position.y) / 100;
+    const rotation = (caption.style.position.z || 0) * (Math.PI / 180); // Convert degrees to radians
+    
+    // Apply rotation if specified
+    if (rotation !== 0) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(rotation);
+      ctx.translate(-x, -y);
+    }
     
     // Calculate total width for single line
     const wordSpacing = 12 * scale;
@@ -3144,6 +3167,11 @@ if (!isMainThread && workerData?.isWorker) {
     ctx.shadowBlur = 0;
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
+    
+    // Restore canvas state if rotation was applied
+    if (rotation !== 0) {
+      ctx.restore();
+    }
   }
   
   /**
@@ -3161,9 +3189,9 @@ if (!isMainThread && workerData?.isWorker) {
     const scale = caption.style?.scale || 1;
     const fontSize = baseFontSize * scale;
     const fontFamily = mapFontNameInWorker(caption.style?.font || 'Arial');
-    const textColor = parseColorInWorker(caption.style?.textColor || '#ffffff');
-    const highlighterColor = parseColorInWorker(caption.style?.highlighterColor || '#ffff00');
-    const backgroundColor = parseColorInWorker(caption.style?.backgroundColor || 'transparent');
+    const textColor = parseColorInWorker(caption.style?.textColor || '#ffffff', caption.style?.textColorOpacity);
+    const highlighterColor = parseColorInWorker(caption.style?.highlighterColor || '#ffff00', caption.style?.highlighterColorOpacity);
+    const backgroundColor = parseColorInWorker(caption.style?.backgroundColor || 'transparent', caption.style?.backgroundColorOpacity);
     
     // Set font
     ctx.font = `bold ${fontSize}px ${fontFamily}`;
@@ -3172,6 +3200,15 @@ if (!isMainThread && workerData?.isWorker) {
     
     const x = (canvasWidth * caption.style.position.x) / 100;
     const y = (canvasHeight * caption.style.position.y) / 100;
+    const rotation = (caption.style.position.z || 0) * (Math.PI / 180); // Convert degrees to radians
+    
+    // Apply rotation if specified
+    if (rotation !== 0) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(rotation);
+      ctx.translate(-x, -y);
+    }
     
     // Show words progressively up to the highlighted word
     const visibleWords = words.slice(0, highlightedWordIndex + 1);
@@ -3238,6 +3275,11 @@ if (!isMainThread && workerData?.isWorker) {
       ctx.shadowOffsetX = 0;
       ctx.shadowOffsetY = 0;
     }
+    
+    // Restore canvas state if rotation was applied
+    if (rotation !== 0) {
+      ctx.restore();
+    }
   }
   
   /**
@@ -3270,7 +3312,7 @@ if (!isMainThread && workerData?.isWorker) {
     }
   }
   
-  function parseColorInWorker(color: string): { r: number; g: number; b: number; a: number } {
+  function parseColorInWorker(color: string, opacity?: number): { r: number; g: number; b: number; a: number } {
     if (color === 'transparent') {
       return { r: 0, g: 0, b: 0, a: 0 };
     }
@@ -3279,9 +3321,12 @@ if (!isMainThread && workerData?.isWorker) {
     const r = parseInt(hex.substr(0, 2), 16);
     const g = parseInt(hex.substr(2, 2), 16);
     const b = parseInt(hex.substr(4, 2), 16);
-    const a = hex.length === 8 ? parseInt(hex.substr(6, 2), 16) / 255 : 1;
+    const baseAlpha = hex.length === 8 ? parseInt(hex.substr(6, 2), 16) / 255 : 1;
     
-    return { r, g, b, a };
+    // Apply opacity if provided (convert percentage to decimal)
+    const finalAlpha = opacity !== undefined ? (baseAlpha * (opacity / 100)) : baseAlpha;
+    
+    return { r, g, b, a: finalAlpha };
   }
   
   function applyTextTransformInWorker(text: string, transform?: string): string {
